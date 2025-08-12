@@ -6,10 +6,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_RTSP_H
-#define RTSP_RTSP_H
-namespace lmshao::rtsp {
-void hello();
-}
+#include <iostream>
 
-#endif // RTSP_RTSP_H
+int main()
+{
+    std::cout << "=== RTSP Server Main ===\n";
+    return 0;
+}
