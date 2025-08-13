@@ -11,8 +11,7 @@
 #include <iostream>
 #include <thread>
 
-#include "rtsp_log.h"
-#include "rtsp_server.h"
+#include "rtsp/rtsp_server.h"
 
 using namespace lmshao::rtsp;
 
@@ -22,7 +21,7 @@ std::shared_ptr<RTSPServer> g_server;
 // 信号处理函数
 void signalHandler(int signum)
 {
-    std::cout << "接收到中断信号 (" << signum << ")，正在停止服务器..." << std::endl;
+    std::cout << "Interrupt signal (" << signum << ") received.\n";
 
     // 停止服务器
     if (g_server) {
@@ -52,24 +51,22 @@ int main(int argc, char *argv[])
         port = static_cast<uint16_t>(std::stoi(argv[2]));
     }
 
-    std::cout << "正在初始化RTSP服务器，监听地址: " << ip << ":" << port << std::endl;
+    std::cout << "Initializing RTSP server on " << ip << ":" << port << std::endl;
 
     // 初始化服务器
     if (!g_server->Init(ip, port)) {
-        std::cerr << "RTSP服务器初始化失败" << std::endl;
+        std::cerr << "Failed to initialize RTSP server" << std::endl;
         return 1;
     }
-
-    RTSP_LOGD("RTSP服务器初始化成功");
 
     // 启动服务器
     if (!g_server->Start()) {
-        std::cerr << "RTSP服务器启动失败" << std::endl;
+        std::cerr << "Failed to start RTSP server" << std::endl;
         return 1;
     }
 
-    RTSP_LOGD("RTSP服务器启动成功");
-    std::cout << "RTSP服务器已启动，按Ctrl+C停止服务器" << std::endl;
+    std::cout << "RTSP server started successfully" << std::endl;
+    std::cout << "Press Ctrl+C to stop the server" << std::endl;
 
     // 主线程等待，实际服务在网络线程中运行
     while (true) {

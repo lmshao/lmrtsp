@@ -1,6 +1,13 @@
+/**
+ * @author SHAO Liming <lmshao@163.com>
+ * @copyright Copyright (c) 2025 SHAO Liming
+ * @license MIT
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
-#ifndef LMSHAO_RTSP_HEADERS_H
-#define LMSHAO_RTSP_HEADERS_H
+#ifndef RTSP_HEADERS_H
+#define RTSP_HEADERS_H
 
 namespace lmshao::rtsp {
 
@@ -112,4 +119,4 @@ constexpr const char *REASON_UNKNOWN = "Unknown";
 
 } // namespace lmshao::rtsp
 
-#endif // LMSHAO_RTSP_HEADERS_H
+#endif // RTSP_HEADERS_H

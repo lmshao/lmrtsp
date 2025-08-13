@@ -9,10 +9,9 @@
 #ifndef RTSP_RESPONSE_H
 #define RTSP_RESPONSE_H
 
+#include <cstdint>
 #include <map>
-#include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -135,6 +134,7 @@ public:
     RTSPResponseBuilder &SetLocation(const std::string &location);
     RTSPResponseBuilder &SetServer(const std::string &server);
     RTSPResponseBuilder &SetPublic(const std::vector<std::string> &methods);
+    RTSPResponseBuilder &SetPublic(const std::string &methods_str);
     RTSPResponseBuilder &SetWWWAuthenticate(const std::string &auth);
     RTSPResponseBuilder &SetRTPInfo(const std::string &rtp_info);
     RTSPResponseBuilder &AddCustomHeader(const std::string &header);
