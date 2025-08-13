@@ -1,5 +1,3 @@
-
-
 cmake_minimum_required(VERSION 3.10)
 project(rtsp VERSION 0.0.1 LANGUAGES CXX)
 
@@ -26,10 +24,14 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/include/rtsp)
 include_directories(${PROJECT_SOURCE_DIR}/network/include)
 
+# Build network library first
+add_subdirectory(network)
+
 # Main RTSP library
 file(GLOB_RECURSE RTSP_SOURCES "src/rtsp/*.cpp")
 add_library(rtsp STATIC ${RTSP_SOURCES})
 target_include_directories(rtsp PUBLIC include network/include)
+target_link_libraries(rtsp PUBLIC network)
 
 # Option to build applications
 option(BUILD_APPS "Build RTSP applications (server/client)" ON)

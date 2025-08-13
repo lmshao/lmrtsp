@@ -6,10 +6,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp/rtsp_response.h"
+#include "rtsp_response.h"
 
 #include <algorithm>
-#include <iostream>
+#include <sstream>
 
 namespace lmshao::rtsp {
 
@@ -480,6 +480,28 @@ RTSPResponseBuilder &RTSPResponseBuilder::SetServer(const std::string &server)
 
 RTSPResponseBuilder &RTSPResponseBuilder::SetPublic(const std::vector<std::string> &methods)
 {
+    response_.response_header_.public_methods_ = methods;
+    return *this;
+}
+
+RTSPResponseBuilder &RTSPResponseBuilder::SetPublic(const std::string &methods_str)
+{
+    // Split comma-separated string into method list
+    std::vector<std::string> methods;
+    size_t start = 0;
+    size_t end = methods_str.find(COMMA);
+
+    while (end != std::string::npos) {
+        methods.push_back(trim(methods_str.substr(start, end - start)));
+        start = end + 1;
+        end = methods_str.find(COMMA, start);
+    }
+
+    // Add the last method
+    if (start < methods_str.length()) {
+        methods.push_back(trim(methods_str.substr(start)));
+    }
+
     response_.response_header_.public_methods_ = methods;
     return *this;
 }
