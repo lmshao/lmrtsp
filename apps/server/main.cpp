@@ -8,8 +8,11 @@
 
 #include <iostream>
 
+#include "rtsp_log.h"
+
 int main()
 {
-    std::cout << "=== RTSP Server Main ===\n";
+    RTSP_LOGD("RTSP server started");
+    RTSP_LOGE("RTSP server encountered an error: %s", "demo error");
     return 0;
 }

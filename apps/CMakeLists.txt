@@ -13,6 +13,7 @@ if(BUILD_APPS)
         target_include_directories(rtsp-server PRIVATE 
             ${CMAKE_SOURCE_DIR}/include
             ${CMAKE_SOURCE_DIR}/network/include
+            ${CMAKE_SOURCE_DIR}/src/rtsp
         )
         target_link_libraries(rtsp-server PRIVATE rtsp)
         
