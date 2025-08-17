@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(rtsp VERSION 0.0.1 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
