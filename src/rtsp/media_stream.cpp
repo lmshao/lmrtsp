@@ -12,7 +12,7 @@
 
 namespace lmshao::rtsp {
 
-// MediaStream 基类实现
+// MediaStream base class implementation
 MediaStream::MediaStream(const std::string &uri, const std::string &mediaType)
     : uri_(uri), mediaType_(mediaType), state_(StreamState::INIT)
 {
@@ -39,7 +39,7 @@ StreamState MediaStream::GetState() const
     return state_;
 }
 
-// RTPStream 实现
+// RTPStream implementation
 RTPStream::RTPStream(const std::string &uri, const std::string &mediaType)
     : MediaStream(uri, mediaType), clientRtpPort_(0), clientRtcpPort_(0), serverRtpPort_(0), serverRtcpPort_(0),
       sequenceNumber_(0), timestamp_(0), isActive_(false)
@@ -75,7 +75,7 @@ bool RTPStream::Setup(const std::string &transport)
     // Parse client ports
     size_t clientPortPos = transport.find("client_port=");
     if (clientPortPos != std::string::npos) {
-        size_t portStart = clientPortPos + 12; // "client_port="的长度
+        size_t portStart = clientPortPos + 12; // Length of "client_port="
         size_t portEnd = transport.find(";", portStart);
         if (portEnd == std::string::npos) {
             portEnd = transport.length();
@@ -180,7 +180,7 @@ std::string RTPStream::GetTransportInfo() const
     return transportInfo_;
 }
 
-// MediaStreamFactory 实现
+// MediaStreamFactory implementation
 std::shared_ptr<MediaStream> MediaStreamFactory::CreateStream(const std::string &uri, const std::string &mediaType)
 {
     RTSP_LOGD("Creating media stream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());

@@ -9,6 +9,7 @@
 #ifndef RTSP_SERVER_H
 #define RTSP_SERVER_H
 
+#include <core-utils/singleton.h>
 #include <network/iserver_listener.h>
 #include <network/tcp_server.h>
 
@@ -21,11 +22,12 @@
 #include "rtsp_session.h"
 
 namespace lmshao::rtsp {
-
-class RTSPServer : public std::enable_shared_from_this<RTSPServer> {
+using namespace lmshao::coreutils;
+class RTSPServer : public std::enable_shared_from_this<RTSPServer>, public Singleton<RTSPServer> {
 public:
-    static std::shared_ptr<RTSPServer> GetInstance();
+    friend class Singleton<RTSPServer>;
 
+    ~RTSPServer() = default;
     bool Init(const std::string &ip, uint16_t port);
     bool Start();
     bool Stop();
@@ -35,8 +37,10 @@ public:
     void RemoveSession(const std::string &sessionId);
     std::shared_ptr<RTSPSession> GetSession(const std::string &sessionId);
 
+protected:
+    RTSPServer();
+
 private:
-    RTSPServer() = default;
     std::shared_ptr<RTSPServerListener> serverListener_;
     std::shared_ptr<network::TcpServer> tcpServer_;
     std::unordered_map<std::string, std::shared_ptr<RTSPSession>> sessions_;

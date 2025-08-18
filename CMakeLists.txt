@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build." FORCE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
@@ -18,6 +18,36 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Compiler flags
+if(MSVC)
+    # MSVC specific flags
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
+    # Debug-specific flags for MSVC
+    set(CMAKE_CXX_FLAGS_DEBUG "/MDd /Zi /Od /DDEBUG")
+    # Release-specific flags for MSVC
+    set(CMAKE_CXX_FLAGS_RELEASE "/MD /O2 /DNDEBUG /DRELEASE")
+else()
+    # GCC/Clang flags for Linux/Unix
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-format-truncation -Wno-unused-result")
+    # Debug-specific flags for GCC/Clang
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG")
+    # Release-specific flags for GCC/Clang
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -DRELEASE")
+endif()
+
+# Print build configuration
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "C++ flags: ${CMAKE_CXX_FLAGS}")
+message(STATUS "C++ flags for ${CMAKE_BUILD_TYPE}: ${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")
+
+# Library build options
+option(BUILD_STATIC_LIBS "Build static libraries" ON)
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+
+if(NOT BUILD_STATIC_LIBS AND NOT BUILD_SHARED_LIBS)
+    message(FATAL_ERROR "At least one of BUILD_STATIC_LIBS or BUILD_SHARED_LIBS must be ON")
+endif()
+
 # Enable testing
 enable_testing()
 
@@ -29,11 +59,69 @@ include_directories(${PROJECT_SOURCE_DIR}/network/include)
 # Build network library first
 add_subdirectory(network)
 
-# Main RTSP library
+# Collect RTSP source files
 file(GLOB_RECURSE RTSP_SOURCES "src/rtsp/*.cpp")
-add_library(rtsp STATIC ${RTSP_SOURCES})
-target_include_directories(rtsp PUBLIC include network/include)
-target_link_libraries(rtsp PUBLIC network)
+
+# Static library
+if(BUILD_STATIC_LIBS)
+    add_library(${PROJECT_NAME}_static STATIC ${RTSP_SOURCES})
+    target_include_directories(${PROJECT_NAME}_static PUBLIC 
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_include_directories(${PROJECT_NAME}_static PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/network/include
+    )
+    # Link to network library
+    target_link_libraries(${PROJECT_NAME}_static PUBLIC 
+        $<IF:$<TARGET_EXISTS:network::static>,network::static,network> 
+    )
+    set_target_properties(${PROJECT_NAME}_static PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+    set_target_properties(${PROJECT_NAME}_static PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+    
+    # Create alias for static library (for internal use)
+    add_library(${PROJECT_NAME}::static ALIAS ${PROJECT_NAME}_static)
+    message(STATUS "Building static library: lib${PROJECT_NAME}.a")
+endif()
+
+# Shared library
+if(BUILD_SHARED_LIBS)
+    add_library(${PROJECT_NAME}_shared SHARED ${RTSP_SOURCES})
+    target_include_directories(${PROJECT_NAME}_shared PUBLIC 
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_include_directories(${PROJECT_NAME}_shared PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/network/include
+    )
+    # Link to network library
+    target_link_libraries(${PROJECT_NAME}_shared PUBLIC 
+        $<IF:$<TARGET_EXISTS:network::shared>,network::shared,network> 
+    )
+    set_target_properties(${PROJECT_NAME}_shared PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+    set_target_properties(${PROJECT_NAME}_shared PROPERTIES
+        VERSION ${PROJECT_VERSION}
+        SOVERSION ${PROJECT_VERSION_MAJOR}
+    )
+    
+    # Create alias for shared library
+    add_library(${PROJECT_NAME}::shared ALIAS ${PROJECT_NAME}_shared)
+    message(STATUS "Building shared library: lib${PROJECT_NAME}.so")
+endif()
+
+# Create a default alias that points to static library (for examples and tests)
+if(BUILD_STATIC_LIBS)
+    add_library(${PROJECT_NAME} ALIAS ${PROJECT_NAME}_static)
+    set(DEFAULT_LIBRARY_TYPE "static")
+else()
+    add_library(${PROJECT_NAME} ALIAS ${PROJECT_NAME}_shared)
+    set(DEFAULT_LIBRARY_TYPE "shared")
+endif()
+
+message(STATUS "Examples and tests will use ${DEFAULT_LIBRARY_TYPE} library")
 
 # Option to build applications
 option(BUILD_APPS "Build RTSP applications (server/client)" ON)
@@ -78,9 +166,8 @@ if(BUILD_EXAMPLES)
             ${PROJECT_SOURCE_DIR}/network/include
         )
         
-        # Examples are header-only, so no need to link rtsp library
-        # But we can link it if needed in the future
-        target_link_libraries(${EXAMPLE_TARGET} PRIVATE rtsp)
+        # Link to the default library (static or shared)
+        target_link_libraries(${EXAMPLE_TARGET} PRIVATE ${PROJECT_NAME})
         
         # Set output directory
         set_target_properties(${EXAMPLE_TARGET} PROPERTIES

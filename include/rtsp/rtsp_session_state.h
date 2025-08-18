@@ -9,6 +9,8 @@
 #ifndef RTSP_SESSION_STATE_H
 #define RTSP_SESSION_STATE_H
 
+#include <core-utils/singleton.h>
+
 #include <memory>
 
 #include "rtsp_request.h"
@@ -18,12 +20,12 @@ namespace lmshao::rtsp {
 
 class RTSPSession;
 
-// 会话状态基类 - 状态模式
+// Session state base class - State pattern
 class RTSPSessionState {
 public:
     virtual ~RTSPSessionState() = default;
 
-    // RTSP方法处理
+    // RTSP method handling
     virtual RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) = 0;
@@ -33,14 +35,14 @@ public:
     virtual RTSPResponse OnGetParameter(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnSetParameter(RTSPSession *session, const RTSPRequest &request) = 0;
 
-    // 获取状态名称
+    // Get state name
     virtual std::string GetName() const = 0;
 };
 
-// 初始状态 - 只接受OPTIONS和DESCRIBE请求
-class InitialState : public RTSPSessionState {
+// Initial state - only accepts OPTIONS and DESCRIBE requests
+class InitialState : public RTSPSessionState, public coreutils::Singleton<InitialState> {
 public:
-    static std::shared_ptr<RTSPSessionState> GetInstance();
+    friend class coreutils::Singleton<InitialState>;
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
@@ -53,14 +55,14 @@ public:
 
     std::string GetName() const override { return "Initial"; }
 
-private:
+protected:
     InitialState() = default;
 };
 
-// 就绪状态 - 已完成SETUP，可以接受PLAY请求
-class ReadyState : public RTSPSessionState {
+// Ready state - SETUP completed, can accept PLAY requests
+class ReadyState : public RTSPSessionState, public coreutils::Singleton<ReadyState> {
 public:
-    static std::shared_ptr<RTSPSessionState> GetInstance();
+    friend class coreutils::Singleton<ReadyState>;
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
@@ -73,15 +75,14 @@ public:
 
     std::string GetName() const override { return "Ready"; }
 
-private:
+protected:
     ReadyState() = default;
 };
 
-// 播放状态 - 正在播放媒体流
-class PlayingState : public RTSPSessionState {
+// Playing state - media stream is playing
+class PlayingState : public RTSPSessionState, public coreutils::Singleton<PlayingState> {
 public:
-    static std::shared_ptr<RTSPSessionState> GetInstance();
-
+    friend class coreutils::Singleton<PlayingState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) override;
@@ -93,15 +94,14 @@ public:
 
     std::string GetName() const override { return "Playing"; }
 
-private:
+protected:
     PlayingState() = default;
 };
 
-// 暂停状态 - 媒体流已暂停
-class PausedState : public RTSPSessionState {
+// Paused state - media stream is paused
+class PausedState : public RTSPSessionState, public coreutils::Singleton<PausedState> {
 public:
-    static std::shared_ptr<RTSPSessionState> GetInstance();
-
+    friend class coreutils::Singleton<PausedState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) override;
@@ -113,7 +113,7 @@ public:
 
     std::string GetName() const override { return "Paused"; }
 
-private:
+protected:
     PausedState() = default;
 };
 

@@ -54,7 +54,7 @@ void RTSPServerListener::OnClose(std::shared_ptr<network::Session> session)
 {
     RTSP_LOGD("Client disconnected: %s:%d", session->host.c_str(), session->port);
 
-    // 清理不完整请求数据
+    // Clean up incomplete request data
     incompleteRequests_.erase(session->fd);
 
     // Find and clean up related RTSP sessions
@@ -88,7 +88,7 @@ void RTSPServerListener::OnAccept(std::shared_ptr<network::Session> session)
 }
 
 void RTSPServerListener::OnReceive(std::shared_ptr<network::Session> session,
-                                   std::shared_ptr<network::DataBuffer> buffer)
+                                   std::shared_ptr<coreutils::DataBuffer> buffer)
 {
     // Get received data
     std::string data(reinterpret_cast<const char *>(buffer->Data()), buffer->Size());
@@ -113,7 +113,7 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
 {
     // Check if it's a complete RTSP request
     // RTSP request ends with \r\n\r\n, or if there's message body, need to check Content-Length
-    size_t headerEnd = data.find("\r\n\r\n");
+    size_t headerEnd = data.find(CRLFCRLF);
     if (headerEnd == std::string::npos) {
         RTSP_LOGD("Incomplete RTSP request, waiting for more data");
         return false;
@@ -122,11 +122,11 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
     // Parse request headers
     std::string headerData = data.substr(0, headerEnd + 4); // Include \r\n\r\n
     // Check Content-Length
-    size_t contentLengthPos = headerData.find("Content-Length:");
+    size_t contentLengthPos = headerData.find(CONTENT_LENGTH);
     int contentLength = 0;
     if (contentLengthPos != std::string::npos) {
-        size_t valueStart = headerData.find_first_not_of(" ", contentLengthPos + 15);
-        size_t valueEnd = headerData.find("\r\n", valueStart);
+        size_t valueStart = headerData.find_first_not_of(SP, contentLengthPos + 15);
+        size_t valueEnd = headerData.find(CRLF, valueStart);
         if (valueStart != std::string::npos && valueEnd != std::string::npos) {
             contentLength = std::stoi(headerData.substr(valueStart, valueEnd - valueStart));
         }
@@ -157,8 +157,8 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
 
         // Check if session ID already exists
         std::string sessionId;
-        if (request.general_header_.find("Session") != request.general_header_.end()) {
-            sessionId = request.general_header_.at("Session");
+        if (request.general_header_.find(SESSION) != request.general_header_.end()) {
+            sessionId = request.general_header_.at(SESSION);
             rtspSession = server->GetSession(sessionId);
         }
 
@@ -169,6 +169,7 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
 
         // Handle request
         if (rtspSession) {
+            RTSP_LOGD("Handle request: \n%s", completeRequest.c_str());
             server->HandleRequest(rtspSession, request);
         } else {
             RTSP_LOGE("Failed to create or find RTSP session");
