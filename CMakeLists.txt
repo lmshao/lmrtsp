@@ -55,12 +55,15 @@ enable_testing()
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/include/rtsp)
 include_directories(${PROJECT_SOURCE_DIR}/network/include)
+include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Build network library first
 add_subdirectory(network)
 
 # Collect RTSP source files
 file(GLOB_RECURSE RTSP_SOURCES "src/rtsp/*.cpp")
+file(GLOB_RECURSE MPEGTS_SOURCES "src/mpegts/*.cpp")
+set(RTSP_SOURCES ${RTSP_SOURCES} ${MPEGTS_SOURCES})
 
 # Static library
 if(BUILD_STATIC_LIBS)
@@ -156,33 +159,31 @@ if(BUILD_EXAMPLES)
         # Get filename without extension
         get_filename_component(EXAMPLE_NAME ${EXAMPLE_SOURCE} NAME_WE)
         
-        # Create executable with rtsp-example- prefix to avoid name conflicts
-        set(EXAMPLE_TARGET "rtsp-example-${EXAMPLE_NAME}")
-        add_executable(${EXAMPLE_TARGET} ${EXAMPLE_SOURCE})
+        # Create executable with original filename
+        add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE})
         
         # Set include directories for examples
-        target_include_directories(${EXAMPLE_TARGET} PRIVATE 
+        target_include_directories(${EXAMPLE_NAME} PRIVATE 
             ${PROJECT_SOURCE_DIR}/include
             ${PROJECT_SOURCE_DIR}/network/include
         )
         
         # Link to the default library (static or shared)
-        target_link_libraries(${EXAMPLE_TARGET} PRIVATE ${PROJECT_NAME})
+        target_link_libraries(${EXAMPLE_NAME} PRIVATE ${PROJECT_NAME})
         
         # Set output directory
-        set_target_properties(${EXAMPLE_TARGET} PROPERTIES
+        set_target_properties(${EXAMPLE_NAME} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples
         )
         
-        message(STATUS "Added example: ${EXAMPLE_TARGET}")
+        message(STATUS "Added example: ${EXAMPLE_NAME}")
     endforeach()
     
     # Create a custom target to build all examples at once
     add_custom_target(examples)
     foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
         get_filename_component(EXAMPLE_NAME ${EXAMPLE_SOURCE} NAME_WE)
-        set(EXAMPLE_TARGET "rtsp-example-${EXAMPLE_NAME}")
-        add_dependencies(examples ${EXAMPLE_TARGET})
+        add_dependencies(examples ${EXAMPLE_NAME})
     endforeach()
     
 endif()
