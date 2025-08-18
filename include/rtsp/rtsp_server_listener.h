@@ -20,28 +20,28 @@ namespace lmshao::rtsp {
 
 class RTSPServer;
 
-// 观察者模式：RTSP服务器监听器
+// Observer pattern: RTSP server listener
 class RTSPServerListener : public network::IServerListener {
 public:
     explicit RTSPServerListener(std::shared_ptr<RTSPServer> server);
 
-    // 实现IServerListener接口
+    // Implement IServerListener interface
     void OnError(std::shared_ptr<network::Session> session, const std::string &errorInfo) override;
     void OnClose(std::shared_ptr<network::Session> session) override;
     void OnAccept(std::shared_ptr<network::Session> session) override;
-    void OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<network::DataBuffer> buffer) override;
+    void OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<coreutils::DataBuffer> buffer) override;
 
 private:
-    // 解析RTSP请求
+    // Parse RTSP request
     bool ParseRTSPRequest(const std::string &data, std::shared_ptr<network::Session> session);
 
-    // 处理不完整的请求数据
+    // Handle incomplete request data
     void HandleIncompleteData(std::shared_ptr<network::Session> session, const std::string &data);
 
     std::weak_ptr<RTSPServer> rtspServer_;
 
-    // 存储不完整的请求数据
-    std::unordered_map<lmshao::network::socket_t, std::string> incompleteRequests_;
+    // Store incomplete request data
+    std::unordered_map<network::socket_t, std::string> incompleteRequests_;
 };
 
 } // namespace lmshao::rtsp

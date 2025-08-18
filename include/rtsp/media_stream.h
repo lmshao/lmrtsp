@@ -14,33 +14,33 @@
 
 namespace lmshao::rtsp {
 
-// 媒体流状态枚举
+// Media stream state enumeration
 enum class StreamState {
-    INIT,    // 初始状态
-    READY,   // 准备就绪
-    PLAYING, // 正在播放
-    PAUSED   // 已暂停
+    INIT,    // Initial state
+    READY,   // Ready
+    PLAYING, // Playing
+    PAUSED   // Paused
 };
 
-// 媒体流基类
+// Media stream base class
 class MediaStream {
 public:
     MediaStream(const std::string &uri, const std::string &mediaType);
     virtual ~MediaStream();
 
-    // 媒体流控制
+    // Media stream control
     virtual bool Setup(const std::string &transport) = 0;
     virtual bool Play(const std::string &range = "") = 0;
     virtual bool Pause() = 0;
     virtual bool Teardown() = 0;
 
-    // 媒体信息
+    // Media information
     std::string GetUri() const;
     std::string GetMediaType() const;
     StreamState GetState() const;
     virtual std::string GetRtpInfo() const = 0;
 
-    // 传输信息
+    // Transport information
     virtual std::string GetTransportInfo() const = 0;
 
 protected:
@@ -49,7 +49,7 @@ protected:
     StreamState state_;
 };
 
-// RTP流实现
+// RTP stream implementation
 class RTPStream : public MediaStream {
 public:
     RTPStream(const std::string &uri, const std::string &mediaType);
@@ -66,20 +66,20 @@ public:
 private:
     std::string transportInfo_;
 
-    // RTP会话参数
+    // RTP session parameters
     uint16_t clientRtpPort_;
     uint16_t clientRtcpPort_;
     uint16_t serverRtpPort_;
     uint16_t serverRtcpPort_;
     std::string clientIp_;
 
-    // RTP状态
+    // RTP state
     uint16_t sequenceNumber_;
     uint32_t timestamp_;
     bool isActive_;
 };
 
-// 工厂方法创建媒体流
+// Factory method to create media stream
 class MediaStreamFactory {
 public:
     static std::shared_ptr<MediaStream> CreateStream(const std::string &uri, const std::string &mediaType);

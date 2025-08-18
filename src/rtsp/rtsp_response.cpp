@@ -11,48 +11,11 @@
 #include <algorithm>
 #include <sstream>
 
+#include "rtsp_utils.h"
+
 namespace lmshao::rtsp {
 
 namespace {
-
-// Helper function to trim whitespace from both ends of a string
-std::string trim(const std::string &str)
-{
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) {
-        return "";
-    }
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-// Helper function to convert string to lowercase
-std::string toLower(const std::string &str)
-{
-    std::string lower = str;
-    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-    return lower;
-}
-
-// Helper function to split string by delimiter
-std::vector<std::string> split(const std::string &str, const std::string &delimiter)
-{
-    std::vector<std::string> tokens;
-    size_t start = 0;
-    size_t end = str.find(delimiter);
-
-    while (end != std::string::npos) {
-        tokens.push_back(str.substr(start, end - start));
-        start = end + delimiter.length();
-        end = str.find(delimiter, start);
-    }
-
-    if (start < str.length()) {
-        tokens.push_back(str.substr(start));
-    }
-
-    return tokens;
-}
 
 // Helper function to parse status code from string
 StatusCode parseStatusCode(const std::string &status_str)
@@ -69,9 +32,9 @@ StatusCode parseStatusCode(const std::string &status_str)
 std::vector<std::string> splitCommaSeparated(const std::string &str)
 {
     std::vector<std::string> result;
-    std::vector<std::string> parts = split(str, COMMA);
+    std::vector<std::string> parts = RTSPUtils::split(str, COMMA);
     for (const std::string &part : parts) {
-        std::string trimmed = trim(part);
+        std::string trimmed = RTSPUtils::trim(part);
         if (!trimmed.empty()) {
             result.push_back(trimmed);
         }
@@ -85,7 +48,7 @@ ResponseHeader ResponseHeader::FromString(const std::string &header_str)
 {
     ResponseHeader header;
 
-    std::vector<std::string> lines = split(header_str, CRLF);
+    std::vector<std::string> lines = RTSPUtils::split(header_str, CRLF);
 
     for (const std::string &line : lines) {
         if (line.empty()) {
@@ -99,29 +62,29 @@ ResponseHeader ResponseHeader::FromString(const std::string &header_str)
             continue;
         }
 
-        std::string header_name = trim(line.substr(0, colon_pos));
-        std::string header_value = trim(line.substr(colon_pos + 1));
+        std::string header_name = RTSPUtils::trim(line.substr(0, colon_pos));
+        std::string header_value = RTSPUtils::trim(line.substr(colon_pos + 1));
 
         // Convert header name to lowercase for comparison
-        std::string header_name_lower = toLower(header_name);
+        std::string header_name_lower = RTSPUtils::toLower(header_name);
 
         // Parse standard response headers
-        if (header_name_lower == toLower(LOCATION)) {
+        if (header_name_lower == RTSPUtils::toLower(LOCATION)) {
             header.location_ = header_value;
-        } else if (header_name_lower == toLower(PROXY_AUTHENTICATE)) {
+        } else if (header_name_lower == RTSPUtils::toLower(PROXY_AUTHENTICATE)) {
             header.proxy_authenticate_ = header_value;
-        } else if (header_name_lower == toLower(PUBLIC)) {
+        } else if (header_name_lower == RTSPUtils::toLower(PUBLIC)) {
             // Parse comma-separated public methods
             header.public_methods_ = splitCommaSeparated(header_value);
-        } else if (header_name_lower == toLower(RETRY_AFTER)) {
+        } else if (header_name_lower == RTSPUtils::toLower(RETRY_AFTER)) {
             header.retry_after_ = header_value;
-        } else if (header_name_lower == toLower(SERVER)) {
+        } else if (header_name_lower == RTSPUtils::toLower(SERVER)) {
             header.server_ = header_value;
-        } else if (header_name_lower == toLower(VARY)) {
+        } else if (header_name_lower == RTSPUtils::toLower(VARY)) {
             header.vary_ = header_value;
-        } else if (header_name_lower == toLower(WWW_AUTHENTICATE)) {
+        } else if (header_name_lower == RTSPUtils::toLower(WWW_AUTHENTICATE)) {
             header.www_authenticate_ = header_value;
-        } else if (header_name_lower == toLower(RTP_INFO)) {
+        } else if (header_name_lower == RTSPUtils::toLower(RTP_INFO)) {
             header.rtp_info_ = header_value;
         } else {
             // Unknown header, add to custom headers
@@ -141,7 +104,7 @@ RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
     }
 
     // Split the response into lines
-    std::vector<std::string> lines = split(resp_str, CRLF);
+    std::vector<std::string> lines = RTSPUtils::split(resp_str, CRLF);
 
     if (lines.empty()) {
         return response;
@@ -149,7 +112,7 @@ RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
 
     // Parse the status line (first line)
     std::string status_line = lines[0];
-    std::vector<std::string> status_parts = split(status_line, SP);
+    std::vector<std::string> status_parts = RTSPUtils::split(status_line, SP);
 
     if (status_parts.size() >= 3) {
         response.version_ = status_parts[0];
@@ -191,26 +154,30 @@ RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
             continue; // Invalid header line
         }
 
-        std::string header_name = trim(line.substr(0, colon_pos));
-        std::string header_value = trim(line.substr(colon_pos + 1));
+        std::string header_name = RTSPUtils::trim(line.substr(0, colon_pos));
+        std::string header_value = RTSPUtils::trim(line.substr(colon_pos + 1));
 
         // Convert header name to lowercase for comparison
-        std::string header_name_lower = toLower(header_name);
+        std::string header_name_lower = RTSPUtils::toLower(header_name);
 
         // Classify headers into general, response, and entity headers
-        if (header_name_lower == toLower(CSEQ) || header_name_lower == toLower(DATE) ||
-            header_name_lower == toLower(SESSION) || header_name_lower == toLower(TRANSPORT) ||
-            header_name_lower == toLower(RANGE) || header_name_lower == toLower(REQUIRE) ||
-            header_name_lower == toLower(PROXY_REQUIRE)) {
+        if (header_name_lower == RTSPUtils::toLower(CSEQ) || header_name_lower == RTSPUtils::toLower(DATE) ||
+            header_name_lower == RTSPUtils::toLower(SESSION) || header_name_lower == RTSPUtils::toLower(TRANSPORT) ||
+            header_name_lower == RTSPUtils::toLower(RANGE) || header_name_lower == RTSPUtils::toLower(REQUIRE) ||
+            header_name_lower == RTSPUtils::toLower(PROXY_REQUIRE)) {
             // General headers
             response.general_header_[header_name] = header_value;
-        } else if (header_name_lower == toLower(CONTENT_TYPE) || header_name_lower == toLower(CONTENT_LENGTH)) {
+        } else if (header_name_lower == RTSPUtils::toLower(CONTENT_TYPE) ||
+                   header_name_lower == RTSPUtils::toLower(CONTENT_LENGTH)) {
             // Entity headers
             response.entity_header_[header_name] = header_value;
-        } else if (header_name_lower == toLower(LOCATION) || header_name_lower == toLower(PROXY_AUTHENTICATE) ||
-                   header_name_lower == toLower(PUBLIC) || header_name_lower == toLower(RETRY_AFTER) ||
-                   header_name_lower == toLower(SERVER) || header_name_lower == toLower(VARY) ||
-                   header_name_lower == toLower(WWW_AUTHENTICATE) || header_name_lower == toLower(RTP_INFO)) {
+        } else if (header_name_lower == RTSPUtils::toLower(LOCATION) ||
+                   header_name_lower == RTSPUtils::toLower(PROXY_AUTHENTICATE) ||
+                   header_name_lower == RTSPUtils::toLower(PUBLIC) ||
+                   header_name_lower == RTSPUtils::toLower(RETRY_AFTER) ||
+                   header_name_lower == RTSPUtils::toLower(SERVER) || header_name_lower == RTSPUtils::toLower(VARY) ||
+                   header_name_lower == RTSPUtils::toLower(WWW_AUTHENTICATE) ||
+                   header_name_lower == RTSPUtils::toLower(RTP_INFO)) {
             // Response headers - parse using ResponseHeader::FromString
             std::string single_header = header_name + COLON + SP + header_value + CRLF;
             ResponseHeader parsed_header = ResponseHeader::FromString(single_header);
@@ -379,7 +346,7 @@ std::string ResponseHeader::ToString() const
         for (size_t i = 0; i < public_methods_.size(); ++i) {
             oss << public_methods_[i];
             if (i + 1 < public_methods_.size()) {
-                oss << COMMA;
+                oss << COMMA << SP;
             }
         }
         oss << CRLF;
@@ -492,14 +459,14 @@ RTSPResponseBuilder &RTSPResponseBuilder::SetPublic(const std::string &methods_s
     size_t end = methods_str.find(COMMA);
 
     while (end != std::string::npos) {
-        methods.push_back(trim(methods_str.substr(start, end - start)));
+        methods.push_back(RTSPUtils::trim(methods_str.substr(start, end - start)));
         start = end + 1;
         end = methods_str.find(COMMA, start);
     }
 
     // Add the last method
     if (start < methods_str.length()) {
-        methods.push_back(trim(methods_str.substr(start)));
+        methods.push_back(RTSPUtils::trim(methods_str.substr(start)));
     }
 
     response_.response_header_.public_methods_ = methods;

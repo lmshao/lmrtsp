@@ -13,17 +13,17 @@
 
 namespace lmshao::rtsp {
 
-// 通用RTSP方法处理函数，可以被各个状态类复用
+// Common RTSP method handling functions that can be reused by various state classes
 namespace {
 
 RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
 {
     RTSP_LOGD("Processing OPTIONS request");
 
-    // OPTIONS请求在所有状态下都可以处理
+    // OPTIONS requests can be handled in all states
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 构建响应
+    // Build response
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
@@ -37,14 +37,14 @@ RTSPResponse HandleDescribe(RTSPSession *session, const RTSPRequest &request)
 {
     RTSP_LOGD("Processing DESCRIBE request");
 
-    // DESCRIBE请求在所有状态下都可以处理
+    // DESCRIBE requests can be handled in all states
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 获取请求的URI
+    // Get request URI
     std::string uri = request.uri_;
 
-    // 这里应该根据URI获取媒体信息并生成SDP描述
-    // 简化实现，使用一个示例SDP
+    // Here we should get media information based on URI and generate SDP description
+    // Simplified implementation, using an example SDP
     std::string sdp = "v=0\r\n"
                       "o=- 12345 12345 IN IP4 127.0.0.1\r\n"
                       "s=RTSP Session\r\n"
@@ -56,10 +56,10 @@ RTSPResponse HandleDescribe(RTSPSession *session, const RTSPRequest &request)
                       "a=rtpmap:97 MPEG4-GENERIC/44100/2\r\n"
                       "a=control:track2\r\n";
 
-    // 保存SDP描述到会话
+    // Save SDP description to session
     session->SetSdpDescription(sdp);
 
-    // 构建响应
+    // Build response
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
@@ -75,10 +75,10 @@ RTSPResponse HandleGetParameter(RTSPSession *session, const RTSPRequest &request
 {
     RTSP_LOGD("Processing GET_PARAMETER request");
 
-    // GET_PARAMETER请求在所有状态下都可以处理
+    // GET_PARAMETER requests can be handled in all states
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 构建响应
+    // Build response
     auto response =
         RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).SetSession(session->GetSessionId()).Build();
 
@@ -91,22 +91,13 @@ RTSPResponse HandleSetParameter(RTSPSession *session, const RTSPRequest &request
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 简化实现，返回成功响应
+    // Simplified implementation, return success response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
 
     return response;
 }
 
 } // namespace
-
-// InitialState 实现
-std::shared_ptr<RTSPSessionState> InitialState::GetInstance()
-{
-    static std::shared_ptr<InitialState> instance(new InitialState());
-    return instance;
-}
-
-// GetName方法已在头文件中定义
 
 RTSPResponse InitialState::OnOptions(RTSPSession *session, const RTSPRequest &request)
 {
@@ -134,29 +125,27 @@ RTSPResponse InitialState::OnSetup(RTSPSession *session, const RTSPRequest &requ
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 获取Transport头
+    // Get Transport header
     std::string transport = "";
-    for (const auto &header : request.request_header_.custom_header_) {
-        if (header.find("Transport:") == 0) {
-            transport = header.substr(10); // 去掉"Transport: "
-            break;
-        }
+    if (request.general_header_.find(TRANSPORT) != request.general_header_.end()) {
+        transport = request.general_header_.at(TRANSPORT);
     }
+    RTSP_LOGD("Transport: %s", transport.c_str());
 
-    // 设置媒体
+    // Setup media
     if (!session->SetupMedia(request.uri_, transport)) {
         RTSP_LOGE("Failed to setup media");
 
-        // 构建错误响应
+        // Build error response
         auto response = RTSPResponseBuilder().SetStatus(StatusCode::NotFound).SetCSeq(cseq).Build();
 
         return response;
     }
 
-    // 切换到Ready状态
-    session->ChangeState(ReadyState::GetInstance());
+    // Switch to Ready state
+    session->ChangeState(std::static_pointer_cast<RTSPSessionState>(ReadyState::GetInstance()));
 
-    // 构建成功响应
+    // Build success response
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
@@ -173,7 +162,7 @@ RTSPResponse InitialState::OnPlay(RTSPSession *session, const RTSPRequest &reque
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 在Initial状态下不能执行PLAY
+    // Cannot execute PLAY in Initial state
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -185,7 +174,7 @@ RTSPResponse InitialState::OnPause(RTSPSession *session, const RTSPRequest &requ
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 在Initial状态下不能执行PAUSE
+    // Cannot execute PAUSE in Initial state
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -197,20 +186,11 @@ RTSPResponse InitialState::OnTeardown(RTSPSession *session, const RTSPRequest &r
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 在Initial状态下不能执行TEARDOWN
+    // Cannot execute TEARDOWN in Initial state
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
 }
-
-// ReadyState 实现
-std::shared_ptr<RTSPSessionState> ReadyState::GetInstance()
-{
-    static std::shared_ptr<ReadyState> instance(new ReadyState());
-    return instance;
-}
-
-// GetName方法已在头文件中定义
 
 RTSPResponse ReadyState::OnOptions(RTSPSession *session, const RTSPRequest &request)
 {
@@ -234,7 +214,7 @@ RTSPResponse ReadyState::OnSetParameter(RTSPSession *session, const RTSPRequest 
 
 RTSPResponse ReadyState::OnSetup(RTSPSession *session, const RTSPRequest &request)
 {
-    // 在Ready状态下，可以继续设置其他媒体轨道
+    // In Ready state, can continue to setup other media tracks
     return InitialState::GetInstance()->OnSetup(session, request);
 }
 
@@ -244,32 +224,32 @@ RTSPResponse ReadyState::OnPlay(RTSPSession *session, const RTSPRequest &request
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 获取Range头（如果有）
+    // Get Range header (if any)
     std::string range = "";
     if (request.request_header_.range_) {
         range = *request.request_header_.range_;
     }
 
-    // 开始播放
+    // Start playing
     if (!session->PlayMedia()) {
         RTSP_LOGE("Failed to start playing");
 
-        // 构建错误响应
+        // Build error response
         auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
 
         return response;
     }
 
-    // 切换到Playing状态
-    session->ChangeState(PlayingState::GetInstance());
+    // Switch to Playing state
+    session->ChangeState(std::static_pointer_cast<RTSPSessionState>(PlayingState::GetInstance()));
 
-    // 构建成功响应
+    // Build success response
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
                         .SetSession(session->GetSessionId())
                         .SetRange(range.empty() ? "npt=0-" : range)
-                        // 这里应该添加RTP-Info头，包含RTP时间戳信息
+                        // Here we should add RTP-Info header with RTP timestamp information
                         .SetRTPInfo("url=rtsp://example.com/track1;seq=1000;rtptime=123456")
                         .Build();
 
@@ -282,7 +262,7 @@ RTSPResponse ReadyState::OnPause(RTSPSession *session, const RTSPRequest &reques
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 在Ready状态下不能执行PAUSE
+    // Cannot execute PAUSE in Ready state
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -294,26 +274,17 @@ RTSPResponse ReadyState::OnTeardown(RTSPSession *session, const RTSPRequest &req
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 释放媒体资源
+    // Release media resources
     session->TeardownMedia();
 
-    // 切换到Initial状态
+    // Switch to Initial state
     session->ChangeState(InitialState::GetInstance());
 
-    // 构建响应
+    // Build response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
 
     return response;
 }
-
-// PlayingState 实现
-std::shared_ptr<RTSPSessionState> PlayingState::GetInstance()
-{
-    static std::shared_ptr<PlayingState> instance(new PlayingState());
-    return instance;
-}
-
-// GetName方法已在头文件中定义
 
 RTSPResponse PlayingState::OnOptions(RTSPSession *session, const RTSPRequest &request)
 {
@@ -341,7 +312,7 @@ RTSPResponse PlayingState::OnSetup(RTSPSession *session, const RTSPRequest &requ
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 在Playing状态下不能执行SETUP
+    // Cannot execute SETUP in Playing state
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -353,7 +324,7 @@ RTSPResponse PlayingState::OnPlay(RTSPSession *session, const RTSPRequest &reque
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 已经在播放中，返回OK
+    // Already playing, return OK
     auto response =
         RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).SetSession(session->GetSessionId()).Build();
 
@@ -366,20 +337,20 @@ RTSPResponse PlayingState::OnPause(RTSPSession *session, const RTSPRequest &requ
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 暂停播放
+    // Pause playing
     if (!session->PauseMedia()) {
         RTSP_LOGE("Failed to pause playing");
 
-        // 构建错误响应
+        // Build error response
         auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
 
         return response;
     }
 
-    // 切换到Paused状态
+    // Switch to Paused state
     session->ChangeState(PausedState::GetInstance());
 
-    // 构建成功响应
+    // Build success response
     auto response =
         RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).SetSession(session->GetSessionId()).Build();
 
@@ -392,26 +363,21 @@ RTSPResponse PlayingState::OnTeardown(RTSPSession *session, const RTSPRequest &r
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 释放媒体资源
+    // Release media resources
     session->TeardownMedia();
 
-    // 切换到Initial状态
+    // Switch to Initial state
     session->ChangeState(InitialState::GetInstance());
 
-    // 构建响应
+    // Build response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
 
     return response;
 }
 
-// PausedState 实现
-std::shared_ptr<RTSPSessionState> PausedState::GetInstance()
-{
-    static std::shared_ptr<PausedState> instance(new PausedState());
-    return instance;
-}
+// PausedState implementation
 
-// GetName方法已在头文件中定义
+// GetName method is already defined in header file
 
 RTSPResponse PausedState::OnOptions(RTSPSession *session, const RTSPRequest &request)
 {
@@ -439,7 +405,7 @@ RTSPResponse PausedState::OnSetup(RTSPSession *session, const RTSPRequest &reque
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 在Paused状态下不能执行SETUP
+    // Cannot execute SETUP in Paused state
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -451,32 +417,32 @@ RTSPResponse PausedState::OnPlay(RTSPSession *session, const RTSPRequest &reques
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 获取Range头（如果有）
+    // Get Range header (if any)
     std::string range = "";
     if (request.request_header_.range_) {
         range = *request.request_header_.range_;
     }
 
-    // 恢复播放
+    // Resume playing
     if (!session->PlayMedia(range)) {
         RTSP_LOGE("Failed to resume playing");
 
-        // 构建错误响应
+        // Build error response
         auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
 
         return response;
     }
 
-    // 切换到Playing状态
+    // Switch to Playing state
     session->ChangeState(PlayingState::GetInstance());
 
-    // 构建成功响应
+    // Build success response
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
                         .SetSession(session->GetSessionId())
                         .SetRange(range.empty() ? "npt=0-" : range)
-                        // 这里应该添加RTP-Info头，包含RTP时间戳信息
+                        // Here we should add RTP-Info header with RTP timestamp information
                         .SetRTPInfo("url=rtsp://example.com/track1;seq=1000;rtptime=123456")
                         .Build();
 
@@ -489,7 +455,7 @@ RTSPResponse PausedState::OnPause(RTSPSession *session, const RTSPRequest &reque
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 已经在暂停状态，返回OK
+    // Already paused, return OK
     auto response =
         RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).SetSession(session->GetSessionId()).Build();
 
@@ -502,13 +468,13 @@ RTSPResponse PausedState::OnTeardown(RTSPSession *session, const RTSPRequest &re
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 释放媒体资源
+    // Release media resources
     session->TeardownMedia();
 
-    // 切换到Initial状态
+    // Switch to Initial state
     session->ChangeState(InitialState::GetInstance());
 
-    // 构建响应
+    // Build response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
 
     return response;
@@ -520,7 +486,7 @@ RTSPResponse RTSPSessionState::OnSetup(RTSPSession *session, const RTSPRequest &
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 构建错误响应
+    // Build error response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -532,7 +498,7 @@ RTSPResponse RTSPSessionState::OnPlay(RTSPSession *session, const RTSPRequest &r
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 构建错误响应
+    // Build error response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -544,7 +510,7 @@ RTSPResponse RTSPSessionState::OnPause(RTSPSession *session, const RTSPRequest &
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 构建错误响应
+    // Build error response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
@@ -556,22 +522,10 @@ RTSPResponse RTSPSessionState::OnTeardown(RTSPSession *session, const RTSPReques
 
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
-    // 构建错误响应
+    // Build error response
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
 
     return response;
 }
-
-// InitialState的方法已在前面定义
-
-// ReadyState的方法已在前面定义
-
-// PlayingState的方法已在前面定义
-
-// PausedState::GetInstance() 已在前面定义
-
-// 这些方法已在前面定义
-// RTSPResponse PausedState::OnPlay(RTSPSession* session, const RTSPRequest& request)
-// RTSPResponse PausedState::OnTeardown(RTSPSession* session, const RTSPRequest& request)
 
 } // namespace lmshao::rtsp

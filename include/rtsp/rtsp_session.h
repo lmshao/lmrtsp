@@ -28,47 +28,47 @@ public:
     explicit RTSPSession(std::shared_ptr<network::Session> networkSession);
     ~RTSPSession();
 
-    // 处理RTSP请求
+    // Process RTSP request
     RTSPResponse ProcessRequest(const RTSPRequest &request);
 
-    // 状态管理
+    // State management
     void ChangeState(std::shared_ptr<RTSPSessionState> newState);
     std::shared_ptr<RTSPSessionState> GetCurrentState() const;
 
-    // 会话信息
+    // Session information
     std::string GetSessionId() const;
     std::shared_ptr<network::Session> GetNetworkSession() const;
 
-    // 媒体管理
+    // Media management
     bool SetupMedia(const std::string &uri, const std::string &transport);
     bool PlayMedia(const std::string &range = "");
     bool PauseMedia();
     bool TeardownMedia();
 
-    // 资源管理
+    // Resource management
     void SetSdpDescription(const std::string &sdp);
     std::string GetSdpDescription() const;
 
-    // 传输参数
+    // Transport parameters
     void SetTransportInfo(const std::string &transport);
     std::string GetTransportInfo() const;
 
 private:
-    // 生成唯一会话ID
+    // Generate unique session ID
     static std::string GenerateSessionId();
 
     std::string sessionId_;
     std::shared_ptr<RTSPSessionState> currentState_;
     std::shared_ptr<network::Session> networkSession_;
 
-    // 媒体相关
+    // Media related
     std::vector<std::shared_ptr<MediaStream>> mediaStreams_;
     std::string sdpDescription_;
     std::string transportInfo_;
 
-    // 会话计时
-    uint32_t timeout_;      // 会话超时时间（秒）
-    time_t lastActiveTime_; // 最后活动时间
+    // Session timing
+    uint32_t timeout_;      // Session timeout (seconds)
+    time_t lastActiveTime_; // Last active time
 };
 
 } // namespace lmshao::rtsp

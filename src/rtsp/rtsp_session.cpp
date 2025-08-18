@@ -9,7 +9,9 @@
 #include "rtsp_session.h"
 
 #include <ctime>
+#include <functional>
 #include <random>
+#include <unordered_map>
 
 #include "rtsp/media_stream.h"
 #include "rtsp/rtsp_session_state.h"
@@ -51,35 +53,34 @@ RTSPResponse RTSPSession::ProcessRequest(const RTSPRequest &request)
 
     RTSP_LOGD("Processing %s request in state %s", request.method_.c_str(), currentState_->GetName().c_str());
 
-    // Process request based on method and current state
-    if (request.method_ == "OPTIONS") {
-        return currentState_->OnOptions(this, request);
-    } else if (request.method_ == "DESCRIBE") {
-        return currentState_->OnDescribe(this, request);
-    } else if (request.method_ == "SETUP") {
-        return currentState_->OnSetup(this, request);
-    } else if (request.method_ == "PLAY") {
-        return currentState_->OnPlay(this, request);
-    } else if (request.method_ == "PAUSE") {
-        return currentState_->OnPause(this, request);
-    } else if (request.method_ == "TEARDOWN") {
-        return currentState_->OnTeardown(this, request);
-    } else if (request.method_ == "GET_PARAMETER") {
-        return currentState_->OnGetParameter(this, request);
-    } else if (request.method_ == "SET_PARAMETER") {
-        return currentState_->OnSetParameter(this, request);
-    } else {
-        // Unsupported method
-        RTSP_LOGW("Unsupported RTSP method: %s", request.method_.c_str());
+    // Method to state handler mapping - O(1) lookup instead of O(n) if-else chain
+    using MethodHandler = RTSPResponse (RTSPSessionState::*)(RTSPSession *, const RTSPRequest &);
 
-        // Build error response
-        auto response = RTSPResponseBuilder()
-                            .SetStatus(StatusCode::NotImplemented)
-                            .SetCSeq(std::stoi(request.general_header_.at("CSeq")))
-                            .Build();
+    static const std::unordered_map<std::string, MethodHandler> method_handlers = {
+        {METHOD_OPTIONS, &RTSPSessionState::OnOptions},
+        {METHOD_DESCRIBE, &RTSPSessionState::OnDescribe},
+        {METHOD_SETUP, &RTSPSessionState::OnSetup},
+        {METHOD_PLAY, &RTSPSessionState::OnPlay},
+        {METHOD_PAUSE, &RTSPSessionState::OnPause},
+        {METHOD_TEARDOWN, &RTSPSessionState::OnTeardown},
+        {METHOD_GET_PARAMETER, &RTSPSessionState::OnGetParameter},
+        {METHOD_SET_PARAMETER, &RTSPSessionState::OnSetParameter}};
 
-        return response;
+    auto it = method_handlers.find(request.method_);
+    if (it != method_handlers.end()) {
+        return (currentState_.get()->*(it->second))(this, request);
     }
+
+    // Unsupported method
+    RTSP_LOGW("Unsupported RTSP method: %s", request.method_.c_str());
+
+    // Build error response
+    auto response = RTSPResponseBuilder()
+                        .SetStatus(StatusCode::NotImplemented)
+                        .SetCSeq(std::stoi(request.general_header_.at(CSEQ)))
+                        .Build();
+
+    return response;
 }
 
 void RTSPSession::ChangeState(std::shared_ptr<RTSPSessionState> newState)
@@ -106,7 +107,7 @@ std::shared_ptr<network::Session> RTSPSession::GetNetworkSession() const
 
 bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transport)
 {
-    RTSP_LOGD("Setting up media for URI: %s", uri.c_str());
+    RTSP_LOGD("Setting up media for URI: %s, transport: %s", uri.c_str(), transport.c_str());
 
     // Parse media type
     std::string mediaType = "video"; // Default to video
@@ -207,15 +208,13 @@ std::string RTSPSession::GetTransportInfo() const
 
 std::string RTSPSession::GenerateSessionId()
 {
-    // Use random number to generate session ID
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 0xFFFFFFFF);
+    thread_local static std::random_device rd;
+    uint32_t part1 = rd();
+    uint32_t part2 = rd();
 
-    char buffer[16];
-    snprintf(buffer, sizeof(buffer), "%08X%08X", dis(gen), dis(gen));
-
-    return std::string(buffer);
+    char buffer[18];
+    snprintf(buffer, sizeof(buffer), "%08X%08X", part1, part2);
+    return buffer;
 }
 
 } // namespace lmshao::rtsp

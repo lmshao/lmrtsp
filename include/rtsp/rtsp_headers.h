@@ -66,9 +66,10 @@ constexpr const char *RTSP_VERSION = "RTSP/1.0";
 
 // Protocol Separators
 constexpr const char *CRLF = "\r\n";
+constexpr const char *CRLFCRLF = "\r\n\r\n";
 constexpr const char *COLON = ":";
 constexpr const char *SP = " ";
-constexpr const char *COMMA = ", ";
+constexpr const char *COMMA = ",";
 
 // Status Code Reason Phrases
 constexpr const char *REASON_CONTINUE = "Continue";

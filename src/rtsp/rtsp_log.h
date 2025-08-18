@@ -40,7 +40,7 @@ namespace lmshao::rtsp {
 #define COLOR_YELLOW "\033[33m"
 #define COLOR_RESET "\033[0m"
 
-#define RTSP_FUNC_NAME __PRETTY_FUNCTION__
+#define RTSP_FUNC_NAME __FUNCTION__
 #define FILENAME_ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
 #define RTSP_LOG_TIME_STR                                                                                              \
     ([]() -> const char * {                                                                                            \

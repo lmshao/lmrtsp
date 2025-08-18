@@ -10,17 +10,15 @@
 
 #include <network/tcp_server.h>
 
-#include "rtsp_command.h"
 #include "rtsp_log.h"
 #include "rtsp_server_listener.h"
 #include "rtsp_session.h"
 
 namespace lmshao::rtsp {
 
-std::shared_ptr<RTSPServer> RTSPServer::GetInstance()
+RTSPServer::RTSPServer()
 {
-    static std::shared_ptr<RTSPServer> instance(new RTSPServer());
-    return instance;
+    RTSP_LOGD("RTSPServer constructor called");
 }
 
 bool RTSPServer::Init(const std::string &ip, uint16_t port)
@@ -88,29 +86,14 @@ void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPR
 {
     RTSP_LOGD("Handling %s request for session %s", request.method_.c_str(), session->GetSessionId().c_str());
 
-    // Use command pattern to handle request
-    auto command = RTSPCommandFactory::CreateCommand(request);
-    if (command) {
-        RTSPResponse response = command->Execute(session.get());
+    // Process request directly through session state machine
+    RTSPResponse response = session->ProcessRequest(request);
 
-        // Send response
-        auto networkSession = session->GetNetworkSession();
-        if (networkSession) {
-            networkSession->Send(response.ToString());
-        }
-    } else {
-        RTSP_LOGE("Unknown RTSP method: %s", request.method_.c_str());
-
-        // Send error response
-        int cseq = 0;
-        if (request.general_header_.find("CSeq") != request.general_header_.end()) {
-            cseq = std::stoi(request.general_header_.at("CSeq"));
-        }
-        auto response = RTSPResponseFactory::CreateError(StatusCode::NotImplemented, cseq).Build();
-        auto networkSession = session->GetNetworkSession();
-        if (networkSession) {
-            networkSession->Send(response.ToString());
-        }
+    // Send response
+    auto networkSession = session->GetNetworkSession();
+    if (networkSession) {
+        RTSP_LOGD("Send response: \n%s", response.ToString().c_str());
+        networkSession->Send(response.ToString());
     }
 }
 

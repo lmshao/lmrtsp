@@ -15,15 +15,15 @@
 
 using namespace lmshao::rtsp;
 
-// 全局服务器实例，用于信号处理
+// Global server instance for signal handling
 std::shared_ptr<RTSPServer> g_server;
 
-// 信号处理函数
+// Signal handler function
 void signalHandler(int signum)
 {
     std::cout << "Interrupt signal (" << signum << ") received.\n";
 
-    // 停止服务器
+    // Stop server
     if (g_server) {
         g_server->Stop();
     }
@@ -33,17 +33,17 @@ void signalHandler(int signum)
 
 int main(int argc, char *argv[])
 {
-    // 注册信号处理
+    // Register signal handler
     signal(SIGINT, signalHandler);
 
-    // 获取RTSP服务器实例
+    // Get RTSP server instance
     g_server = RTSPServer::GetInstance();
 
-    // 初始化服务器，默认监听所有网络接口的554端口
+    // Initialize server, default listening on all network interfaces port 554
     std::string ip = "0.0.0.0";
     uint16_t port = 554;
 
-    // 如果提供了命令行参数，使用指定的IP和端口
+    // If command line arguments are provided, use specified IP and port
     if (argc >= 2) {
         ip = argv[1];
     }
@@ -53,13 +53,13 @@ int main(int argc, char *argv[])
 
     std::cout << "Initializing RTSP server on " << ip << ":" << port << std::endl;
 
-    // 初始化服务器
+    // Initialize server
     if (!g_server->Init(ip, port)) {
         std::cerr << "Failed to initialize RTSP server" << std::endl;
         return 1;
     }
 
-    // 启动服务器
+    // Start server
     if (!g_server->Start()) {
         std::cerr << "Failed to start RTSP server" << std::endl;
         return 1;
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     std::cout << "RTSP server started successfully" << std::endl;
     std::cout << "Press Ctrl+C to stop the server" << std::endl;
 
-    // 主线程等待，实际服务在网络线程中运行
+    // Main thread waits, actual service runs in network thread
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
