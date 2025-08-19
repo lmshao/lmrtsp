@@ -24,7 +24,7 @@ public:
     TSStreamParser();
     ~TSStreamParser();
 
-    void SetCallback(std::shared_ptr<TSPacketCallback> callback);
+    void SetCallback(std::shared_ptr<TSDemuxerListener> callback);
 
     void ParseData(const uint8_t *data, size_t size);
     void ParsePacket(const TSPacket &packet);
@@ -43,7 +43,7 @@ public:
     std::vector<uint16_t> GetActiveAudioPIDs() const;
 
 private:
-    std::shared_ptr<TSPacketCallback> callback_;
+    std::shared_ptr<TSDemuxerListener> callback_;
     std::map<uint16_t, std::shared_ptr<coreutils::DataBuffer>> stream_buffers_;
     std::map<uint16_t, uint64_t> last_pcr_;
     std::set<uint16_t> enabled_video_pids_;
