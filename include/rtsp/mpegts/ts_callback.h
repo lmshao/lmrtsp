@@ -9,20 +9,30 @@
 #ifndef RTSP_TS_CALLBACK_H
 #define RTSP_TS_CALLBACK_H
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 
 namespace lmshao::rtsp::mpegts {
 
-// TS packet callback interface
-class TSPacketCallback {
+// TS muxer callback interface
+class TSMuxerListener {
 public:
-    virtual ~TSPacketCallback() = default;
+    virtual ~TSMuxerListener() = default;
 
-    virtual void OnVideoData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pcr = 0) = 0;
-    virtual void OnAudioData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pcr = 0) = 0;
+    // Called when a TS packet is ready
+    virtual void OnTSPacket(const uint8_t *data, size_t size) = 0;
+};
+
+// TS demuxer callback interface
+class TSDemuxerListener {
+public:
+    virtual ~TSDemuxerListener() = default;
+
+    virtual void OnVideoData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pts) = 0;
+    virtual void OnAudioData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pts) = 0;
 
     virtual void OnPATReceived(const std::vector<uint16_t> &program_pids) = 0;
     virtual void OnPMTReceived(uint16_t program_pid, const std::map<uint16_t, uint8_t> &stream_pids) = 0;

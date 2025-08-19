@@ -14,13 +14,12 @@
 #include <vector>
 
 #include "rtsp/mpegts/ts_callback.h"
-#include "rtsp/mpegts/ts_muxer.h"
 #include "rtsp/mpegts/ts_parser.h"
 
 using namespace lmshao::rtsp::mpegts;
 using namespace lmshao::coreutils;
 
-class TSDemuxerCallback : public TSPacketCallback {
+class DemuxerCallback : public TSDemuxerListener {
 private:
     std::ofstream video_file_;
     std::ofstream audio_file_;
@@ -34,13 +33,13 @@ private:
     std::string audio_filename_;
 
 public:
-    TSDemuxerCallback()
+    DemuxerCallback()
         : video_file_opened_(false), audio_file_opened_(false), video_packets_(0), audio_packets_(0),
           total_bytes_written_(0)
     {
     }
 
-    ~TSDemuxerCallback()
+    ~DemuxerCallback()
     {
         if (video_file_.is_open()) {
             video_file_.close();
@@ -84,7 +83,7 @@ public:
         }
     }
 
-    void OnVideoData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pcr) override
+    void OnVideoData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pts) override
     {
         if (!video_file_opened_) {
             // Determine filename based on stream type
@@ -117,7 +116,7 @@ public:
         }
     }
 
-    void OnAudioData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pcr) override
+    void OnAudioData(uint16_t pid, const uint8_t *data, size_t size, uint64_t pts) override
     {
         if (!audio_file_opened_) {
             // Determine filename based on stream type
@@ -256,7 +255,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    auto callback = std::make_shared<TSDemuxerCallback>();
+    auto callback = std::make_shared<DemuxerCallback>();
 
     TSStreamParser parser;
     parser.SetCallback(callback);

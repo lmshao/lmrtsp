@@ -22,7 +22,7 @@ TSStreamParser::~TSStreamParser()
     Stop();
 }
 
-void TSStreamParser::SetCallback(std::shared_ptr<TSPacketCallback> callback)
+void TSStreamParser::SetCallback(std::shared_ptr<TSDemuxerListener> callback)
 {
     callback_ = callback;
 }
@@ -205,6 +205,10 @@ std::vector<uint16_t> TSStreamParser::GetActiveAudioPIDs() const
 
 void TSStreamParser::ProcessPAT(const std::shared_ptr<coreutils::DataBuffer> &data)
 {
+    if (!callback_) {
+        return;
+    }
+
     /*
      * PAT (Program Association Table) structure parsing
      *
@@ -448,12 +452,15 @@ void TSStreamParser::ProcessStreamData(uint16_t pid, const std::shared_ptr<coreu
 
     // For audio/video streams, pass data directly (simplified processing)
     // In real applications, this should parse PES packets and frame boundaries
-    uint64_t pcr = last_pcr_.find(pid) != last_pcr_.end() ? last_pcr_[pid] : 0;
+    uint64_t pts = 0;
+    if (last_pcr_.count(pid)) {
+        pts = last_pcr_[pid];
+    }
 
     if (IsVideoPID(pid)) {
-        callback_->OnVideoData(pid, data->Data(), data->Size(), pcr);
+        callback_->OnVideoData(pid, data->Data(), data->Size(), pts);
     } else if (IsAudioPID(pid)) {
-        callback_->OnAudioData(pid, data->Data(), data->Size(), pcr);
+        callback_->OnAudioData(pid, data->Data(), data->Size(), pts);
     }
 }
 
