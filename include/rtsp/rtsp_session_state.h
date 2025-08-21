@@ -9,7 +9,7 @@
 #ifndef RTSP_SESSION_STATE_H
 #define RTSP_SESSION_STATE_H
 
-#include <core-utils/singleton.h>
+#include <coreutils/singleton.h>
 
 #include <memory>
 

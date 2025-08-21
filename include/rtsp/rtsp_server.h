@@ -9,7 +9,7 @@
 #ifndef RTSP_SERVER_H
 #define RTSP_SERVER_H
 
-#include <core-utils/singleton.h>
+#include <coreutils/singleton.h>
 #include <network/iserver_listener.h>
 #include <network/tcp_server.h>
 
