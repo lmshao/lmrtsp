@@ -10,6 +10,9 @@
 #define RTSP_SESSION_H
 
 #include <network/session.h>
+#include "network/udp_server.h"
+#include "network/iserver_listener.h"
+#include "core-utils/data_buffer.h"
 
 #include <memory>
 #include <string>
@@ -23,7 +26,7 @@ namespace lmshao::rtsp {
 class RTSPSessionState;
 class MediaStream;
 
-class RTSPSession {
+class RTSPSession : public std::enable_shared_from_this<RTSPSession> {
 public:
     explicit RTSPSession(std::shared_ptr<network::Session> networkSession);
     ~RTSPSession();
@@ -41,9 +44,11 @@ public:
 
     // Media management
     bool SetupMedia(const std::string &uri, const std::string &transport);
-    bool PlayMedia(const std::string &range = "");
-    bool PauseMedia();
-    bool TeardownMedia();
+    bool PlayMedia(const std::string &uri, const std::string &range = "");
+    bool PauseMedia(const std::string &uri);
+    bool TeardownMedia(const std::string &uri);
+    std::shared_ptr<MediaStream> GetMediaStream(int track_index);
+    const std::vector<std::shared_ptr<MediaStream>> &GetMediaStreams() const;
 
     // Resource management
     void SetSdpDescription(const std::string &sdp);

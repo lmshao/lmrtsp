@@ -1,3 +1,0 @@
-[submodule "src/network"]
-	path = network
-	url = git@github.com:lmshao/network.git
