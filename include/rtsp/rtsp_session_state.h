@@ -28,6 +28,8 @@ public:
     // RTSP method handling
     virtual RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) = 0;
+    virtual RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) = 0;
+    virtual RTSPResponse OnRecord(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnPlay(RTSPSession *session, const RTSPRequest &request) = 0;
     virtual RTSPResponse OnPause(RTSPSession *session, const RTSPRequest &request) = 0;
@@ -46,6 +48,8 @@ public:
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnRecord(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPlay(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPause(RTSPSession *session, const RTSPRequest &request) override;
@@ -66,6 +70,8 @@ public:
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnRecord(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPlay(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPause(RTSPSession *session, const RTSPRequest &request) override;
@@ -85,6 +91,8 @@ public:
     friend class coreutils::Singleton<PlayingState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnRecord(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPlay(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPause(RTSPSession *session, const RTSPRequest &request) override;
@@ -104,6 +112,8 @@ public:
     friend class coreutils::Singleton<PausedState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
+    RTSPResponse OnRecord(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnSetup(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPlay(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnPause(RTSPSession *session, const RTSPRequest &request) override;

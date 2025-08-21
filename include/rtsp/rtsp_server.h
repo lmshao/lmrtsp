@@ -36,6 +36,7 @@ public:
     std::shared_ptr<RTSPSession> CreateSession(std::shared_ptr<network::Session> networkSession);
     void RemoveSession(const std::string &sessionId);
     std::shared_ptr<RTSPSession> GetSession(const std::string &sessionId);
+    std::unordered_map<std::string, std::shared_ptr<RTSPSession>> GetSessions();
 
 protected:
     RTSPServer();

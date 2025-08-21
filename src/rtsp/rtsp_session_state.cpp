@@ -27,7 +27,7 @@ RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
-                        .SetPublic("OPTIONS, DESCRIBE, SETUP, PLAY, PAUSE, TEARDOWN, GET_PARAMETER, SET_PARAMETER")
+                        .SetPublic("OPTIONS, DESCRIBE, ANNOUNCE, RECORD, SETUP, PLAY, PAUSE, TEARDOWN, GET_PARAMETER, SET_PARAMETER")
                         .Build();
 
     return response;
@@ -97,11 +97,62 @@ RTSPResponse HandleSetParameter(RTSPSession *session, const RTSPRequest &request
     return response;
 }
 
+RTSPResponse HandleAnnounce(RTSPSession *session, const RTSPRequest &request)
+{
+    RTSP_LOGD("Processing ANNOUNCE request");
+
+    int cseq = std::stoi(request.general_header_.at("CSeq"));
+
+    // here we can get sdp info from request.message_body_
+
+    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+
+    return response;
+}
+
+RTSPResponse HandleRecord(RTSPSession *session, const RTSPRequest &request)
+{
+    RTSP_LOGD("Processing RECORD request");
+
+    int cseq = std::stoi(request.general_header_.at("CSeq"));
+
+    // here we can get sdp info from request.message_body_
+
+    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+
+    return response;
+}
+
 } // namespace
+
+RTSPResponse InitialState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleRecord(session, request);
+}
+
+RTSPResponse ReadyState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleRecord(session, request);
+}
+
+RTSPResponse PlayingState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleRecord(session, request);
+}
+
+RTSPResponse PausedState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleRecord(session, request);
+}
 
 RTSPResponse InitialState::OnOptions(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleOptions(session, request);
+}
+
+RTSPResponse InitialState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleAnnounce(session, request);
 }
 
 RTSPResponse InitialState::OnDescribe(RTSPSession *session, const RTSPRequest &request)
@@ -212,6 +263,16 @@ RTSPResponse ReadyState::OnSetParameter(RTSPSession *session, const RTSPRequest 
     return HandleSetParameter(session, request);
 }
 
+RTSPResponse ReadyState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleAnnounce(session, request);
+}
+
+RTSPResponse PlayingState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleAnnounce(session, request);
+}
+
 RTSPResponse ReadyState::OnSetup(RTSPSession *session, const RTSPRequest &request)
 {
     // In Ready state, can continue to setup other media tracks
@@ -231,7 +292,7 @@ RTSPResponse ReadyState::OnPlay(RTSPSession *session, const RTSPRequest &request
     }
 
     // Start playing
-    if (!session->PlayMedia()) {
+    if (!session->PlayMedia(request.uri_, range)) {
         RTSP_LOGE("Failed to start playing");
 
         // Build error response
@@ -275,7 +336,7 @@ RTSPResponse ReadyState::OnTeardown(RTSPSession *session, const RTSPRequest &req
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     // Release media resources
-    session->TeardownMedia();
+    session->TeardownMedia(request.uri_);
 
     // Switch to Initial state
     session->ChangeState(InitialState::GetInstance());
@@ -338,7 +399,7 @@ RTSPResponse PlayingState::OnPause(RTSPSession *session, const RTSPRequest &requ
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     // Pause playing
-    if (!session->PauseMedia()) {
+    if (!session->PauseMedia(request.uri_)) {
         RTSP_LOGE("Failed to pause playing");
 
         // Build error response
@@ -364,7 +425,7 @@ RTSPResponse PlayingState::OnTeardown(RTSPSession *session, const RTSPRequest &r
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     // Release media resources
-    session->TeardownMedia();
+    session->TeardownMedia(request.uri_);
 
     // Switch to Initial state
     session->ChangeState(InitialState::GetInstance());
@@ -399,6 +460,11 @@ RTSPResponse PausedState::OnSetParameter(RTSPSession *session, const RTSPRequest
     return HandleSetParameter(session, request);
 }
 
+RTSPResponse PausedState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+{
+    return HandleAnnounce(session, request);
+}
+
 RTSPResponse PausedState::OnSetup(RTSPSession *session, const RTSPRequest &request)
 {
     RTSP_LOGD("Processing SETUP request in PausedState");
@@ -424,7 +490,7 @@ RTSPResponse PausedState::OnPlay(RTSPSession *session, const RTSPRequest &reques
     }
 
     // Resume playing
-    if (!session->PlayMedia(range)) {
+    if (!session->PlayMedia(request.uri_, range)) {
         RTSP_LOGE("Failed to resume playing");
 
         // Build error response
@@ -469,7 +535,7 @@ RTSPResponse PausedState::OnTeardown(RTSPSession *session, const RTSPRequest &re
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     // Release media resources
-    session->TeardownMedia();
+    session->TeardownMedia(request.uri_);
 
     // Switch to Initial state
     session->ChangeState(InitialState::GetInstance());

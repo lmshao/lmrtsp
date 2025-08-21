@@ -123,4 +123,9 @@ std::shared_ptr<RTSPSession> RTSPServer::GetSession(const std::string &sessionId
     return nullptr;
 }
 
+std::unordered_map<std::string, std::shared_ptr<RTSPSession>> RTSPServer::GetSessions()
+{
+    return sessions_;
+}
+
 } // namespace lmshao::rtsp

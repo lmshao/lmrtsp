@@ -13,6 +13,7 @@
 
 #include "rtsp_log.h"
 #include "rtsp_server.h"
+#include "rtsp/media_stream.h"
 
 using namespace lmshao::rtsp;
 
@@ -71,9 +72,29 @@ int main(int argc, char *argv[])
     RTSP_LOGD("RTSP server started successfully");
     std::cout << "RTSP server is running, press Ctrl+C to stop server" << std::endl;
 
-    // Main thread waits, actual service runs in network thread
+    // Main loop to push media data
+    uint32_t timestamp = 0;
     while (true) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        auto sessions = g_server->GetSessions();
+        for (auto &session_pair : sessions) {
+            auto session = session_pair.second;
+            const auto &media_streams = session->GetMediaStreams();
+            for (const auto &stream : media_streams) {
+                if (stream->GetState() == StreamState::PLAYING) {
+                    auto rtp_stream = std::dynamic_pointer_cast<RTPStream>(stream);
+                    if (rtp_stream) {
+                        rtp::MediaFrame frame;
+                        frame.data.assign(1024, 0xAB);
+                        frame.timestamp = timestamp;
+                        frame.marker = false;
+                        rtp_stream->PushFrame(std::move(frame));
+                    }
+                }
+            }
+        }
+
+        timestamp += 3600; // For 90kHz clock rate, 40ms frame duration
+        std::this_thread::sleep_for(std::chrono::milliseconds(40));
     }
 
     return 0;
