@@ -8,7 +8,7 @@
 
 #include "rtsp_server_listener.h"
 
-#include <core-utils/data_buffer.h>
+#include <coreutils/data_buffer.h>
 #include <network/session.h>
 
 #include "rtsp_log.h"

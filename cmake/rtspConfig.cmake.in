@@ -1,0 +1,30 @@
+# RTSP library configuration file
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# RTSP version information
+set(RTSP_VERSION @PROJECT_VERSION@)
+
+# Find required dependencies
+find_dependency(Threads)
+find_dependency(coreutils)
+find_dependency(network)
+
+# Include target definitions
+include("${CMAKE_CURRENT_LIST_DIR}/rtspTargets.cmake")
+
+# Create aliases for compatibility
+if(TARGET rtsp::rtsp_static AND NOT TARGET rtsp::rtsp)
+    add_library(rtsp::rtsp ALIAS rtsp::rtsp_static)
+endif()
+
+if(TARGET rtsp::rtsp_static AND NOT TARGET rtsp)
+    add_library(rtsp ALIAS rtsp::rtsp_static)
+endif()
+
+if(TARGET rtsp::rtsp_shared AND NOT TARGET rtsp_shared)
+    add_library(rtsp_shared ALIAS rtsp::rtsp_shared)
+endif()
+
+check_required_components(rtsp)
