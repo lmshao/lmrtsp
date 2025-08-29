@@ -10,7 +10,7 @@
 
 #include <cstring>
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 static const int SAMPLING_FREQUENCY_TABLE[] = {96000, 88200, 64000, 48000, 44100, 32000, 24000,
                                                22050, 16000, 12000, 11025, 8000,  7350};
@@ -146,4 +146,4 @@ int ADTSHeader::GetIndexFromSampleRate(int sample_rate)
     return 0; // Default to 0 if not found
 }
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts

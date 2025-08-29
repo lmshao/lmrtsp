@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_RESPONSE_H
-#define RTSP_RESPONSE_H
+#ifndef LMSHAO_RTSP_RTSP_RESPONSE_H
+#define LMSHAO_RTSP_RTSP_RESPONSE_H
 
 #include <cstdint>
 #include <map>
@@ -176,4 +176,4 @@ public:
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_RESPONSE_H
+#endif // LMSHAO_RTSP_RTSP_RESPONSE_H

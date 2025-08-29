@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef TEST_FRAMEWORK_H
-#define TEST_FRAMEWORK_H
+#ifndef LMSHAO_RTSP_TEST_FRAMEWORK_H
+#define LMSHAO_RTSP_TEST_FRAMEWORK_H
 
 #include <exception>
 #include <functional>
@@ -129,4 +129,4 @@ public:
 
 } // namespace test_framework
 
-#endif // TEST_FRAMEWORK_H
+#endif // LMSHAO_RTSP_TEST_FRAMEWORK_H

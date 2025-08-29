@@ -6,8 +6,12 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef MEDIA_STREAM_H
-#define MEDIA_STREAM_H
+#ifndef LMSHAO_RTSP_MEDIA_STREAM_H
+#define LMSHAO_RTSP_MEDIA_STREAM_H
+
+#include <network/iserver_listener.h>
+#include <network/udp_client.h>
+#include <network/udp_server.h>
 
 #include <atomic>
 #include <condition_variable>
@@ -16,15 +20,16 @@
 #include <queue>
 #include <string>
 #include <thread>
-#include "rtsp/rtp/i_rtp_packetizer.h"
-#include "network/udp_client.h"
-#include "network/udp_server.h"
-#include "network/iserver_listener.h"
+
+#include "rtp/i_rtp_packetizer.h"
+
+using namespace lmshao::network;
+using namespace lmshao::coreutils;
+using namespace lmshao::rtp;
 
 namespace lmshao::rtsp {
 
 class RTSPSession;
-
 
 // Media stream state enumeration
 enum class StreamState {
@@ -41,7 +46,7 @@ public:
     virtual ~MediaStream();
 
     // Media stream control
-    virtual bool Setup(const std::string &transport, const std::string& client_ip) = 0;
+    virtual bool Setup(const std::string &transport, const std::string &client_ip) = 0;
     virtual bool Play(const std::string &range = "") = 0;
     virtual bool Pause() = 0;
     virtual bool Teardown() = 0;
@@ -68,12 +73,12 @@ protected:
 };
 
 // RTP stream implementation
-class RTPStream : public MediaStream, public network::IServerListener, public std::enable_shared_from_this<RTPStream> {
+class RTPStream : public MediaStream, public IServerListener, public std::enable_shared_from_this<RTPStream> {
 public:
     RTPStream(const std::string &uri, const std::string &mediaType);
     ~RTPStream() override;
 
-    bool Setup(const std::string &transport, const std::string& client_ip) override;
+    bool Setup(const std::string &transport, const std::string &client_ip) override;
     bool Play(const std::string &range = "") override;
     bool Pause() override;
     bool Teardown() override;
@@ -81,27 +86,27 @@ public:
     std::string GetRtpInfo() const override;
     std::string GetTransportInfo() const override;
 
-    void PushFrame(rtp::MediaFrame &&frame);
+    void PushFrame(MediaFrame &&frame);
 
     uint16_t GetClientRtpPort() const { return clientRtpPort_; }
     uint16_t GetClientRtcpPort() const { return clientRtcpPort_; }
 
     // IServerListener implementation
-    void OnAccept(std::shared_ptr<network::Session> session) override {}
-    void OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<coreutils::DataBuffer> data) override;
-    void OnClose(std::shared_ptr<network::Session> session) override;
-    void OnError(std::shared_ptr<network::Session> session, const std::string& error) override;
+    void OnAccept(std::shared_ptr<Session> session) override {}
+    void OnReceive(std::shared_ptr<Session> session, std::shared_ptr<DataBuffer> data) override;
+    void OnClose(std::shared_ptr<Session> session) override;
+    void OnError(std::shared_ptr<Session> session, const std::string &error) override;
 
 private:
     void SendMedia();
 
 private:
     std::string transportInfo_;
-    std::unique_ptr<rtp::IRtpPacketizer> packetizer_;
-    std::shared_ptr<network::UdpServer> rtp_server_;
-    std::shared_ptr<network::UdpServer> rtcp_server_;
-    std::shared_ptr<network::UdpClient> rtp_client_;
-    std::shared_ptr<network::UdpClient> rtcp_client_;
+    std::unique_ptr<IRtpPacketizer> packetizer_;
+    std::shared_ptr<UdpServer> rtp_server_;
+    std::shared_ptr<UdpServer> rtcp_server_;
+    std::shared_ptr<UdpClient> rtp_client_;
+    std::shared_ptr<UdpClient> rtcp_client_;
 
     // RTP session parameters
     uint16_t clientRtpPort_;
@@ -116,7 +121,7 @@ private:
     std::atomic<bool> isActive_;
     std::thread send_thread_;
 
-    std::queue<rtp::MediaFrame> frame_queue_;
+    std::queue<MediaFrame> frame_queue_;
     std::mutex queue_mutex_;
     std::condition_variable queue_cv_;
 };
@@ -129,4 +134,4 @@ public:
 
 } // namespace lmshao::rtsp
 
-#endif // MEDIA_STREAM_H
+#endif // LMSHAO_RTSP_MEDIA_STREAM_H

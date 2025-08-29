@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_TS_CALLBACK_H
-#define RTSP_TS_CALLBACK_H
+#ifndef LMSHAO_MPEGTS_TS_CALLBACK_H
+#define LMSHAO_MPEGTS_TS_CALLBACK_H
 
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 // TS muxer callback interface
 class TSMuxerListener {
@@ -41,6 +41,6 @@ public:
     virtual void OnSyncLoss() = 0;
 };
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts
 
-#endif // RTSP_TS_CALLBACK_H
+#endif // LMSHAO_MPEGTS_TS_CALLBACK_H

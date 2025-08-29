@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_HEADERS_H
-#define RTSP_HEADERS_H
+#ifndef LMSHAO_RTSP_RTSP_HEADERS_H
+#define LMSHAO_RTSP_RTSP_HEADERS_H
 
 namespace lmshao::rtsp {
 
@@ -116,8 +116,9 @@ constexpr const char *REASON_SERVICE_UNAVAILABLE = "Service Unavailable";
 constexpr const char *REASON_GATEWAY_TIMEOUT = "Gateway Time-out";
 constexpr const char *REASON_RTSP_VERSION_NOT_SUPPORTED = "RTSP Version not supported";
 constexpr const char *REASON_OPTION_NOT_SUPPORTED = "Option not supported";
-constexpr const char *REASON_UNKNOWN = "Unknown";
+// Avoid conflict with Windows REASON_UNKNOWN macro
+constexpr const char *REASON_UNKNOWN_ERROR = "Unknown";
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_HEADERS_H
+#endif // LMSHAO_RTSP_RTSP_HEADERS_H

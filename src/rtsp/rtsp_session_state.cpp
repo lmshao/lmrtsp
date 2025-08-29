@@ -24,11 +24,13 @@ RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     // Build response
-    auto response = RTSPResponseBuilder()
-                        .SetStatus(StatusCode::OK)
-                        .SetCSeq(cseq)
-                        .SetPublic("OPTIONS, DESCRIBE, ANNOUNCE, RECORD, SETUP, PLAY, PAUSE, TEARDOWN, GET_PARAMETER, SET_PARAMETER")
-                        .Build();
+    auto response =
+        RTSPResponseBuilder()
+            .SetStatus(StatusCode::OK)
+            .SetCSeq(cseq)
+            .SetPublic(
+                "OPTIONS, DESCRIBE, ANNOUNCE, RECORD, SETUP, PLAY, PAUSE, TEARDOWN, GET_PARAMETER, SET_PARAMETER")
+            .Build();
 
     return response;
 }
@@ -125,22 +127,22 @@ RTSPResponse HandleRecord(RTSPSession *session, const RTSPRequest &request)
 
 } // namespace
 
-RTSPResponse InitialState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse InitialState::OnRecord(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse ReadyState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse ReadyState::OnRecord(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse PlayingState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse PlayingState::OnRecord(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse PausedState::OnRecord(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse PausedState::OnRecord(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleRecord(session, request);
 }
@@ -150,7 +152,7 @@ RTSPResponse InitialState::OnOptions(RTSPSession *session, const RTSPRequest &re
     return HandleOptions(session, request);
 }
 
-RTSPResponse InitialState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse InitialState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleAnnounce(session, request);
 }
@@ -263,12 +265,12 @@ RTSPResponse ReadyState::OnSetParameter(RTSPSession *session, const RTSPRequest 
     return HandleSetParameter(session, request);
 }
 
-RTSPResponse ReadyState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse ReadyState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RTSPResponse PlayingState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse PlayingState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleAnnounce(session, request);
 }
@@ -460,7 +462,7 @@ RTSPResponse PausedState::OnSetParameter(RTSPSession *session, const RTSPRequest
     return HandleSetParameter(session, request);
 }
 
-RTSPResponse PausedState::OnAnnounce(RTSPSession* session, const RTSPRequest& request)
+RTSPResponse PausedState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
 {
     return HandleAnnounce(session, request);
 }

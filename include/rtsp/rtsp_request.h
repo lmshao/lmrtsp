@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_REQUEST_H
-#define RTSP_REQUEST_H
+#ifndef LMSHAO_RTSP_RTSP_REQUEST_H
+#define LMSHAO_RTSP_RTSP_REQUEST_H
 
 #include <map>
 #include <optional>
@@ -115,4 +115,4 @@ public:
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_REQUEST_H
+#endif // LMSHAO_RTSP_RTSP_REQUEST_H

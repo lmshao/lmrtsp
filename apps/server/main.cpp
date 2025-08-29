@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
                 if (stream->GetState() == StreamState::PLAYING) {
                     auto rtp_stream = std::dynamic_pointer_cast<RTPStream>(stream);
                     if (rtp_stream) {
-                        rtp::MediaFrame frame;
+                        MediaFrame frame;
                         frame.data.assign(1024, 0xAB);
                         frame.timestamp = timestamp;
                         frame.marker = false;

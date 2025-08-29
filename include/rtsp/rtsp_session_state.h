@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_SESSION_STATE_H
-#define RTSP_SESSION_STATE_H
+#ifndef LMSHAO_RTSP_RTSP_SESSION_STATE_H
+#define LMSHAO_RTSP_RTSP_SESSION_STATE_H
 
 #include <coreutils/singleton.h>
 
@@ -129,4 +129,4 @@ protected:
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_SESSION_STATE_H
+#endif // LMSHAO_RTSP_RTSP_SESSION_STATE_H

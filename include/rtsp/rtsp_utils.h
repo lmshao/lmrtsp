@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_UTILS_H
-#define RTSP_UTILS_H
+#ifndef LMSHAO_RTSP_RTSP_UTILS_H
+#define LMSHAO_RTSP_RTSP_UTILS_H
 
 #include <string>
 #include <vector>
@@ -49,4 +49,4 @@ private:
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_UTILS_H
+#endif // LMSHAO_RTSP_RTSP_UTILS_H

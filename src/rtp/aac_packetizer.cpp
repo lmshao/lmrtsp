@@ -1,17 +1,31 @@
-#include "rtsp/rtp/aac_packetizer.h"
-#include <arpa/inet.h>
+/**
+ * @author SHAO Liming <lmshao@163.com>
+ * @copyright Copyright (c) 2025 SHAO Liming
+ * @license MIT
+ *
+ * SPDX-License-Identifier: MIT
+ */
 
-namespace lmshao::rtsp::rtp {
+#include "rtp/aac_packetizer.h"
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#endif
+
+namespace lmshao::rtp {
 
 AacPacketizer::AacPacketizer(uint32_t ssrc, uint16_t sequence_number, uint32_t timestamp, uint32_t mtu_size)
-    : ssrc_(ssrc),
-      sequence_number_(sequence_number),
-      timestamp_(timestamp),
-      mtu_size_(mtu_size) {}
+    : ssrc_(ssrc), sequence_number_(sequence_number), timestamp_(timestamp), mtu_size_(mtu_size)
+{
+}
 
-std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame& frame) {
+std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame &frame)
+{
     std::vector<RtpPacket> packets;
-    const uint8_t* frame_data = frame.data.data();
+    const uint8_t *frame_data = frame.data.data();
     size_t frame_size = frame.data.size();
 
     // Assuming the frame contains a single ADTS frame
@@ -20,7 +34,7 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame& frame) {
         return packets;
     }
 
-    const uint8_t* payload_data = frame_data + 7;
+    const uint8_t *payload_data = frame_data + 7;
     size_t payload_size = frame_size - 7;
 
     if (payload_size <= mtu_size_ - 12 - 4) { // 12 for RTP header, 4 for AU header
@@ -29,7 +43,7 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame& frame) {
         packet.header.padding = 0;
         packet.header.extension = 0;
         packet.header.csrc_count = 0;
-        packet.header.marker = 1; // AAC frames are usually sent in a single packet
+        packet.header.marker = 1;        // AAC frames are usually sent in a single packet
         packet.header.payload_type = 97; // Dynamic payload type for AAC
         packet.header.sequence_number = htons(sequence_number_++);
         packet.header.timestamp = htonl(timestamp_);
@@ -39,8 +53,8 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame& frame) {
         uint8_t au_header[4];
         au_header[0] = 0x00;
         au_header[1] = 0x10;
-        au_header[2] = (payload_size & 0x1FE0) >> 5;
-        au_header[3] = (payload_size & 0x1F) << 3;
+        au_header[2] = static_cast<uint8_t>((payload_size & 0x1FE0) >> 5);
+        au_header[3] = static_cast<uint8_t>((payload_size & 0x1F) << 3);
 
         packet.payload.assign(au_header, au_header + 4);
         packet.payload.insert(packet.payload.end(), payload_data, payload_data + payload_size);
@@ -52,4 +66,4 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame& frame) {
     return packets;
 }
 
-}
+} // namespace lmshao::rtp

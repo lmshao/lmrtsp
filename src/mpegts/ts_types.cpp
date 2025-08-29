@@ -6,11 +6,11 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp/mpegts/ts_types.h"
+#include "mpegts/ts_types.h"
 
 #include <cstring>
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 size_t TSPacket::GetTotalSize() const
 {
@@ -68,4 +68,4 @@ std::vector<uint8_t> TSPacket::GetRawData() const
     return raw_data;
 }
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts

@@ -6,13 +6,13 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp/mpegts/ts_muxer.h"
+#include "mpegts/ts_muxer.h"
 
 #include <algorithm>
 #include <cstring>
 #include <iostream>
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 TSStreamMuxer::TSStreamMuxer()
     : video_pid_(0x1001), audio_pid_(0x1002), pcr_pid_(0x1001), bitrate_(5000000), pcr_interval_(100),
@@ -566,4 +566,4 @@ uint32_t TSStreamMuxer::CalculateCRC32(const uint8_t *data, size_t length)
     return crc;
 }
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts

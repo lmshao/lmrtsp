@@ -13,7 +13,7 @@
 
 #include "rtsp_log.h"
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 TSStreamParser::TSStreamParser() : running_(false), parsed_packets_(0), pcr_parsing_enabled_(true) {}
 
@@ -555,4 +555,4 @@ uint64_t TSStreamParser::ExtractPCR(const TSPacket &packet)
     return (pcr_base * 300) + pcr_ext;
 }
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts

@@ -13,10 +13,10 @@
 #include <string>
 #include <vector>
 
-#include "rtsp/mpegts/ts_callback.h"
-#include "rtsp/mpegts/ts_parser.h"
+#include "mpegts/ts_callback.h"
+#include "mpegts/ts_parser.h"
 
-using namespace lmshao::rtsp::mpegts;
+using namespace lmshao::mpegts;
 using namespace lmshao::coreutils;
 
 class DemuxerCallback : public TSDemuxerListener {
