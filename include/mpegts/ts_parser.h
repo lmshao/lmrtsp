@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_TS_PARSER_H
-#define RTSP_TS_PARSER_H
+#ifndef LMSHAO_MPEGTS_TS_PARSER_H
+#define LMSHAO_MPEGTS_TS_PARSER_H
 
 #include <map>
 #include <memory>
@@ -17,7 +17,9 @@
 #include "ts_callback.h"
 #include "ts_types.h"
 
-namespace lmshao::rtsp::mpegts {
+using namespace lmshao::coreutils;
+
+namespace lmshao::mpegts {
 
 class TSStreamParser {
 public:
@@ -44,7 +46,7 @@ public:
 
 private:
     std::shared_ptr<TSDemuxerListener> callback_;
-    std::map<uint16_t, std::shared_ptr<coreutils::DataBuffer>> stream_buffers_;
+    std::map<uint16_t, std::shared_ptr<DataBuffer>> stream_buffers_;
     std::map<uint16_t, uint64_t> last_pcr_;
     std::set<uint16_t> enabled_video_pids_;
     std::set<uint16_t> enabled_audio_pids_;
@@ -53,9 +55,9 @@ private:
     size_t parsed_packets_;
     bool pcr_parsing_enabled_;
 
-    void ProcessPAT(const std::shared_ptr<coreutils::DataBuffer> &data);
-    void ProcessPMT(uint16_t pid, const std::shared_ptr<coreutils::DataBuffer> &data);
-    void ProcessStreamData(uint16_t pid, const std::shared_ptr<coreutils::DataBuffer> &data);
+    void ProcessPAT(const std::shared_ptr<DataBuffer> &data);
+    void ProcessPMT(uint16_t pid, const std::shared_ptr<DataBuffer> &data);
+    void ProcessStreamData(uint16_t pid, const std::shared_ptr<DataBuffer> &data);
     void ProcessPCR(uint16_t pid, uint64_t pcr);
 
     bool IsVideoPID(uint16_t pid) const;
@@ -64,6 +66,6 @@ private:
     uint64_t ExtractPCR(const TSPacket &packet);
 };
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts
 
-#endif // RTSP_TS_PARSER_H
+#endif // LMSHAO_MPEGTS_TS_PARSER_H

@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-#include "network/tcp_client.h"
+#include <network/tcp_client.h>
 #include "rtsp/rtsp_request.h"
 #include "rtsp/rtsp_response.h"
 
@@ -28,10 +28,8 @@ public:
         tcp_client_->SetListener(shared_from_this());
         tcp_client_->Init();
         tcp_client_->Connect();
-    }
-
-    void OnConnect(network::socket_t fd) override {
-        std::cout << "Connected to server" << std::endl;
+        
+        // Start with OPTIONS request
         SendOptions();
     }
 

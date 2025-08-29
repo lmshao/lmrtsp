@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_SERVER_LISTENER_H
-#define RTSP_SERVER_LISTENER_H
+#ifndef LMSHAO_RTSP_RTSP_SERVER_LISTENER_H
+#define LMSHAO_RTSP_RTSP_SERVER_LISTENER_H
 
 #include <network/common.h>
 #include <network/iserver_listener.h>
@@ -46,4 +46,4 @@ private:
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_SERVER_LISTENER_H
+#endif // LMSHAO_RTSP_RTSP_SERVER_LISTENER_H

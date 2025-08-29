@@ -8,11 +8,12 @@
 
 #include <signal.h>
 
+#include <chrono>
 #include <iostream>
 #include <thread>
 
+#include "rtp/i_rtp_packetizer.h"
 #include "rtsp/media_stream.h"
-#include "rtsp/rtp/i_rtp_packetizer.h"
 #include "rtsp/rtsp_server.h"
 
 using namespace lmshao::rtsp;
@@ -80,10 +81,11 @@ int main(int argc, char *argv[])
                 if (media_stream) {
                     auto rtp_stream = std::dynamic_pointer_cast<RTPStream>(media_stream);
                     if (rtp_stream && rtp_stream->GetState() == lmshao::rtsp::StreamState::PLAYING) {
-                        rtp::MediaFrame frame;
+                        MediaFrame frame;
                         frame.data.assign(1024, 'a'); // Dummy data
-                        frame.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::system_clock::now().time_since_epoch()).count();
+                        frame.timestamp = static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                                    std::chrono::system_clock::now().time_since_epoch())
+                                                                    .count());
                         rtp_stream->PushFrame(std::move(frame));
                     }
                 }

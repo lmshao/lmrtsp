@@ -121,7 +121,7 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
 
     // 2. Check if media stream for this track already exists
     std::shared_ptr<MediaStream> media_stream;
-    for (const auto& stream : mediaStreams_) {
+    for (const auto &stream : mediaStreams_) {
         // The URI of a media stream is its track id
         if (stream->GetUri() == track_id) {
             media_stream = stream;

@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp/mpegts/ts_muxer.h"
+#include "mpegts/ts_muxer.h"
 
 #include <chrono>
 #include <climits>
@@ -16,10 +16,10 @@
 #include <thread>
 #include <vector>
 
-#include "rtsp/mpegts/adts_header.h"
-#include "rtsp/mpegts/ts_types.h"
+#include "mpegts/adts_header.h"
+#include "mpegts/ts_types.h"
 
-using namespace lmshao::rtsp::mpegts;
+using namespace lmshao::mpegts;
 
 // Configuration constants
 constexpr uint16_t VIDEO_PID = 0x0100;        // 256

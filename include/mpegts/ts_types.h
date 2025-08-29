@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_TS_TYPES_H
-#define RTSP_TS_TYPES_H
+#ifndef LMSHAO_MPEGTS_TS_TYPES_H
+#define LMSHAO_MPEGTS_TS_TYPES_H
 
 #include <coreutils/data_buffer.h>
 
@@ -15,7 +15,9 @@
 #include <memory>
 #include <vector>
 
-namespace lmshao::rtsp::mpegts {
+using namespace lmshao::coreutils;
+
+namespace lmshao::mpegts {
 
 // TS packet size constants
 constexpr size_t TS_PACKET_SIZE = 188;
@@ -130,10 +132,10 @@ struct PATTable {
 
 struct TSPacket {
     TSHeader header;
-    std::shared_ptr<coreutils::DataBuffer> adaptation_field;
-    std::shared_ptr<coreutils::DataBuffer> payload;
+    std::shared_ptr<DataBuffer> adaptation_field;
+    std::shared_ptr<DataBuffer> payload;
 
-    TSPacket() : adaptation_field(nullptr), payload(std::make_shared<coreutils::DataBuffer>()) {}
+    TSPacket() : adaptation_field(nullptr), payload(std::make_shared<DataBuffer>()) {}
 
     size_t GetTotalSize() const;
     bool HasPCR() const;
@@ -141,6 +143,6 @@ struct TSPacket {
     std::vector<uint8_t> GetRawData() const;
 };
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts
 
-#endif // RTSP_TS_TYPES_H
+#endif // LMSHAO_MPEGTS_TS_TYPES_H

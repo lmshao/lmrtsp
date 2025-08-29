@@ -6,13 +6,13 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef MPEGTS_ADTS_HEADER_H
-#define MPEGTS_ADTS_HEADER_H
+#ifndef LMSHAO_MPEGTS_ADTS_HEADER_H
+#define LMSHAO_MPEGTS_ADTS_HEADER_H
 
 #include <cstddef>
 #include <cstdint>
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 class ADTSHeader {
 public:
@@ -66,6 +66,6 @@ private:
     static int GetIndexFromSampleRate(int sample_rate);
 };
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts
 
-#endif // MPEGTS_ADTS_HEADER_H
+#endif // LMSHAO_MPEGTS_ADTS_HEADER_H

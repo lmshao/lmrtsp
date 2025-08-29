@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_TS_MUXER_H
-#define RTSP_TS_MUXER_H
+#ifndef LMSHAO_MPEGTS_TS_MUXER_H
+#define LMSHAO_MPEGTS_TS_MUXER_H
 
 #include <map>
 #include <memory>
@@ -17,7 +17,7 @@
 #include "ts_callback.h"
 #include "ts_types.h"
 
-namespace lmshao::rtsp::mpegts {
+namespace lmshao::mpegts {
 
 // TS stream muxer
 class TSStreamMuxer {
@@ -82,6 +82,6 @@ private:
     uint32_t CalculateCRC32(const uint8_t *data, size_t length);
 };
 
-} // namespace lmshao::rtsp::mpegts
+} // namespace lmshao::mpegts
 
-#endif // RTSP_TS_MUXER_H
+#endif // LMSHAO_MPEGTS_TS_MUXER_H

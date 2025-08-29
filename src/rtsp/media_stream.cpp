@@ -7,9 +7,11 @@
  */
 
 #include "media_stream.h"
+
 #include <chrono>
 #include <vector>
-#include "rtsp/rtp/h264_packetizer.h"
+
+#include "rtp/h264_packetizer.h"
 #include "rtsp/rtsp_session.h"
 #include "rtsp_log.h"
 
@@ -17,49 +19,61 @@ namespace lmshao::rtsp {
 
 // MediaStream base class implementation
 MediaStream::MediaStream(const std::string &uri, const std::string &mediaType)
-    : uri_(uri), mediaType_(mediaType), state_(StreamState::INIT) {
+    : uri_(uri), mediaType_(mediaType), state_(StreamState::INIT)
+{
     RTSP_LOGD("Created MediaStream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());
 }
 
-MediaStream::~MediaStream() {
+MediaStream::~MediaStream()
+{
     RTSP_LOGD("Destroyed MediaStream for URI: %s", uri_.c_str());
 }
 
-std::string MediaStream::GetUri() const {
+std::string MediaStream::GetUri() const
+{
     return uri_;
 }
 
-std::string MediaStream::GetMediaType() const {
+std::string MediaStream::GetMediaType() const
+{
     return mediaType_;
 }
 
-StreamState MediaStream::GetState() const {
+StreamState MediaStream::GetState() const
+{
     return state_;
 }
 
-int MediaStream::GetTrackId() const {
+int MediaStream::GetTrackId() const
+{
     return track_index_;
 }
 
-void MediaStream::SetSession(std::weak_ptr<RTSPSession> session) {
+void MediaStream::SetSession(std::weak_ptr<RTSPSession> session)
+{
     session_ = session;
 }
 
-void MediaStream::SetTrackIndex(int index) {
+void MediaStream::SetTrackIndex(int index)
+{
     track_index_ = index;
 }
 
 // RTPStream implementation
 RTPStream::RTPStream(const std::string &uri, const std::string &mediaType)
     : MediaStream(uri, mediaType), clientRtpPort_(0), clientRtcpPort_(0), serverRtpPort_(0), serverRtcpPort_(0),
-      sequenceNumber_(0), timestamp_(0), isActive_(false) {}
+      sequenceNumber_(0), timestamp_(0), isActive_(false)
+{
+}
 
-RTPStream::~RTPStream() {
+RTPStream::~RTPStream()
+{
     // Ensure resources are released
     Teardown();
 }
 
-bool RTPStream::Setup(const std::string &transport, const std::string &client_ip) {
+bool RTPStream::Setup(const std::string &transport, const std::string &client_ip)
+{
     clientIp_ = client_ip;
     RTSP_LOGD("Setting up RTP stream with transport: %s", transport.c_str());
 
@@ -150,7 +164,8 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
     return true;
 }
 
-bool RTPStream::Play(const std::string &range) {
+bool RTPStream::Play(const std::string &range)
+{
     RTSP_LOGD("Playing RTP stream, range: %s", range.c_str());
 
     if (state_ != StreamState::READY && state_ != StreamState::PAUSED) {
@@ -174,7 +189,8 @@ bool RTPStream::Play(const std::string &range) {
     return true;
 }
 
-bool RTPStream::Pause() {
+bool RTPStream::Pause()
+{
     RTSP_LOGD("Pausing RTP stream");
 
     if (state_ != StreamState::PLAYING) {
@@ -191,7 +207,8 @@ bool RTPStream::Pause() {
     return true;
 }
 
-bool RTPStream::Teardown() {
+bool RTPStream::Teardown()
+{
     RTSP_LOGD("Tearing down RTP stream");
 
     if (state_ == StreamState::INIT) {
@@ -229,36 +246,43 @@ bool RTPStream::Teardown() {
     return true;
 }
 
-std::string RTPStream::GetRtpInfo() const {
+std::string RTPStream::GetRtpInfo() const
+{
     // In actual implementation, this should return the value of RTP-Info header
     // Example: RTP-Info: url=rtsp://example.com/media.mp4/track1;seq=12345;rtptime=3450012
     return "url=" + uri_ + ";seq=" + std::to_string(sequenceNumber_) + ";rtptime=" + std::to_string(timestamp_);
 }
 
-std::string RTPStream::GetTransportInfo() const {
+std::string RTPStream::GetTransportInfo() const
+{
     return transportInfo_;
 }
 
-void RTPStream::PushFrame(rtp::MediaFrame &&frame) {
+void RTPStream::PushFrame(MediaFrame &&frame)
+{
     std::unique_lock<std::mutex> lock(queue_mutex_);
     frame_queue_.push(std::move(frame));
     lock.unlock();
     queue_cv_.notify_one();
 }
 
-void RTPStream::OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<coreutils::DataBuffer> data) {
+void RTPStream::OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<coreutils::DataBuffer> data)
+{
     RTSP_LOGD("RTPStream received a packet");
 }
 
-void RTPStream::OnClose(std::shared_ptr<network::Session> session) {
+void RTPStream::OnClose(std::shared_ptr<network::Session> session)
+{
     RTSP_LOGD("RTPStream session closed");
 }
 
-void RTPStream::OnError(std::shared_ptr<network::Session> session, const std::string &error) {
+void RTPStream::OnError(std::shared_ptr<network::Session> session, const std::string &error)
+{
     RTSP_LOGE("RTPStream error: %s", error.c_str());
 }
 
-void RTPStream::SendMedia() {
+void RTPStream::SendMedia()
+{
     RTSP_LOGD("SendMedia thread started");
 
     while (isActive_) {
@@ -269,14 +293,14 @@ void RTPStream::SendMedia() {
             break;
         }
 
-        rtp::MediaFrame frame = std::move(frame_queue_.front());
+        MediaFrame frame = std::move(frame_queue_.front());
         frame_queue_.pop();
         lock.unlock();
 
         // Pack frame into RTP packets and send them
         if (packetizer_) {
             auto packets = packetizer_->packetize(frame);
-            for (const auto& packet : packets) {
+            for (const auto &packet : packets) {
                 auto buffer = packet.serialize();
                 if (!rtp_client_->Send(buffer.data(), buffer.size())) {
                     RTSP_LOGE("Failed to send RTP packet");
@@ -290,7 +314,8 @@ void RTPStream::SendMedia() {
 }
 
 // MediaStreamFactory implementation
-std::shared_ptr<MediaStream> MediaStreamFactory::CreateStream(const std::string &uri, const std::string &mediaType) {
+std::shared_ptr<MediaStream> MediaStreamFactory::CreateStream(const std::string &uri, const std::string &mediaType)
+{
     RTSP_LOGD("Creating media stream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());
 
     // Currently only supports RTP streams

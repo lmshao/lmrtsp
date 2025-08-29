@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef RTSP_LOG_H
-#define RTSP_LOG_H
+#ifndef LMSHAO_RTSP_RTSP_LOG_H
+#define LMSHAO_RTSP_RTSP_LOG_H
 
 #include <chrono>
 #include <cstdio>
@@ -75,4 +75,4 @@ namespace lmshao::rtsp {
 
 } // namespace lmshao::rtsp
 
-#endif // RTSP_LOG_H
+#endif // LMSHAO_RTSP_RTSP_LOG_H

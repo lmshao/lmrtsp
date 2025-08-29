@@ -328,7 +328,7 @@ std::string GetReasonPhrase(StatusCode code)
         case StatusCode::OptionNotSupported:
             return REASON_OPTION_NOT_SUPPORTED;
         default:
-            return REASON_UNKNOWN;
+            return REASON_UNKNOWN_ERROR;
     }
 }
 

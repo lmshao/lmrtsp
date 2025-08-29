@@ -149,12 +149,14 @@ endif()
 # Source files and include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/include/rtsp)
+include_directories(${PROJECT_SOURCE_DIR}/include/rtp)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Collect RTSP source files
 file(GLOB_RECURSE RTSP_SOURCES "src/rtsp/*.cpp")
+file(GLOB_RECURSE RTP_SOURCES "src/rtp/*.cpp")
 file(GLOB_RECURSE MPEGTS_SOURCES "src/mpegts/*.cpp")
-set(SOURCES ${RTSP_SOURCES} ${MPEGTS_SOURCES})
+set(SOURCES ${RTSP_SOURCES} ${RTP_SOURCES} ${MPEGTS_SOURCES})
 
 # Validate build options
 if(NOT BUILD_STATIC_LIBS AND NOT BUILD_SHARED_LIBS)
@@ -184,8 +186,10 @@ find_package(Threads REQUIRED)
 
 # Print source file summary
 list(LENGTH RTSP_SOURCES RTSP_COUNT)
+list(LENGTH RTP_SOURCES RTP_COUNT)
 list(LENGTH MPEGTS_SOURCES MPEGTS_COUNT)
 message(STATUS "Found ${RTSP_COUNT} RTSP source files")
+message(STATUS "Found ${RTP_COUNT} RTP source files")
 message(STATUS "Found ${MPEGTS_COUNT} MPEG-TS source files")
 
 # Static library
@@ -323,41 +327,53 @@ if(BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
+# Platform-specific installation settings
+if(WIN32)
+    # Disable install/uninstall targets on Windows platform
+    message(STATUS "Install/uninstall targets are disabled on Windows platform")
+    message(STATUS "Use the library directly from the build directory")
+    set(ENABLE_INSTALL OFF)
+else()
+    set(ENABLE_INSTALL ON)
+endif()
+
 # Installation
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-# Install headers
-install(DIRECTORY include/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING PATTERN "*.h"
-)
-
-# Install libraries
-if(BUILD_STATIC_LIBS)
-    install(TARGETS rtsp_static
-        EXPORT rtspTargets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+# Only install if enabled
+if(ENABLE_INSTALL)
+    # Install headers
+    install(DIRECTORY include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING PATTERN "*.h"
     )
-endif()
 
-if(BUILD_SHARED_LIBS)
-    install(TARGETS rtsp_shared
-        EXPORT rtspTargets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    # Install libraries
+    if(BUILD_STATIC_LIBS)
+        install(TARGETS rtsp_static
+            EXPORT rtspTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
+    endif()
+
+    if(BUILD_SHARED_LIBS)
+        install(TARGETS rtsp_shared
+            EXPORT rtspTargets
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
+    endif()
+
+    # Install CMake targets
+    install(EXPORT rtspTargets
+        FILE rtspTargets.cmake
+        NAMESPACE rtsp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
     )
-endif()
-
-# Install CMake targets
-install(EXPORT rtspTargets
-    FILE rtspTargets.cmake
-    NAMESPACE rtsp::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
-)
 
 # Create config file
 configure_package_config_file(
@@ -373,24 +389,25 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-# Install config files
-install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/rtspConfig.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/rtspConfigVersion.cmake
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
-)
+    # Install config files
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/rtspConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/rtspConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
+    )
 
-# Create uninstall target
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-    @ONLY
-)
+    # Create uninstall target
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+        @ONLY
+    )
 
-add_custom_target(uninstall_rtsp
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-    COMMENT "Uninstalling RTSP library..."
-)
+    add_custom_target(uninstall_rtsp
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+        COMMENT "Uninstalling RTSP library..."
+    )
+endif()
 
 # Print build configuration summary
 message(STATUS "")
@@ -404,8 +421,13 @@ message(STATUS "Build shared library: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build examples: ${BUILD_EXAMPLES}")
 message(STATUS "Build tests: ${BUILD_TESTS}")
 message(STATUS "Build applications: ${BUILD_APPS}")
-message(STATUS "Install support: ON")
-message(STATUS "Uninstall support: ON (make uninstall_rtsp)")
+if(ENABLE_INSTALL)
+    message(STATUS "Install support: ON")
+    message(STATUS "Uninstall support: ON (make uninstall_rtsp)")
+else()
+    message(STATUS "Install support: DISABLED (Windows platform)")
+    message(STATUS "Uninstall support: DISABLED (Windows platform)")
+endif()
 message(STATUS "======================================================")
 message(STATUS "")
 
