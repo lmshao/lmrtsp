@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "media_stream.h"
+#include "rtsp/media_stream.h"
 
 #include <chrono>
 #include <vector>

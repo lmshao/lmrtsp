@@ -14,9 +14,9 @@ option(BUILD_TESTS "Build tests" ON)
 option(BUILD_APPS "Build RTSP applications (server/client)" ON)
 option(INSTALL_TO_USER_LOCAL "Install to ~/.local instead of system-wide" OFF)
 
-# Set default build type to Release if not specified
+# Set default build type to Debug if not specified
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Debug)
 endif()
 
 # Display configuration options for developers
