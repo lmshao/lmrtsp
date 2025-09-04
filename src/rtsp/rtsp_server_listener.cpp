@@ -48,6 +48,12 @@ void RTSPServerListener::OnError(std::shared_ptr<network::Session> session, cons
 
     // Clean up incomplete request data
     incompleteRequests_.erase(session->fd);
+
+    // Notify callback
+    auto server = rtspServer_.lock();
+    if (server) {
+        server->NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnError(session->host, -1, errorInfo); });
+    }
 }
 
 void RTSPServerListener::OnClose(std::shared_ptr<network::Session> session)
@@ -57,19 +63,22 @@ void RTSPServerListener::OnClose(std::shared_ptr<network::Session> session)
     // Clean up incomplete request data
     incompleteRequests_.erase(session->fd);
 
-    // Find and clean up related RTSP sessions
+    // Notify callback about client disconnection
     auto server = rtspServer_.lock();
     if (server) {
+        server->NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnClientDisconnected(session->host); });
+
         // Traverse all sessions to find RTSP sessions using this network session
         // Note: We need to traverse all sessions and check if network sessions match
         std::vector<std::string> sessionsToRemove;
 
         // Get all session IDs and check network sessions
-        for (const auto &sessionId : GetSessionIds(server)) {
-            auto rtspSession = server->GetSession(sessionId);
+        auto sessions = server->GetSessions();
+        for (const auto &pair : sessions) {
+            auto rtspSession = pair.second;
             if (rtspSession && rtspSession->GetNetworkSession() == session) {
                 // Found related session, mark for deletion
-                sessionsToRemove.push_back(sessionId);
+                sessionsToRemove.push_back(pair.first);
             }
         }
 
@@ -83,6 +92,14 @@ void RTSPServerListener::OnClose(std::shared_ptr<network::Session> session)
 void RTSPServerListener::OnAccept(std::shared_ptr<network::Session> session)
 {
     RTSP_LOGD("New client connected: %s:%d", session->host.c_str(), session->port);
+
+    // Notify callback about client connection
+    auto server = rtspServer_.lock();
+    if (server) {
+        server->NotifyCallback([&](IRTSPServerCallback *callback) {
+            callback->OnClientConnected(session->host, ""); // User-Agent will be obtained from RTSP request
+        });
+    }
 
     // Don't create RTSP session at this stage, wait until first RTSP request arrives
 }
@@ -152,27 +169,36 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
             return false;
         }
 
-        // Get or create RTSP session
-        std::shared_ptr<RTSPSession> rtspSession = nullptr;
-
-        // Check if session ID already exists
-        std::string sessionId;
-        if (request.general_header_.find(SESSION) != request.general_header_.end()) {
-            sessionId = request.general_header_.at(SESSION);
-            rtspSession = server->GetSession(sessionId);
-        }
-
-        // If no session found, create a new one
-        if (!rtspSession) {
-            rtspSession = server->CreateSession(session);
-        }
-
-        // Handle request
-        if (rtspSession) {
-            RTSP_LOGD("Handle request: \n%s", completeRequest.c_str());
-            server->HandleRequest(rtspSession, request);
+        // Handle stateless requests (OPTIONS, DESCRIBE) directly without creating session
+        if (request.method_ == METHOD_OPTIONS || request.method_ == METHOD_DESCRIBE) {
+            RTSP_LOGD("Handle stateless request: \n%s", completeRequest.c_str());
+            server->HandleStatelessRequest(session, request);
         } else {
-            RTSP_LOGE("Failed to create or find RTSP session");
+            // Get or create RTSP session for stateful requests
+            std::shared_ptr<RTSPSession> rtspSession = nullptr;
+
+            // Check if session ID already exists
+            std::string sessionId;
+            if (request.general_header_.find(SESSION) != request.general_header_.end()) {
+                sessionId = request.general_header_.at(SESSION);
+                rtspSession = server->GetSession(sessionId);
+            }
+
+            // For SETUP request, create a new session if none exists
+            // For other requests, session must already exist
+            if (!rtspSession && request.method_ == METHOD_SETUP) {
+                rtspSession = server->CreateSession(session);
+            }
+
+            // Handle request
+            if (rtspSession) {
+                RTSP_LOGD("Handle request: \n%s", completeRequest.c_str());
+                server->HandleRequest(rtspSession, request);
+            } else {
+                RTSP_LOGE("Failed to create or find RTSP session for method: %s", request.method_.c_str());
+                // Send error response for requests that require a session but don't have one
+                server->SendErrorResponse(session, request, 454, "Session Not Found");
+            }
         }
 
         // Check if there's remaining data (may contain multiple requests

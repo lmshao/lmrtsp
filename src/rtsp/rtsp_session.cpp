@@ -11,11 +11,15 @@
 #include <ctime>
 #include <functional>
 #include <random>
+#include <string>
 #include <unordered_map>
 
 #include "media_stream.h"
+#include "rtsp/rtsp_headers.h"
 #include "rtsp/rtsp_session_state.h"
 #include "rtsp_log.h"
+#include "rtsp_response.h"
+#include "rtsp_server.h"
 
 namespace lmshao::rtsp {
 
@@ -26,69 +30,85 @@ RTSPSession::RTSPSession(std::shared_ptr<network::Session> networkSession)
     // Generate session ID
     sessionId_ = GenerateSessionId();
 
-    // Set initial state
-    currentState_ = InitialState::GetInstance();
-
-    // Record current time
+    // Initialize last active time
     lastActiveTime_ = std::time(nullptr);
 
-    RTSP_LOGD("Created RTSP session: %s", sessionId_.c_str());
+    // Initialize state machine to Initial state
+    currentState_ = InitialState::GetInstance();
+
+    RTSP_LOGD("RTSPSession created with ID: %s", sessionId_.c_str());
+}
+
+RTSPSession::RTSPSession(std::shared_ptr<network::Session> networkSession, std::weak_ptr<RTSPServer> server)
+    : networkSession_(networkSession), rtspServer_(server), timeout_(60)
+{
+    // Generate session ID
+    sessionId_ = GenerateSessionId();
+
+    // Initialize last active time
+    lastActiveTime_ = std::time(nullptr);
+
+    // Initialize state machine to Initial state
+    currentState_ = InitialState::GetInstance();
+
+    RTSP_LOGD("RTSPSession created with ID: %s and server reference", sessionId_.c_str());
 }
 
 RTSPSession::~RTSPSession()
 {
-    // Clean up all media streams
-    for (auto &stream : mediaStreams_) {
-        stream->Teardown();
-    }
-    mediaStreams_.clear();
+    RTSP_LOGD("RTSPSession destroyed: %s", sessionId_.c_str());
 
-    RTSP_LOGD("Destroyed RTSP session: %s", sessionId_.c_str());
+    // Clean up media streams
+    mediaStreams_.clear();
 }
 
 RTSPResponse RTSPSession::ProcessRequest(const RTSPRequest &request)
 {
     // Update last active time
-    lastActiveTime_ = std::time(nullptr);
+    UpdateLastActiveTime();
 
-    RTSP_LOGD("Processing %s request in state %s", request.method_.c_str(), currentState_->GetName().c_str());
-
-    // Method to state handler mapping - O(1) lookup instead of O(n) if-else chain
-    using MethodHandler = RTSPResponse (RTSPSessionState::*)(RTSPSession *, const RTSPRequest &);
-
-    static const std::unordered_map<std::string, MethodHandler> method_handlers = {
-        {METHOD_OPTIONS, &RTSPSessionState::OnOptions},
-        {METHOD_DESCRIBE, &RTSPSessionState::OnDescribe},
-        {METHOD_ANNOUNCE, &RTSPSessionState::OnAnnounce},
-        {METHOD_RECORD, &RTSPSessionState::OnRecord},
-        {METHOD_SETUP, &RTSPSessionState::OnSetup},
-        {METHOD_PLAY, &RTSPSessionState::OnPlay},
-        {METHOD_PAUSE, &RTSPSessionState::OnPause},
-        {METHOD_TEARDOWN, &RTSPSessionState::OnTeardown},
-        {METHOD_GET_PARAMETER, &RTSPSessionState::OnGetParameter},
-        {METHOD_SET_PARAMETER, &RTSPSessionState::OnSetParameter}};
-
-    auto it = method_handlers.find(request.method_);
-    if (it != method_handlers.end()) {
-        return (currentState_.get()->*(it->second))(this, request);
+    // Use state machine to process request
+    if (!currentState_) {
+        // Fallback: initialize to Initial state if not set
+        currentState_ = InitialState::GetInstance();
     }
 
-    // Unsupported method
-    RTSP_LOGW("Unsupported RTSP method: %s", request.method_.c_str());
+    const std::string &method = request.method_;
 
-    // Build error response
-    auto response = RTSPResponseBuilder()
-                        .SetStatus(StatusCode::NotImplemented)
-                        .SetCSeq(std::stoi(request.general_header_.at(CSEQ)))
-                        .Build();
-
-    return response;
+    // Delegate to state machine based on method
+    if (method == "OPTIONS") {
+        return currentState_->OnOptions(this, request);
+    } else if (method == "DESCRIBE") {
+        return currentState_->OnDescribe(this, request);
+    } else if (method == "ANNOUNCE") {
+        return currentState_->OnAnnounce(this, request);
+    } else if (method == "RECORD") {
+        return currentState_->OnRecord(this, request);
+    } else if (method == "SETUP") {
+        return currentState_->OnSetup(this, request);
+    } else if (method == "PLAY") {
+        return currentState_->OnPlay(this, request);
+    } else if (method == "PAUSE") {
+        return currentState_->OnPause(this, request);
+    } else if (method == "TEARDOWN") {
+        return currentState_->OnTeardown(this, request);
+    } else if (method == "GET_PARAMETER") {
+        return currentState_->OnGetParameter(this, request);
+    } else if (method == "SET_PARAMETER") {
+        return currentState_->OnSetParameter(this, request);
+    } else {
+        // Unknown method
+        int cseq = 0;
+        auto cseq_it = request.general_header_.find("CSeq");
+        if (cseq_it != request.general_header_.end()) {
+            cseq = std::stoi(cseq_it->second);
+        }
+        return RTSPResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
+    }
 }
 
 void RTSPSession::ChangeState(std::shared_ptr<RTSPSessionState> newState)
 {
-    RTSP_LOGD("Changing state from %s to %s", currentState_->GetName().c_str(), newState->GetName().c_str());
-
     currentState_ = newState;
 }
 
@@ -102,150 +122,118 @@ std::string RTSPSession::GetSessionId() const
     return sessionId_;
 }
 
+std::string RTSPSession::GetClientIP() const
+{
+    if (networkSession_) {
+        return networkSession_->host;
+    }
+    return "";
+}
+
+uint16_t RTSPSession::GetClientPort() const
+{
+    if (networkSession_) {
+        return networkSession_->port;
+    }
+    return 0;
+}
+
 std::shared_ptr<network::Session> RTSPSession::GetNetworkSession() const
 {
     return networkSession_;
 }
 
+std::weak_ptr<RTSPServer> RTSPSession::GetRTSPServer() const
+{
+    return rtspServer_;
+}
+
 bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transport)
 {
-    RTSP_LOGD("Setting up media for track: %s", uri.c_str());
+    RTSP_LOGD("Setting up media for URI: %s, Transport: %s", uri.c_str(), transport.c_str());
 
-    // 1. Extract trackID from URI
-    size_t last_slash = uri.find_last_of('/');
-    if (last_slash == std::string::npos) {
-        RTSP_LOGE("Invalid track URI: %s", uri.c_str());
-        return false;
-    }
-    std::string track_id = uri.substr(last_slash + 1);
+    // Parse transport parameters
+    rtpTransportParams_ = ParseTransportHeader(transport);
 
-    // 2. Check if media stream for this track already exists
-    std::shared_ptr<MediaStream> media_stream;
-    for (const auto &stream : mediaStreams_) {
-        // The URI of a media stream is its track id
-        if (stream->GetUri() == track_id) {
-            media_stream = stream;
-            break;
+    // Extract client ports from transport header
+    uint16_t clientRtpPort = 0, clientRtcpPort = 0;
+    size_t clientPortPos = transport.find("client_port=");
+    if (clientPortPos != std::string::npos) {
+        size_t portStart = clientPortPos + 12; // Length of "client_port="
+        size_t portEnd = transport.find(';', portStart);
+        if (portEnd == std::string::npos) {
+            portEnd = transport.length();
+        }
+        std::string portRange = transport.substr(portStart, portEnd - portStart);
+        size_t dashPos = portRange.find('-');
+        if (dashPos != std::string::npos) {
+            clientRtpPort = static_cast<uint16_t>(std::stoi(portRange.substr(0, dashPos)));
+            clientRtcpPort = static_cast<uint16_t>(std::stoi(portRange.substr(dashPos + 1)));
         }
     }
 
-    if (!media_stream) {
-        // 3. If not, create a new one
-        RTSP_LOGD("Creating new media stream for track: %s", track_id.c_str());
-        // TODO: get mediaType from SDP
-        media_stream = MediaStreamFactory::CreateStream(track_id, "video");
-        if (media_stream) {
-            media_stream->SetSession(weak_from_this());
-            media_stream->SetTrackIndex(mediaStreams_.size());
-            mediaStreams_.push_back(media_stream);
-        } else {
-            RTSP_LOGE("Failed to create media stream for track: %s", track_id.c_str());
-            return false;
-        }
-    }
+    // Allocate server ports (simple allocation for demo)
+    uint16_t serverRtpPort = 6000 + (std::hash<std::string>{}(sessionId_) % 1000) * 2;
+    uint16_t serverRtcpPort = serverRtpPort + 1;
 
-    // 4. Setup the stream
-    if (!media_stream->Setup(transport, networkSession_->host)) {
-        RTSP_LOGE("Failed to setup media stream for track: %s", track_id.c_str());
-        return false;
-    }
+    // Build transport info for response
+    transportInfo_ = transport + ";server_port=" + std::to_string(serverRtpPort) + "-" + std::to_string(serverRtcpPort);
 
-    // 5. Construct Transport header for response
-    transportInfo_ = media_stream->GetTransportInfo();
+    // Set setup flag
+    isSetup_ = true;
 
+    RTSP_LOGD("Media setup completed for session: %s, Transport: %s", sessionId_.c_str(), transportInfo_.c_str());
     return true;
 }
 
 bool RTSPSession::PlayMedia(const std::string &uri, const std::string &range)
 {
-    RTSP_LOGD("Playing media for URI: %s", uri.c_str());
+    RTSP_LOGD("Playing media for URI: %s, Range: %s", uri.c_str(), range.c_str());
 
-    // If URI is the aggregate URI (without track ID), play all streams
-    size_t last_slash = uri.find_last_of('/');
-    if (last_slash == std::string::npos || last_slash == uri.length() - 1) {
-        bool success = true;
-        for (auto &stream : mediaStreams_) {
-            if (!stream->Play(range)) {
-                RTSP_LOGE("Failed to play media stream: %s", stream->GetUri().c_str());
-                success = false;
-            }
-        }
-        return success;
+    if (!isSetup_) {
+        RTSP_LOGE("Cannot play media: session not setup");
+        return false;
     }
 
-    // Otherwise, play the specific track
-    std::string track_id = uri.substr(last_slash + 1);
-    for (auto &stream : mediaStreams_) {
-        if (stream->GetUri() == track_id) {
-            return stream->Play(range);
-        }
-    }
+    // Set playing state
+    isPlaying_ = true;
+    isPaused_ = false;
 
-    RTSP_LOGE("Media stream not found for track: %s", track_id.c_str());
-    return false;
+    RTSP_LOGD("Media playback started for session: %s", sessionId_.c_str());
+    return true;
 }
 
 bool RTSPSession::PauseMedia(const std::string &uri)
 {
     RTSP_LOGD("Pausing media for URI: %s", uri.c_str());
 
-    // If URI is the aggregate URI (without track ID), pause all streams
-    size_t last_slash = uri.find_last_of('/');
-    if (last_slash == std::string::npos || last_slash == uri.length() - 1) {
-        bool success = true;
-        for (auto &stream : mediaStreams_) {
-            if (!stream->Pause()) {
-                RTSP_LOGE("Failed to pause media stream: %s", stream->GetUri().c_str());
-                success = false;
-            }
-        }
-        return success;
+    if (!isPlaying_) {
+        RTSP_LOGE("Cannot pause media: not currently playing");
+        return false;
     }
 
-    // Otherwise, pause the specific track
-    std::string track_id = uri.substr(last_slash + 1);
-    for (auto &stream : mediaStreams_) {
-        if (stream->GetUri() == track_id) {
-            return stream->Pause();
-        }
-    }
+    // Set paused state
+    isPaused_ = true;
+    isPlaying_ = false;
 
-    RTSP_LOGE("Media stream not found for track: %s", track_id.c_str());
-    return false;
+    RTSP_LOGD("Media playback paused for session: %s", sessionId_.c_str());
+    return true;
 }
 
 bool RTSPSession::TeardownMedia(const std::string &uri)
 {
     RTSP_LOGD("Tearing down media for URI: %s", uri.c_str());
 
-    // If URI is the aggregate URI (without track ID), teardown all streams
-    size_t last_slash = uri.find_last_of('/');
-    if (last_slash == std::string::npos || last_slash == uri.length() - 1) {
-        bool success = true;
-        for (auto &stream : mediaStreams_) {
-            if (!stream->Teardown()) {
-                RTSP_LOGE("Failed to teardown media stream: %s", stream->GetUri().c_str());
-                success = false;
-            }
-        }
-        mediaStreams_.clear();
-        return success;
-    }
+    // Reset all states
+    isPlaying_ = false;
+    isPaused_ = false;
+    isSetup_ = false;
 
-    // Otherwise, teardown the specific track
-    std::string track_id = uri.substr(last_slash + 1);
-    for (auto it = mediaStreams_.begin(); it != mediaStreams_.end(); ++it) {
-        if ((*it)->GetUri() == track_id) {
-            bool success = (*it)->Teardown();
-            if (success) {
-                mediaStreams_.erase(it);
-            }
-            return success;
-        }
-    }
+    // Clear media streams
+    mediaStreams_.clear();
 
-    RTSP_LOGE("Media stream not found for track: %s", track_id.c_str());
-    return false;
+    RTSP_LOGD("Media teardown completed for session: %s", sessionId_.c_str());
+    return true;
 }
 
 void RTSPSession::SetSdpDescription(const std::string &sdp)
@@ -270,10 +258,10 @@ std::string RTSPSession::GetTransportInfo() const
 
 std::shared_ptr<MediaStream> RTSPSession::GetMediaStream(int track_index)
 {
-    if (track_index < 0 || static_cast<size_t>(track_index) >= mediaStreams_.size()) {
-        return nullptr;
+    if (track_index >= 0 && track_index < static_cast<int>(mediaStreams_.size())) {
+        return mediaStreams_[track_index];
     }
-    return mediaStreams_[track_index];
+    return nullptr;
 }
 
 const std::vector<std::shared_ptr<MediaStream>> &RTSPSession::GetMediaStreams() const
@@ -281,15 +269,107 @@ const std::vector<std::shared_ptr<MediaStream>> &RTSPSession::GetMediaStreams() 
     return mediaStreams_;
 }
 
+bool RTSPSession::IsPlaying() const
+{
+    return isPlaying_;
+}
+
+bool RTSPSession::IsPaused() const
+{
+    return isPaused_;
+}
+
+bool RTSPSession::IsSetup() const
+{
+    return isSetup_;
+}
+
+void RTSPSession::UpdateLastActiveTime()
+{
+    lastActiveTime_ = std::time(nullptr);
+}
+
+bool RTSPSession::IsExpired(uint32_t timeout_seconds) const
+{
+    time_t current_time = std::time(nullptr);
+    return (current_time - lastActiveTime_) > timeout_seconds;
+}
+
+time_t RTSPSession::GetLastActiveTime() const
+{
+    return lastActiveTime_;
+}
+
 std::string RTSPSession::GenerateSessionId()
 {
-    thread_local static std::random_device rd;
-    uint32_t part1 = rd();
-    uint32_t part2 = rd();
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(100000, 999999);
 
-    char buffer[18];
-    snprintf(buffer, sizeof(buffer), "%08X%08X", part1, part2);
-    return buffer;
+    return std::to_string(dis(gen));
+}
+
+RTPTransportParams RTSPSession::ParseTransportHeader(const std::string &transport) const
+{
+    RTPTransportParams params;
+    // TODO: Implement transport header parsing
+    return params;
+}
+
+void RTSPSession::SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_info)
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    mediaStreamInfo_ = stream_info;
+}
+
+std::shared_ptr<MediaStreamInfo> RTSPSession::GetMediaStreamInfo() const
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    return mediaStreamInfo_;
+}
+
+void RTSPSession::SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender)
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    rtpSender_ = rtp_sender;
+}
+
+std::shared_ptr<IRTPSender> RTSPSession::GetRTPSender() const
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    return rtpSender_;
+}
+
+bool RTSPSession::HasRTPSender() const
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    return rtpSender_ != nullptr;
+}
+
+void RTSPSession::SetRTPTransportParams(const RTPTransportParams &params)
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    rtpTransportParams_ = params;
+}
+
+RTPTransportParams RTSPSession::GetRTPTransportParams() const
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    return rtpTransportParams_;
+}
+
+bool RTSPSession::HasValidTransport() const
+{
+    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+    // TODO: Implement transport validation logic
+    return true;
+}
+
+RTPStatistics RTSPSession::GetRTPStatistics() const
+{
+    RTPStatistics stats;
+    // TODO: Implement RTP statistics collection
+    return stats;
 }
 
 } // namespace lmshao::rtsp
