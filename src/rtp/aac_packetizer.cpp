@@ -8,6 +8,8 @@
 
 #include "rtp/aac_packetizer.h"
 
+#include <rtp/rtp_logger.h>
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -20,10 +22,12 @@ namespace lmshao::rtp {
 AacPacketizer::AacPacketizer(uint32_t ssrc, uint16_t sequence_number, uint32_t timestamp, uint32_t mtu_size)
     : ssrc_(ssrc), sequence_number_(sequence_number), timestamp_(timestamp), mtu_size_(mtu_size)
 {
+    RTP_LOGD("AacPacketizer created: SSRC=0x%08X, MTU=%u", ssrc, mtu_size);
 }
 
 std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame &frame)
 {
+    RTP_LOGD("AacPacketizer: packetizing AAC frame, size: %zu", frame.data.size());
     std::vector<RtpPacket> packets;
     const uint8_t *frame_data = frame.data.data();
     size_t frame_size = frame.data.size();
@@ -31,6 +35,7 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame &frame)
     // Assuming the frame contains a single ADTS frame
     // ADTS header is 7 bytes, we need to skip it
     if (frame_size <= 7) {
+        RTP_LOGW("AacPacketizer: frame too small (%zu bytes), skipping", frame_size);
         return packets;
     }
 
@@ -61,8 +66,10 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame &frame)
         packets.push_back(std::move(packet));
     } else {
         // Fragmentation for AAC is more complex and not implemented here
+        RTP_LOGW("AacPacketizer: frame too large for single packet, fragmentation not implemented");
     }
 
+    RTP_LOGD("AacPacketizer: generated %zu RTP packets", packets.size());
     return packets;
 }
 

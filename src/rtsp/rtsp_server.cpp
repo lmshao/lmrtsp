@@ -9,9 +9,9 @@
 #include "rtsp_server.h"
 
 #include <network/tcp_server.h>
+#include <rtsp/rtsp_logger.h>
 
 #include "rtsp/irtsp_server_callback.h"
-#include "rtsp_log.h"
 #include "rtsp_response.h"
 #include "rtsp_server_listener.h"
 #include "rtsp_session.h"

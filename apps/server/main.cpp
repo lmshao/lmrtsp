@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <network/network_logger.h>
+#include <rtsp/rtsp_logger.h>
 #include <signal.h>
 
 #include <iostream>
@@ -14,7 +16,6 @@
 #include "rtp/i_rtp_packetizer.h"
 #include "rtsp/media_stream.h"
 #include "rtsp/rtsp_session.h"
-#include "rtsp_log.h"
 #include "rtsp_server.h"
 
 using namespace lmshao::rtsp;
@@ -40,6 +41,8 @@ int main(int argc, char *argv[])
     // Register signal handler
     signal(SIGINT, signalHandler);
 
+    InitNetworkLogger(lmshao::coreutils::LogLevel::kWarn);
+    InitRtspLogger(lmshao::coreutils::LogLevel::kDebug);
     // Get RTSP server instance
     g_server = RTSPServer::GetInstance();
 
