@@ -8,33 +8,49 @@
 
 #include "rtp/tcp_transport.h"
 
+#include <rtp/rtp_logger.h>
+
 using namespace lmshao::network;
 using namespace lmshao::coreutils;
 
 namespace lmshao::rtp {
 
-TcpTransport::TcpTransport() = default;
+TcpTransport::TcpTransport()
+{
+    RTP_LOGD("TcpTransport created");
+}
 
 TcpTransport::~TcpTransport()
 {
+    RTP_LOGD("TcpTransport destroyed");
     Close();
 }
 
 bool TcpTransport::Init(const std::string &ip, uint16_t port)
 {
+    RTP_LOGD("TcpTransport initializing: %s:%d", ip.c_str(), port);
     tcp_client_ = TcpClient::Create(ip, port);
     if (!tcp_client_) {
+        RTP_LOGE("Failed to create TCP client");
         return false;
     }
     tcp_client_->SetListener(shared_from_this());
-    return tcp_client_->Init();
+    bool result = tcp_client_->Init();
+    if (result) {
+        RTP_LOGD("TcpTransport initialized successfully");
+    } else {
+        RTP_LOGE("Failed to initialize TCP client");
+    }
+    return result;
 }
 
 bool TcpTransport::Send(const uint8_t *data, size_t size)
 {
     if (!tcp_client_) {
+        RTP_LOGE("TcpTransport: TCP client not initialized");
         return false;
     }
+    RTP_LOGD("TcpTransport: sending %zu bytes", size);
     return tcp_client_->Send(reinterpret_cast<const char *>(data), size);
 }
 

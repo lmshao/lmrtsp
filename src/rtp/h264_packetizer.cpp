@@ -15,6 +15,8 @@
 #include <arpa/inet.h>
 #endif
 
+#include <rtp/rtp_logger.h>
+
 #include <algorithm>
 #include <iostream>
 
@@ -42,6 +44,7 @@ const uint8_t *find_nalu_start(const uint8_t *data, size_t size)
 H264Packetizer::H264Packetizer(uint32_t ssrc, uint16_t sequence_number, uint32_t timestamp, uint32_t mtu_size)
     : ssrc_(ssrc), sequence_number_(sequence_number), timestamp_(timestamp), mtu_size_(mtu_size)
 {
+    RTP_LOGD("H264Packetizer created: SSRC=0x%08X, MTU=%u", ssrc, mtu_size);
 }
 
 std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
@@ -49,6 +52,8 @@ std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
     packets_.clear();
     const uint8_t *frame_data = frame.data.data();
     size_t frame_size = frame.data.size();
+
+    RTP_LOGD("H264Packetizer: packetizing frame, size: %zu", frame_size);
 
     const uint8_t *nalu_start = find_nalu_start(frame_data, frame_size);
     while (nalu_start) {
@@ -69,6 +74,7 @@ std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
         packets_.back().header.marker = 1;
     }
 
+    RTP_LOGD("H264Packetizer: generated %zu RTP packets", packets_.size());
     return packets_;
 }
 

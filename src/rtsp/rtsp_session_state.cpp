@@ -8,7 +8,8 @@
 
 #include "rtsp_session_state.h"
 
-#include "rtsp_log.h"
+#include <rtsp/rtsp_logger.h>
+
 #include "rtsp_response.h"
 #include "rtsp_server.h"
 #include "rtsp_session.h"

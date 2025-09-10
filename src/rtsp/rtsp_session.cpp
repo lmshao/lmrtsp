@@ -8,6 +8,8 @@
 
 #include "rtsp_session.h"
 
+#include <rtsp/rtsp_logger.h>
+
 #include <ctime>
 #include <functional>
 #include <random>
@@ -17,7 +19,6 @@
 #include "media_stream.h"
 #include "rtsp/rtsp_headers.h"
 #include "rtsp/rtsp_session_state.h"
-#include "rtsp_log.h"
 #include "rtsp_response.h"
 #include "rtsp_server.h"
 

@@ -10,8 +10,8 @@
 
 #include <coreutils/data_buffer.h>
 #include <network/session.h>
+#include <rtsp/rtsp_logger.h>
 
-#include "rtsp_log.h"
 #include "rtsp_request.h"
 #include "rtsp_server.h"
 #include "rtsp_session.h"
