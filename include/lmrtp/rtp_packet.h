@@ -6,14 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTP_RTP_PACKET_H
-#define LMSHAO_RTP_RTP_PACKET_H
+#ifndef LMSHAO_LMRTP_RTP_PACKET_H
+#define LMSHAO_LMRTP_RTP_PACKET_H
 
 #include <cstdint>
 #include <cstring>
 #include <vector>
 
-// Platform-specific network headers
+// Platform-specific lmnet headers
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -28,7 +28,7 @@
 #include <endian.h>
 #endif
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 // Represents the fixed-size RTP header.
 // See RFC 3550 for details.
 struct RtpHeader {
@@ -70,11 +70,11 @@ public:
         header.marker = 0;
     }
 
-    // Serialize the packet into a byte buffer for network transmission.
+    // Serialize the packet into a byte buffer for lmnet transmission.
     std::vector<uint8_t> serialize() const
     {
         std::vector<uint8_t> buffer(sizeof(RtpHeader));
-        // Copy header and convert to network byte order
+        // Copy header and convert to lmnet byte order
         RtpHeader net_header = header;
         net_header.sequence_number = htons(header.sequence_number);
         net_header.timestamp = htonl(header.timestamp);
@@ -88,7 +88,7 @@ public:
         return buffer;
     }
 
-    // Parse a byte buffer from the network into an RtpPacket.
+    // Parse a byte buffer from the lmnet into an RtpPacket.
     bool parse(const std::vector<uint8_t> &buffer)
     {
         if (buffer.size() < sizeof(RtpHeader)) {
@@ -97,7 +97,7 @@ public:
 
         memcpy(&header, buffer.data(), sizeof(RtpHeader));
 
-        // Convert from network byte order
+        // Convert from lmnet byte order
         header.sequence_number = ntohs(header.sequence_number);
         header.timestamp = ntohl(header.timestamp);
         header.ssrc = ntohl(header.ssrc);
@@ -119,6 +119,6 @@ public:
     }
 };
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp
 
-#endif // LMSHAO_RTP_RTP_PACKET_H
+#endif // LMSHAO_LMRTP_RTP_PACKET_H

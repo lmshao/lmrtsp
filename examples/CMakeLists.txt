@@ -1,7 +1,7 @@
 # CMakeLists.txt for RTSP Examples
 cmake_minimum_required(VERSION 3.10)
 
-project(rtsp-examples)
+project(lmrtsp-examples)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -16,8 +16,8 @@ foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
     get_filename_component(EXAMPLE_NAME ${EXAMPLE_SOURCE} NAME_WE)
     add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE})
     
-    # Link RTSP library
-    target_link_libraries(${EXAMPLE_NAME} PRIVATE rtsp)
+    # Link lmrtsp library
+    target_link_libraries(${EXAMPLE_NAME} PRIVATE lmrtsp)
     
     # Set output directory
     set_target_properties(${EXAMPLE_NAME} PROPERTIES

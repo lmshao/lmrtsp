@@ -6,17 +6,17 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp/media_stream.h"
+#include "media_stream.h"
 
-#include <rtsp/rtsp_logger.h>
+#include "internal_logger.h"
 
 #include <chrono>
 #include <vector>
 
-#include "rtp/h264_packetizer.h"
-#include "rtsp/rtsp_session.h"
+#include "lmrtp/h264_packetizer.h"
+#include "rtsp_session.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 // MediaStream base class implementation
 MediaStream::MediaStream(const std::string &uri, const std::string &mediaType)
@@ -120,7 +120,7 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
     }
 
     // Allocate server ports
-    auto port = network::UdpServer::GetIdlePortPair();
+    auto port = lmnet::UdpServer::GetIdlePortPair();
     if (port == 0) {
         RTSP_LOGE("Failed to get idle port pair");
         return false;
@@ -128,27 +128,27 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
     serverRtpPort_ = port;
     serverRtcpPort_ = port + 1;
 
-    rtp_server_ = std::make_shared<network::UdpServer>(serverRtpPort_);
+    rtp_server_ = std::make_shared<lmnet::UdpServer>(serverRtpPort_);
     rtp_server_->SetListener(shared_from_this());
     if (!rtp_server_->Start()) {
         RTSP_LOGE("Failed to start rtp server");
         return false;
     }
 
-    rtcp_server_ = std::make_shared<network::UdpServer>(serverRtcpPort_);
+    rtcp_server_ = std::make_shared<lmnet::UdpServer>(serverRtcpPort_);
     rtcp_server_->SetListener(shared_from_this());
     if (!rtcp_server_->Start()) {
         RTSP_LOGE("Failed to start rtcp server");
         return false;
     }
 
-    rtp_client_ = std::make_shared<network::UdpClient>(clientIp_, clientRtpPort_);
+    rtp_client_ = std::make_shared<lmnet::UdpClient>(clientIp_, clientRtpPort_);
     if (!rtp_client_->Init()) {
         RTSP_LOGE("Failed to init rtp client");
         return false;
     }
 
-    rtcp_client_ = std::make_shared<network::UdpClient>(clientIp_, clientRtcpPort_);
+    rtcp_client_ = std::make_shared<lmnet::UdpClient>(clientIp_, clientRtcpPort_);
     if (!rtcp_client_->Init()) {
         RTSP_LOGE("Failed to init rtcp client");
         return false;
@@ -267,17 +267,17 @@ void RTPStream::PushFrame(MediaFrame &&frame)
     queue_cv_.notify_one();
 }
 
-void RTPStream::OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<coreutils::DataBuffer> data)
+void RTPStream::OnReceive(std::shared_ptr<lmnet::Session> session, std::shared_ptr<lmcore::DataBuffer> data)
 {
     RTSP_LOGD("RTPStream received a packet");
 }
 
-void RTPStream::OnClose(std::shared_ptr<network::Session> session)
+void RTPStream::OnClose(std::shared_ptr<lmnet::Session> session)
 {
     RTSP_LOGD("RTPStream session closed");
 }
 
-void RTPStream::OnError(std::shared_ptr<network::Session> session, const std::string &error)
+void RTPStream::OnError(std::shared_ptr<lmnet::Session> session, const std::string &error)
 {
     RTSP_LOGE("RTPStream error: %s", error.c_str());
 }
@@ -323,4 +323,4 @@ std::shared_ptr<MediaStream> MediaStreamFactory::CreateStream(const std::string 
     return std::make_shared<RTPStream>(uri, mediaType);
 }
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp

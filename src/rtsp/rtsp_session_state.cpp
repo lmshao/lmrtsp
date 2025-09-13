@@ -8,13 +8,13 @@
 
 #include "rtsp_session_state.h"
 
-#include <rtsp/rtsp_logger.h>
+#include "internal_logger.h"
 
 #include "rtsp_response.h"
 #include "rtsp_server.h"
 #include "rtsp_session.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 // Common RTSP method handling functions
 namespace {
@@ -412,4 +412,4 @@ RTSPResponse PausedState::OnTeardown(RTSPSession *session, const RTSPRequest &re
 
 // GetName functions are implemented inline in the header file
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp

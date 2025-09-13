@@ -6,15 +6,15 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTP_RTP_SESSION_H
-#define LMSHAO_RTP_RTP_SESSION_H
+#ifndef LMSHAO_LMRTP_RTP_SESSION_H
+#define LMSHAO_LMRTP_RTP_SESSION_H
 
 #include <memory>
 
-#include "rtp/i_rtp_packetizer.h"
-#include "rtp/i_transport.h"
+#include "lmrtp/i_rtp_packetizer.h"
+#include "lmrtp/i_transport.h"
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 class RtpSession {
 public:
@@ -28,6 +28,6 @@ private:
     std::unique_ptr<ITransport> transport_;
 };
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp
 
-#endif // LMSHAO_RTP_RTP_SESSION_H
+#endif // LMSHAO_LMRTP_RTP_SESSION_H

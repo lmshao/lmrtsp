@@ -6,14 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtp/tcp_transport.h"
+#include "lmrtp/tcp_transport.h"
 
-#include <rtp/rtp_logger.h>
+#include "internal_logger.h"
 
-using namespace lmshao::network;
-using namespace lmshao::coreutils;
+using namespace lmshao::lmnet;
+using namespace lmshao::lmcore;
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 TcpTransport::TcpTransport()
 {
@@ -76,4 +76,4 @@ void TcpTransport::OnError(socket_t fd, const std::string &errorInfo)
     // Not used for sending RTP data
 }
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp

@@ -6,10 +6,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_RTSP_HEADERS_H
-#define LMSHAO_RTSP_RTSP_HEADERS_H
+#ifndef LMSHAO_LMRTSP_RTSP_HEADERS_H
+#define LMSHAO_LMRTSP_RTSP_HEADERS_H
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 // RTSP Methods
 constexpr const char *METHOD_OPTIONS = "OPTIONS";
@@ -119,6 +119,6 @@ constexpr const char *REASON_OPTION_NOT_SUPPORTED = "Option not supported";
 // Avoid conflict with Windows REASON_UNKNOWN macro
 constexpr const char *REASON_UNKNOWN_ERROR = "Unknown";
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_RTSP_HEADERS_H
+#endif // LMSHAO_LMRTSP_RTSP_HEADERS_H

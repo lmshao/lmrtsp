@@ -16,8 +16,8 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     # Create test executable
     add_executable(${TEST_NAME} ${TEST_SOURCE})
     
-    # Link to RTSP library
-    target_link_libraries(${TEST_NAME} rtsp)
+    # Link to lmrtsp library
+    target_link_libraries(${TEST_NAME} lmrtsp)
     
     # Set include directories
     target_include_directories(${TEST_NAME} PRIVATE 
@@ -51,7 +51,7 @@ add_custom_target(run-all-tests
     COMMAND ${CMAKE_CTEST_COMMAND} --verbose
     DEPENDS build-tests
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "Running all RTSP tests..."
+    COMMENT "Running all lmrtsp tests..."
 )
 
 message(STATUS "Tests will be built in: ${CMAKE_BINARY_DIR}/tests")

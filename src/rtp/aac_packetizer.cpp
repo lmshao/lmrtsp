@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtp/aac_packetizer.h"
+#include "lmrtp/aac_packetizer.h"
 
-#include <rtp/rtp_logger.h>
+#include "internal_logger.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 #endif
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 AacPacketizer::AacPacketizer(uint32_t ssrc, uint16_t sequence_number, uint32_t timestamp, uint32_t mtu_size)
     : ssrc_(ssrc), sequence_number_(sequence_number), timestamp_(timestamp), mtu_size_(mtu_size)
@@ -73,4 +73,4 @@ std::vector<RtpPacket> AacPacketizer::packetize(const MediaFrame &frame)
     return packets;
 }
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp

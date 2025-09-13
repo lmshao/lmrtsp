@@ -1,0 +1,30 @@
+# LMRTSP library configuration file
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# LMRTSP version information
+set(LMRTSP_VERSION @PROJECT_VERSION@)
+
+# Find required dependencies
+find_dependency(Threads)
+find_dependency(lmcore)
+find_dependency(lmnet)
+
+# Include target definitions
+include("${CMAKE_CURRENT_LIST_DIR}/lmrtspTargets.cmake")
+
+# Create aliases for compatibility
+if(TARGET lmrtsp::lmrtsp_static AND NOT TARGET lmrtsp::lmrtsp)
+    add_library(lmrtsp::lmrtsp ALIAS lmrtsp::lmrtsp_static)
+endif()
+
+if(TARGET lmrtsp::lmrtsp_static AND NOT TARGET lmrtsp)
+    add_library(lmrtsp ALIAS lmrtsp::lmrtsp_static)
+endif()
+
+if(TARGET lmrtsp::lmrtsp_shared AND NOT TARGET lmrtsp_shared)
+    add_library(lmrtsp_shared ALIAS lmrtsp::lmrtsp_shared)
+endif()
+
+check_required_components(lmrtsp)

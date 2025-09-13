@@ -6,17 +6,17 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_RTSP_SESSION_STATE_H
-#define LMSHAO_RTSP_RTSP_SESSION_STATE_H
+#ifndef LMSHAO_LMRTSP_RTSP_SESSION_STATE_H
+#define LMSHAO_LMRTSP_RTSP_SESSION_STATE_H
 
-#include <coreutils/singleton.h>
+#include <lmcore/singleton.h>
 
 #include <memory>
 
 #include "rtsp_request.h"
 #include "rtsp_response.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 class RTSPSession;
 
@@ -42,9 +42,9 @@ public:
 };
 
 // Initial state - only accepts OPTIONS and DESCRIBE requests
-class InitialState : public RTSPSessionState, public coreutils::Singleton<InitialState> {
+class InitialState : public RTSPSessionState, public lmcore::Singleton<InitialState> {
 public:
-    friend class coreutils::Singleton<InitialState>;
+    friend class lmcore::Singleton<InitialState>;
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
@@ -64,9 +64,9 @@ protected:
 };
 
 // Ready state - SETUP completed, can accept PLAY requests
-class ReadyState : public RTSPSessionState, public coreutils::Singleton<ReadyState> {
+class ReadyState : public RTSPSessionState, public lmcore::Singleton<ReadyState> {
 public:
-    friend class coreutils::Singleton<ReadyState>;
+    friend class lmcore::Singleton<ReadyState>;
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
@@ -86,9 +86,9 @@ protected:
 };
 
 // Playing state - media stream is playing
-class PlayingState : public RTSPSessionState, public coreutils::Singleton<PlayingState> {
+class PlayingState : public RTSPSessionState, public lmcore::Singleton<PlayingState> {
 public:
-    friend class coreutils::Singleton<PlayingState>;
+    friend class lmcore::Singleton<PlayingState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
@@ -107,9 +107,9 @@ protected:
 };
 
 // Paused state - media stream is paused
-class PausedState : public RTSPSessionState, public coreutils::Singleton<PausedState> {
+class PausedState : public RTSPSessionState, public lmcore::Singleton<PausedState> {
 public:
-    friend class coreutils::Singleton<PausedState>;
+    friend class lmcore::Singleton<PausedState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
@@ -127,6 +127,6 @@ protected:
     PausedState() = default;
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_RTSP_SESSION_STATE_H
+#endif // LMSHAO_LMRTSP_RTSP_SESSION_STATE_H

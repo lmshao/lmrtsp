@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtp/h264_packetizer.h"
+#include "lmrtp/h264_packetizer.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -15,12 +15,12 @@
 #include <arpa/inet.h>
 #endif
 
-#include <rtp/rtp_logger.h>
+#include "internal_logger.h"
 
 #include <algorithm>
 #include <iostream>
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 namespace {
 // Finds the start of a NAL unit. Returns a pointer to the first byte of the NAL unit payload (after the start code).
@@ -139,4 +139,4 @@ void H264Packetizer::PacketizeFuA(const uint8_t *nalu, size_t nalu_size)
     }
 }
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp

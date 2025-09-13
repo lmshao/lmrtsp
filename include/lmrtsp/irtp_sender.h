@@ -1,12 +1,12 @@
-#ifndef LMSHAO_RTSP_IRTP_SENDER_H
-#define LMSHAO_RTSP_IRTP_SENDER_H
+#ifndef LMSHAO_LMRTSP_IRTP_SENDER_H
+#define LMSHAO_LMRTSP_IRTP_SENDER_H
 
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 struct RTPStatistics {
     uint64_t packets_sent = 0;
@@ -68,6 +68,6 @@ public:
     virtual void DestroyRTPSender(std::shared_ptr<IRTPSender> sender) = 0;
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_IRTP_SENDER_H
+#endif // LMSHAO_LMRTSP_IRTP_SENDER_H

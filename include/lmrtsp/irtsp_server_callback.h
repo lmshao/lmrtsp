@@ -6,12 +6,12 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_IRTSP_SERVER_CALLBACK_H
-#define LMSHAO_RTSP_IRTSP_SERVER_CALLBACK_H
+#ifndef LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
+#define LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
 
 #include <string>
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 /**
  * @brief RTSP server callback interface
@@ -100,6 +100,6 @@ public:
     }
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_IRTSP_SERVER_CALLBACK_H
+#endif // LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H

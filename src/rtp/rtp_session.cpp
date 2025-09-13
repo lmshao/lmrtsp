@@ -6,11 +6,11 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtp/rtp_session.h"
+#include "lmrtp/rtp_session.h"
 
-#include <rtp/rtp_logger.h>
+#include "internal_logger.h"
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 RtpSession::RtpSession(std::unique_ptr<IRtpPacketizer> packetizer, std::unique_ptr<ITransport> transport)
     : packetizer_(std::move(packetizer)), transport_(std::move(transport))
@@ -34,4 +34,4 @@ void RtpSession::SendFrame(const MediaFrame &frame)
     }
 }
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp

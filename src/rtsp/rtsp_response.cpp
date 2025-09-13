@@ -13,7 +13,7 @@
 
 #include "rtsp_utils.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 namespace {
 
@@ -604,4 +604,4 @@ RTSPResponseBuilder RTSPResponseFactory::CreateNotImplemented(int cseq)
     return CreateError(StatusCode::NotImplemented, cseq);
 }
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp

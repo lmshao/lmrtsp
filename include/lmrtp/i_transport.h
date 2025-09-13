@@ -6,14 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTP_I_TRANSPORT_H
-#define LMSHAO_RTP_I_TRANSPORT_H
+#ifndef LMSHAO_LMRTP_I_TRANSPORT_H
+#define LMSHAO_LMRTP_I_TRANSPORT_H
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 class ITransport {
 public:
@@ -24,6 +24,6 @@ public:
     virtual void Close() = 0;
 };
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp
 
-#endif // LMSHAO_RTP_I_TRANSPORT_H
+#endif // LMSHAO_LMRTP_I_TRANSPORT_H

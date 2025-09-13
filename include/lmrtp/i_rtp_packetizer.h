@@ -6,15 +6,15 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTP_I_RTP_PACKETIZER_H
-#define LMSHAO_RTP_I_RTP_PACKETIZER_H
+#ifndef LMSHAO_LMRTP_I_RTP_PACKETIZER_H
+#define LMSHAO_LMRTP_I_RTP_PACKETIZER_H
 
 #include <memory>
 #include <vector>
 
 #include "rtp_packet.h"
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 // Input frame structure for the packetizer.
 struct MediaFrame {
     std::vector<uint8_t> data;
@@ -32,6 +32,6 @@ public:
     virtual std::vector<RtpPacket> packetize(const MediaFrame &frame) = 0;
 };
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp
 
-#endif // LMSHAO_RTP_I_RTP_PACKETIZER_H
+#endif // LMSHAO_LMRTP_I_RTP_PACKETIZER_H

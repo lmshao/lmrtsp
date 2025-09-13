@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(rtsp VERSION 0.0.1 LANGUAGES CXX)
+project(lmrtsp VERSION 0.2.0 LANGUAGES CXX)
 
 # C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -21,7 +21,7 @@ endif()
 
 # Display configuration options for developers
 message(STATUS "")
-message(STATUS "========== RTSP Library Configuration Options ==========")
+message(STATUS "========== lmrtsp Library Configuration Options ==========")
 message(STATUS "")
 message(STATUS "Build Type Configuration:")
 message(STATUS "  Current build type: ${CMAKE_BUILD_TYPE}")
@@ -33,7 +33,7 @@ message(STATUS "  BUILD_STATIC_LIBS: Build static libraries (current: ${BUILD_ST
 message(STATUS "  BUILD_SHARED_LIBS: Build shared libraries (current: ${BUILD_SHARED_LIBS})")
 message(STATUS "  BUILD_EXAMPLES: Build example programs (current: ${BUILD_EXAMPLES})")
 message(STATUS "  BUILD_TESTS: Build unit tests (current: ${BUILD_TESTS})")
-message(STATUS "  BUILD_APPS: Build RTSP applications (current: ${BUILD_APPS})")
+message(STATUS "  BUILD_APPS: Build lmrtsp applications (current: ${BUILD_APPS})")
 message(STATUS "")
 message(STATUS "Installation Options:")
 message(STATUS "  CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
@@ -42,7 +42,7 @@ message(STATUS "")
 message(STATUS "Usage Examples:")
 message(STATUS "  Debug build:     cmake -DCMAKE_BUILD_TYPE=Debug ..")
 message(STATUS "  User install:    cmake -DINSTALL_TO_USER_LOCAL=ON ..")
-message(STATUS "  Custom prefix:   cmake -DCMAKE_INSTALL_PREFIX=/opt/rtsp ..")
+message(STATUS "  Custom prefix:   cmake -DCMAKE_INSTALL_PREFIX=/opt/lmrtsp ..")
 message(STATUS "  Minimal build:   cmake -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF ..")
 message(STATUS "")
 message(STATUS "============================================================")
@@ -62,84 +62,84 @@ endif()
 # Enable position independent code for shared library compatibility
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Try to find installed coreutils first, fallback to local source if not found
-find_package(coreutils QUIET)
-if(coreutils_FOUND)
-    message(STATUS "Using system-installed coreutils library")
-    set(COREUTILS_SOURCE "system")
+# Try to find installed lmcore first, fallback to local source if not found
+find_package(lmcore QUIET)
+if(lmcore_FOUND)
+    message(STATUS "Using system-installed lmcore library")
+    set(LMCORE_SOURCE "system")
 else()
-    # Check if local coreutils directory exists
-    set(COREUTILS_LOCAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../coreutils")
-    if(EXISTS "${COREUTILS_LOCAL_DIR}/CMakeLists.txt")
-        if(NOT TARGET coreutils)
-            add_subdirectory(../coreutils coreutils_build)
+    # Check if local lmcore directory exists
+    set(LMCORE_LOCAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../lmcore")
+    if(EXISTS "${LMCORE_LOCAL_DIR}/CMakeLists.txt")
+        if(NOT TARGET lmcore)
+            add_subdirectory(../lmcore lmcore_build)
         endif()
-        message(STATUS "Using local coreutils from sibling directory")
-        set(COREUTILS_SOURCE "local")
+        message(STATUS "Using local lmcore from sibling directory")
+        set(LMCORE_SOURCE "local")
     else()
-        # Neither system nor local coreutils found - show helpful error
+        # Neither system nor local lmcore found - show helpful error
         message(STATUS "")
         message(STATUS "========== DEPENDENCY ERROR ==========")
         message(FATAL_ERROR 
-            "Cannot find coreutils dependency!\n"
+            "Cannot find lmcore dependency!\n"
             "\n"
             "Searched locations:\n"
-            "  1. System installation (using find_package coreutils)\n"
-            "  2. Local directory: ${COREUTILS_LOCAL_DIR}\n"
+            "  1. System installation (using find_package lmcore)\n"
+            "  2. Local directory: ${LMCORE_LOCAL_DIR}\n"
             "\n"
-            "Solution - Download coreutils to sibling directory:\n"
+            "Solution - Download lmcore to sibling directory:\n"
             "\n"
             "    cd ${CMAKE_CURRENT_SOURCE_DIR}/..\n"
-            "    git clone ssh://git@github.com/lmshao/coreutils.git\n"
+            "    git clone ssh://git@github.com/lmshao/lmcore.git\n"
             "\n"
             "    # OR if SSH is not available:\n"
-            "    git clone https://github.com/lmshao/coreutils.git\n"
+            "    git clone https://github.com/lmshao/lmcore.git\n"
             "\n"
             "Repository Information:\n"
-            "  📍 GitHub: https://github.com/lmshao/coreutils\n"
-            "  🔑 SSH:    ssh://git@github.com/lmshao/coreutils.git\n"
+            "  📍 GitHub: https://github.com/lmshao/lmcore\n"
+            "  🔑 SSH:    ssh://git@github.com/lmshao/lmcore.git\n"
             "\n"
             "After downloading, re-run: cmake .."
         )
     endif()
 endif()
 
-# Try to find installed network library, fallback to local source if not found
-find_package(network QUIET)
-if(network_FOUND)
-    message(STATUS "Using system-installed network library")
-    set(NETWORK_SOURCE "system")
+# Try to find installed lmnet library, fallback to local source if not found
+find_package(lmnet QUIET)
+if(lmnet_FOUND)
+    message(STATUS "Using system-installed lmnet library")
+    set(LMNET_SOURCE "system")
 else()
-    # Check if local network directory exists
-    set(NETWORK_LOCAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../network")
-    if(EXISTS "${NETWORK_LOCAL_DIR}/CMakeLists.txt")
-        if(NOT TARGET network)
-            add_subdirectory(../network network_build)
+    # Check if local lmnet directory exists
+    set(LMNET_LOCAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../lmnet")
+    if(EXISTS "${LMNET_LOCAL_DIR}/CMakeLists.txt")
+        if(NOT TARGET lmnet)
+            add_subdirectory(../lmnet lmnet_build)
         endif()
-        message(STATUS "Using local network from sibling directory")
-        set(NETWORK_SOURCE "local")
+        message(STATUS "Using local lmnet from sibling directory")
+        set(LMNET_SOURCE "local")
     else()
-        # Neither system nor local network found - show helpful error
+        # Neither system nor local lmnet found - show helpful error
         message(STATUS "")
         message(STATUS "========== DEPENDENCY ERROR ==========")
         message(FATAL_ERROR 
-            "Cannot find network dependency!\n"
+            "Cannot find lmnet dependency!\n"
             "\n"
             "Searched locations:\n"
-            "  1. System installation (using find_package network)\n"
-            "  2. Local directory: ${NETWORK_LOCAL_DIR}\n"
+            "  1. System installation (using find_package lmnet)\n"
+            "  2. Local directory: ${LMNET_LOCAL_DIR}\n"
             "\n"
-            "Solution - Download network to sibling directory:\n"
+            "Solution - Download lmnet to sibling directory:\n"
             "\n"
             "    cd ${CMAKE_CURRENT_SOURCE_DIR}/..\n"
-            "    git clone ssh://git@github.com/lmshao/network.git\n"
+            "    git clone ssh://git@github.com/lmshao/lmnet.git\n"
             "\n"
             "    # OR if SSH is not available:\n"
-            "    git clone https://github.com/lmshao/network.git\n"
+            "    git clone https://github.com/lmshao/lmnet.git\n"
             "\n"
             "Repository Information:\n"
-            "  📍 GitHub: https://github.com/lmshao/network\n"
-            "  🔑 SSH:    ssh://git@github.com/lmshao/network.git\n"
+            "  📍 GitHub: https://github.com/lmshao/lmnet\n"
+            "  🔑 SSH:    ssh://git@github.com/lmshao/lmnet.git\n"
             "\n"
             "After downloading, re-run: cmake .."
         )
@@ -148,15 +148,14 @@ endif()
 
 # Source files and include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
-include_directories(${PROJECT_SOURCE_DIR}/include/rtsp)
-include_directories(${PROJECT_SOURCE_DIR}/include/rtp)
+include_directories(${PROJECT_SOURCE_DIR}/include/lmrtsp)
+include_directories(${PROJECT_SOURCE_DIR}/include/lmrtp)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Collect RTSP source files
 file(GLOB_RECURSE RTSP_SOURCES "src/rtsp/*.cpp")
 file(GLOB_RECURSE RTP_SOURCES "src/rtp/*.cpp")
-file(GLOB_RECURSE MPEGTS_SOURCES "src/mpegts/*.cpp")
-set(SOURCES ${RTSP_SOURCES} ${RTP_SOURCES} ${MPEGTS_SOURCES})
+set(SOURCES ${RTSP_SOURCES} ${RTP_SOURCES})
 
 # Validate build options
 if(NOT BUILD_STATIC_LIBS AND NOT BUILD_SHARED_LIBS)
@@ -181,99 +180,97 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ flags: ${CMAKE_CXX_FLAGS}")
 message(STATUS "C++ flags for ${CMAKE_BUILD_TYPE}: ${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")
 
-# Find threads (required for network operations)
+# Find threads (required for lmnet operations)
 find_package(Threads REQUIRED)
 
 # Print source file summary
 list(LENGTH RTSP_SOURCES RTSP_COUNT)
 list(LENGTH RTP_SOURCES RTP_COUNT)
-list(LENGTH MPEGTS_SOURCES MPEGTS_COUNT)
 message(STATUS "Found ${RTSP_COUNT} RTSP source files")
 message(STATUS "Found ${RTP_COUNT} RTP source files")
-message(STATUS "Found ${MPEGTS_COUNT} MPEG-TS source files")
 
 # Static library
 if(BUILD_STATIC_LIBS)
-    add_library(rtsp_static STATIC ${SOURCES})
+    add_library(lmrtsp_static STATIC ${SOURCES})
     
-    target_include_directories(rtsp_static PUBLIC 
+    target_include_directories(lmrtsp_static PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
     
     # Link dependencies - prefer static to static linking
-    if(coreutils_FOUND)
-        target_link_libraries(rtsp_static PUBLIC 
-            $<IF:$<TARGET_EXISTS:coreutils::coreutils-static>,coreutils::coreutils-static,coreutils::coreutils>
+    if(lmcore_FOUND)
+        target_link_libraries(lmrtsp_static PUBLIC 
+            $<IF:$<TARGET_EXISTS:lmcore::lmcore-static>,lmcore::lmcore-static,lmcore::lmcore>
         )
     else()
-        target_link_libraries(rtsp_static PUBLIC coreutils-static)
+        target_link_libraries(lmrtsp_static PUBLIC lmcore-static)
     endif()
     
-    if(network_FOUND)
-        target_link_libraries(rtsp_static PUBLIC 
-            $<IF:$<TARGET_EXISTS:network::network_static>,network::network_static,network::network>
+    if(lmnet_FOUND)
+        target_link_libraries(lmrtsp_static PUBLIC 
+            $<IF:$<TARGET_EXISTS:lmnet::lmnet_static>,lmnet::lmnet_static,lmnet::lmnet>
         )
     else()
-        target_link_libraries(rtsp_static PUBLIC network_static)
+        target_link_libraries(lmrtsp_static PUBLIC lmnet_static)
     endif()
     
-    target_link_libraries(rtsp_static PUBLIC Threads::Threads)
+    target_link_libraries(lmrtsp_static PUBLIC Threads::Threads)
     
-    set_target_properties(rtsp_static PROPERTIES
-        OUTPUT_NAME rtsp
+    set_target_properties(lmrtsp_static PROPERTIES
+        OUTPUT_NAME lmrtsp
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}
     )
     
     # Create alias for internal use
-    add_library(rtsp::rtsp_static ALIAS rtsp_static)
-    message(STATUS "Building static library: librtsp.a")
+    add_library(lmrtsp::lmrtsp_static ALIAS lmrtsp_static)
+    message(STATUS "Building static library: liblmrtsp.a")
 endif()
 
 # Shared library  
 if(BUILD_SHARED_LIBS)
-    add_library(rtsp_shared SHARED ${SOURCES})
+    add_library(lmrtsp_shared SHARED ${SOURCES})
     
-    target_include_directories(rtsp_shared PUBLIC 
+    target_include_directories(lmrtsp_shared PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
     
     # Link dependencies - prefer shared to shared linking
-    if(coreutils_FOUND)
-        target_link_libraries(rtsp_shared PUBLIC coreutils::coreutils-shared)
+    if(lmcore_FOUND)
+        target_link_libraries(lmrtsp_shared PUBLIC lmcore::lmcore-shared)
     else()
-        target_link_libraries(rtsp_shared PUBLIC coreutils-shared)
+        target_link_libraries(lmrtsp_shared PUBLIC lmcore-shared)
     endif()
     
-    if(network_FOUND)
-        target_link_libraries(rtsp_shared PUBLIC 
-            $<IF:$<TARGET_EXISTS:network::network_shared>,network::network_shared,network::network>
+    if(lmnet_FOUND)
+        target_link_libraries(lmrtsp_shared PUBLIC 
+            $<IF:$<TARGET_EXISTS:lmnet::lmnet_shared>,lmnet::lmnet_shared,lmnet::lmnet>
         )
     else()
-        target_link_libraries(rtsp_shared PUBLIC network_shared)
+        target_link_libraries(lmrtsp_shared PUBLIC lmnet_shared)
     endif()
     
-    target_link_libraries(rtsp_shared PUBLIC Threads::Threads)
+    target_link_libraries(lmrtsp_shared PUBLIC Threads::Threads)
     
-    set_target_properties(rtsp_shared PROPERTIES
-        OUTPUT_NAME rtsp
+    set_target_properties(lmrtsp_shared PROPERTIES
+        OUTPUT_NAME lmrtsp
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}
     )
-    
+
     # Create alias for internal use
-    add_library(rtsp::rtsp_shared ALIAS rtsp_shared)
-    message(STATUS "Building shared library: librtsp.so")
+    add_library(lmrtsp::lmrtsp_shared ALIAS lmrtsp_shared)
+    message(STATUS "Building shared library: liblmrtsp.so")
 endif()
 
 # Create default alias for examples and tests
 if(BUILD_STATIC_LIBS)
-    add_library(rtsp ALIAS rtsp_static)
+    add_library(lmrtsp ALIAS lmrtsp_static)
     set(DEFAULT_LIBRARY_TYPE "static")
 else()
-    add_library(rtsp ALIAS rtsp_shared)
+    add_library(lmrtsp ALIAS lmrtsp_shared)
     set(DEFAULT_LIBRARY_TYPE "shared")
 endif()
 
@@ -281,7 +278,7 @@ message(STATUS "Examples and tests will use ${DEFAULT_LIBRARY_TYPE} library")
 
 # Build examples
 if(BUILD_EXAMPLES)
-    message(STATUS "Building RTSP examples...")
+    message(STATUS "Building lmrtsp examples...")
     
     # Create examples directory in build folder
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/examples)
@@ -302,21 +299,21 @@ if(BUILD_EXAMPLES)
             ${PROJECT_SOURCE_DIR}/include
         )
         
-        # Link to the default library (static or shared)
-        target_link_libraries(${EXAMPLE_NAME} PRIVATE rtsp)
+    # Link to the default library (static or shared)
+    target_link_libraries(${EXAMPLE_NAME} PRIVATE lmrtsp)
         
         # Set output directory
         set_target_properties(${EXAMPLE_NAME} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples
         )
         
-        message(STATUS "RTSP Example target: ${EXAMPLE_NAME}")
+    message(STATUS "lmrtsp Example target: ${EXAMPLE_NAME}")
     endforeach()
 endif()
 
 # Build applications
 if(BUILD_APPS)
-    message(STATUS "Building RTSP applications...")
+    message(STATUS "Building lmrtsp applications...")
     add_subdirectory(apps)
 endif()
 
@@ -351,8 +348,8 @@ if(ENABLE_INSTALL)
 
     # Install libraries
     if(BUILD_STATIC_LIBS)
-        install(TARGETS rtsp_static
-            EXPORT rtspTargets
+        install(TARGETS lmrtsp_static
+            EXPORT lmrtspTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -360,8 +357,8 @@ if(ENABLE_INSTALL)
     endif()
 
     if(BUILD_SHARED_LIBS)
-        install(TARGETS rtsp_shared
-            EXPORT rtspTargets
+        install(TARGETS lmrtsp_shared
+            EXPORT lmrtspTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -369,31 +366,31 @@ if(ENABLE_INSTALL)
     endif()
 
     # Install CMake targets
-    install(EXPORT rtspTargets
-        FILE rtspTargets.cmake
-        NAMESPACE rtsp::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
+    install(EXPORT lmrtspTargets
+        FILE lmrtspTargets.cmake
+        NAMESPACE lmrtsp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lmrtsp
     )
 
 # Create config file
 configure_package_config_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/rtspConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/rtspConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/lmrtspConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lmrtsp
 )
 
 # Create version file
 write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/rtspConfigVersion.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfigVersion.cmake
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 
     # Install config files
     install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/rtspConfig.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/rtspConfigVersion.cmake
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/rtsp
+        ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lmrtsp
     )
 
     # Create uninstall target
@@ -403,19 +400,24 @@ write_basic_package_version_file(
         @ONLY
     )
 
-    add_custom_target(uninstall_rtsp
+    add_custom_target(uninstall_lmrtsp
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-        COMMENT "Uninstalling RTSP library..."
+        COMMENT "Uninstalling lmrtsp library..."
+    )
+    # Provide a convenient generic 'uninstall' target name for users
+    add_custom_target(uninstall
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+        COMMENT "Uninstalling lmrtsp library... (generic 'uninstall' target)"
     )
 endif()
 
 # Print build configuration summary
 message(STATUS "")
-message(STATUS "========== RTSP Library Build Configuration ==========")
+message(STATUS "========== lmrtsp Library Build Configuration ==========")
 message(STATUS "Version: ${PROJECT_VERSION}")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "Coreutils source: ${COREUTILS_SOURCE}")
-message(STATUS "Network source: ${NETWORK_SOURCE}")
+message(STATUS "Lmcore source: ${LMCORE_SOURCE}")
+message(STATUS "Lmnet source: ${LMNET_SOURCE}")
 message(STATUS "Build static library: ${BUILD_STATIC_LIBS}")
 message(STATUS "Build shared library: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build examples: ${BUILD_EXAMPLES}")
@@ -423,7 +425,7 @@ message(STATUS "Build tests: ${BUILD_TESTS}")
 message(STATUS "Build applications: ${BUILD_APPS}")
 if(ENABLE_INSTALL)
     message(STATUS "Install support: ON")
-    message(STATUS "Uninstall support: ON (make uninstall_rtsp)")
+    message(STATUS "Uninstall support: ON (make uninstall_lmrtsp)")
 else()
     message(STATUS "Install support: DISABLED (Windows platform)")
     message(STATUS "Uninstall support: DISABLED (Windows platform)")
