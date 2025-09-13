@@ -6,12 +6,12 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTP_AAC_PACKETIZER_H
-#define LMSHAO_RTP_AAC_PACKETIZER_H
+#ifndef LMSHAO_LMRTP_AAC_PACKETIZER_H
+#define LMSHAO_LMRTP_AAC_PACKETIZER_H
 
-#include "rtp/i_rtp_packetizer.h"
+#include "lmrtp/i_rtp_packetizer.h"
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 class AacPacketizer : public IRtpPacketizer {
 public:
@@ -27,6 +27,6 @@ private:
     uint32_t mtu_size_;
 };
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp
 
-#endif // LMSHAO_RTP_AAC_PACKETIZER_H
+#endif // LMSHAO_LMRTP_AAC_PACKETIZER_H

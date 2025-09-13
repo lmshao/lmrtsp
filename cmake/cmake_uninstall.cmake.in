@@ -8,13 +8,14 @@ string(REGEX REPLACE "\n" ";" files "${files}")
 foreach(file ${files})
   message(STATUS "Uninstalling $ENV{DESTDIR}${file}")
   if(IS_SYMLINK "$ENV{DESTDIR}${file}" OR EXISTS "$ENV{DESTDIR}${file}")
-    exec_program(
-      "@CMAKE_COMMAND@" ARGS "-E remove \"$ENV{DESTDIR}${file}\""
+    execute_process(
+      COMMAND "@CMAKE_COMMAND@" -E remove "$ENV{DESTDIR}${file}"
       OUTPUT_VARIABLE rm_out
-      RETURN_VALUE rm_retval
+      RESULT_VARIABLE rm_retval
+      ERROR_VARIABLE rm_err
     )
     if(NOT "${rm_retval}" STREQUAL 0)
-      message(FATAL_ERROR "Problem when removing $ENV{DESTDIR}${file}")
+      message(FATAL_ERROR "Problem when removing $ENV{DESTDIR}${file}: ${rm_err}")
     endif()
   else()
     message(STATUS "File $ENV{DESTDIR}${file} does not exist.")
@@ -23,16 +24,18 @@ endforeach()
 
 # Try to remove directories that might be empty after uninstall
 if(UNIX)
-  exec_program(
-    "@CMAKE_COMMAND@" ARGS "-E remove_directory \"@CMAKE_INSTALL_PREFIX@/lib/cmake/rtsp\""
+  execute_process(
+    COMMAND "@CMAKE_COMMAND@" -E remove_directory "@CMAKE_INSTALL_PREFIX@/lib/cmake/lmrtsp"
     OUTPUT_VARIABLE rm_out
-    RETURN_VALUE rm_retval
+    RESULT_VARIABLE rm_retval
+    ERROR_VARIABLE rm_err
   )
-  exec_program(
-    "@CMAKE_COMMAND@" ARGS "-E remove_directory \"@CMAKE_INSTALL_PREFIX@/include/rtsp\""
+  execute_process(
+    COMMAND "@CMAKE_COMMAND@" -E remove_directory "@CMAKE_INSTALL_PREFIX@/include/lmrtsp"
     OUTPUT_VARIABLE rm_out
-    RETURN_VALUE rm_retval
+    RESULT_VARIABLE rm_retval2
+    ERROR_VARIABLE rm_err2
   )
 endif()
 
-message(STATUS "RTSP library uninstall completed.")
+message(STATUS "LMRTSP library uninstall completed.")

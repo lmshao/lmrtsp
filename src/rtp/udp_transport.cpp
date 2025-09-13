@@ -6,14 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtp/udp_transport.h"
+#include "lmrtp/udp_transport.h"
 
-#include <network/udp_client.h>
-#include <rtp/rtp_logger.h>
+#include <lmnet/udp_client.h>
+#include "internal_logger.h"
 
-using namespace lmshao::network;
+using namespace lmshao::lmnet;
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 UdpTransport::UdpTransport() : udp_client_(nullptr)
 {
@@ -61,4 +61,4 @@ void UdpTransport::Close()
     }
 }
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp

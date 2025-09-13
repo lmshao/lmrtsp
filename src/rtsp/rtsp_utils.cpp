@@ -10,7 +10,7 @@
 
 #include <algorithm>
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 std::string RTSPUtils::trim(const std::string &str)
 {
@@ -48,4 +48,4 @@ std::vector<std::string> RTSPUtils::split(const std::string &str, const std::str
     return tokens;
 }
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp

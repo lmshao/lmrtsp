@@ -13,11 +13,11 @@
 #include <memory>
 #include <thread>
 
-#include "rtsp/irtsp_server_callback.h"
-#include "rtsp/media_stream_info.h"
-#include "rtsp/rtsp_server.h"
+#include "lmrtsp/irtsp_server_callback.h"
+#include "lmrtsp/media_stream_info.h"
+#include "lmrtsp/rtsp_server.h"
 
-using namespace lmshao::rtsp;
+using namespace lmshao::lmrtsp;
 
 // Global server instance for signal handling
 std::shared_ptr<RTSPServer> g_server;

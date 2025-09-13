@@ -1,11 +1,11 @@
-#ifndef LMSHAO_RTSP_MEDIA_STREAM_INFO_H
-#define LMSHAO_RTSP_MEDIA_STREAM_INFO_H
+#ifndef LMSHAO_LMRTSP_MEDIA_STREAM_INFO_H
+#define LMSHAO_LMRTSP_MEDIA_STREAM_INFO_H
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 /**
  * @brief Media stream information structure
@@ -79,6 +79,6 @@ struct MediaStreamInfo {
     }
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_MEDIA_STREAM_INFO_H
+#endif // LMSHAO_LMRTSP_MEDIA_STREAM_INFO_H

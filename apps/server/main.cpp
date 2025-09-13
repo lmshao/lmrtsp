@@ -6,19 +6,19 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <network/network_logger.h>
-#include <rtsp/rtsp_logger.h>
+#include <lmnet/lmnet_logger.h>
+#include <lmrtsp/lmrtsp_logger.h>
 #include <signal.h>
 
 #include <iostream>
 #include <thread>
 
-#include "rtp/i_rtp_packetizer.h"
-#include "rtsp/media_stream.h"
-#include "rtsp/rtsp_session.h"
+#include "lmrtsp/media_stream.h"
+#include "lmrtsp/rtsp_session.h"
+#include "lmrtp/i_rtp_packetizer.h"
 #include "rtsp_server.h"
 
-using namespace lmshao::rtsp;
+using namespace lmshao::lmrtsp;
 
 // Global server instance for signal handling
 std::shared_ptr<RTSPServer> g_server;
@@ -41,12 +41,12 @@ int main(int argc, char *argv[])
     // Register signal handler
     signal(SIGINT, signalHandler);
 
-    InitNetworkLogger(lmshao::coreutils::LogLevel::kWarn);
-    InitRtspLogger(lmshao::coreutils::LogLevel::kDebug);
+    InitLmnetLogger(lmshao::lmcore::LogLevel::kWarn);
+    InitLmrtspLogger(lmshao::lmcore::LogLevel::kDebug);
     // Get RTSP server instance
     g_server = RTSPServer::GetInstance();
 
-    // Initialize server, default listening on all network interfaces port 8554
+    // Initialize server, default listening on all lmnet interfaces port 8554
     std::string ip = "0.0.0.0";
     uint16_t port = 8554;
 
@@ -66,7 +66,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    RTSP_LOGD("RTSP server initialized successfully");
+    // Log using the logger registry directly
+    auto &logger = lmshao::lmcore::LoggerRegistry::GetLogger<lmshao::lmrtsp::LmrtspModuleTag>();
+    logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmshao::lmcore::LogLevel::kDebug, __FILE__, __LINE__,
+                                                             __FUNCTION__, "RTSP server initialized successfully");
 
     // Start server
     if (!g_server->Start()) {
@@ -74,7 +77,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    RTSP_LOGD("RTSP server started successfully");
+    logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmshao::lmcore::LogLevel::kDebug, __FILE__, __LINE__,
+                                                             __FUNCTION__, "RTSP server started successfully");
     std::cout << "RTSP server is running, press Ctrl+C to stop server" << std::endl;
 
     // Main loop to push media data

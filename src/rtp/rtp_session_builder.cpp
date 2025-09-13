@@ -6,14 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtp/rtp_session_builder.h"
+#include "lmrtp/rtp_session_builder.h"
 
-#include <rtp/rtp_logger.h>
+#include "internal_logger.h"
 
-#include "rtp/h264_packetizer.h"
-#include "rtp/udp_transport.h"
+#include "lmrtp/h264_packetizer.h"
+#include "lmrtp/udp_transport.h"
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 RtpSessionBuilder::RtpSessionBuilder()
 {
@@ -70,4 +70,4 @@ std::unique_ptr<RtpSession> RtpSessionBuilder::Build()
     return std::make_unique<RtpSession>(std::move(packetizer), std::move(transport));
 }
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp

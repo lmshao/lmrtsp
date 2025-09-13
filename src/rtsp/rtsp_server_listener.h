@@ -6,44 +6,44 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_RTSP_SERVER_LISTENER_H
-#define LMSHAO_RTSP_RTSP_SERVER_LISTENER_H
+#ifndef LMSHAO_LMRTSP_RTSP_SERVER_LISTENER_H
+#define LMSHAO_LMRTSP_RTSP_SERVER_LISTENER_H
 
-#include <network/common.h>
-#include <network/iserver_listener.h>
+#include <lmnet/common.h>
+#include <lmnet/iserver_listener.h>
 
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 class RTSPServer;
 
 // Observer pattern: RTSP server listener
-class RTSPServerListener : public network::IServerListener {
+class RTSPServerListener : public lmnet::IServerListener {
 public:
     explicit RTSPServerListener(std::shared_ptr<RTSPServer> server);
 
     // Implement IServerListener interface
-    void OnError(std::shared_ptr<network::Session> session, const std::string &errorInfo) override;
-    void OnClose(std::shared_ptr<network::Session> session) override;
-    void OnAccept(std::shared_ptr<network::Session> session) override;
-    void OnReceive(std::shared_ptr<network::Session> session, std::shared_ptr<coreutils::DataBuffer> buffer) override;
+    void OnError(std::shared_ptr<lmnet::Session> session, const std::string &errorInfo) override;
+    void OnClose(std::shared_ptr<lmnet::Session> session) override;
+    void OnAccept(std::shared_ptr<lmnet::Session> session) override;
+    void OnReceive(std::shared_ptr<lmnet::Session> session, std::shared_ptr<lmcore::DataBuffer> buffer) override;
 
 private:
     // Parse RTSP request
-    bool ParseRTSPRequest(const std::string &data, std::shared_ptr<network::Session> session);
+    bool ParseRTSPRequest(const std::string &data, std::shared_ptr<lmnet::Session> session);
 
     // Handle incomplete request data
-    void HandleIncompleteData(std::shared_ptr<network::Session> session, const std::string &data);
+    void HandleIncompleteData(std::shared_ptr<lmnet::Session> session, const std::string &data);
 
     std::weak_ptr<RTSPServer> rtspServer_;
 
     // Store incomplete request data
-    std::unordered_map<network::socket_t, std::string> incompleteRequests_;
+    std::unordered_map<lmnet::socket_t, std::string> incompleteRequests_;
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_RTSP_SERVER_LISTENER_H
+#endif // LMSHAO_LMRTSP_RTSP_SERVER_LISTENER_H

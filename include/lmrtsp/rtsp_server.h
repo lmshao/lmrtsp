@@ -6,13 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_RTSP_SERVER_H
-#define LMSHAO_RTSP_RTSP_SERVER_H
+#ifndef LMSHAO_LMRTSP_RTSP_SERVER_H
+#define LMSHAO_LMRTSP_RTSP_SERVER_H
 
-#include <coreutils/singleton.h>
-#include <network/iserver_listener.h>
-#include <network/tcp_server.h>
+#include <lmcore/singleton.h>
+#include <lmnet/iserver_listener.h>
+#include <lmnet/tcp_server.h>
 
+#include <atomic>
 #include <functional>
 #include <map>
 #include <memory>
@@ -24,14 +25,14 @@
 #include "media_stream_info.h"
 
 // Forward declarations
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 class RTSPSession;
 class RTSPRequest;
 class RTSPServerListener;
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-namespace lmshao::rtsp {
-using namespace lmshao::coreutils;
+namespace lmshao::lmrtsp {
+using namespace lmshao::lmcore;
 class RTSPServer : public std::enable_shared_from_this<RTSPServer>, public Singleton<RTSPServer> {
 public:
     friend class Singleton<RTSPServer>;
@@ -47,10 +48,10 @@ public:
 
     // Session management
     void HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPRequest &request);
-    void HandleStatelessRequest(std::shared_ptr<network::Session> networkSession, const RTSPRequest &request);
-    void SendErrorResponse(std::shared_ptr<network::Session> networkSession, const RTSPRequest &request, int statusCode,
+    void HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request);
+    void SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request, int statusCode,
                            const std::string &reasonPhrase);
-    std::shared_ptr<RTSPSession> CreateSession(std::shared_ptr<network::Session> networkSession);
+    std::shared_ptr<RTSPSession> CreateSession(std::shared_ptr<lmnet::Session> lmnetSession);
     void RemoveSession(const std::string &sessionId);
     std::shared_ptr<RTSPSession> GetSession(const std::string &sessionId);
     std::unordered_map<std::string, std::shared_ptr<RTSPSession>> GetSessions();
@@ -83,7 +84,7 @@ protected:
 private:
     // Network related
     std::shared_ptr<RTSPServerListener> serverListener_;
-    std::shared_ptr<network::TcpServer> tcpServer_;
+    std::shared_ptr<lmnet::TcpServer> tcpServer_;
     std::string serverIP_;
     uint16_t serverPort_;
     std::atomic<bool> running_{false};
@@ -105,6 +106,6 @@ private:
     void NotifyCallback(std::function<void(IRTSPServerCallback *)> func);
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_RTSP_SERVER_H
+#endif // LMSHAO_LMRTSP_RTSP_SERVER_H

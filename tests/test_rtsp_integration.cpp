@@ -8,12 +8,12 @@
 
 #include <string>
 
-#include "rtsp/rtsp_request.h"
-#include "rtsp/rtsp_response.h"
+#include "lmrtsp/rtsp_request.h"
+#include "lmrtsp/rtsp_response.h"
 #include "test_framework.h"
 
 using namespace test_framework;
-using namespace lmshao::rtsp;
+using namespace lmshao::lmrtsp;
 
 void test_complete_rtsp_session_flow()
 {

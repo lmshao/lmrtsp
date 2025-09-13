@@ -8,7 +8,7 @@
 
 #include "rtsp_session.h"
 
-#include <rtsp/rtsp_logger.h>
+#include "internal_logger.h"
 
 #include <ctime>
 #include <functional>
@@ -17,15 +17,14 @@
 #include <unordered_map>
 
 #include "media_stream.h"
-#include "rtsp/rtsp_headers.h"
-#include "rtsp/rtsp_session_state.h"
+#include "rtsp_headers.h"
 #include "rtsp_response.h"
 #include "rtsp_server.h"
+#include "rtsp_session_state.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
-RTSPSession::RTSPSession(std::shared_ptr<network::Session> networkSession)
-    : networkSession_(networkSession), timeout_(60)
+RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession) : lmnetSession_(lmnetSession), timeout_(60)
 { // Default 60 seconds timeout
 
     // Generate session ID
@@ -40,8 +39,8 @@ RTSPSession::RTSPSession(std::shared_ptr<network::Session> networkSession)
     RTSP_LOGD("RTSPSession created with ID: %s", sessionId_.c_str());
 }
 
-RTSPSession::RTSPSession(std::shared_ptr<network::Session> networkSession, std::weak_ptr<RTSPServer> server)
-    : networkSession_(networkSession), rtspServer_(server), timeout_(60)
+RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RTSPServer> server)
+    : lmnetSession_(lmnetSession), rtspServer_(server), timeout_(60)
 {
     // Generate session ID
     sessionId_ = GenerateSessionId();
@@ -125,23 +124,23 @@ std::string RTSPSession::GetSessionId() const
 
 std::string RTSPSession::GetClientIP() const
 {
-    if (networkSession_) {
-        return networkSession_->host;
+    if (lmnetSession_) {
+        return lmnetSession_->host;
     }
     return "";
 }
 
 uint16_t RTSPSession::GetClientPort() const
 {
-    if (networkSession_) {
-        return networkSession_->port;
+    if (lmnetSession_) {
+        return lmnetSession_->port;
     }
     return 0;
 }
 
-std::shared_ptr<network::Session> RTSPSession::GetNetworkSession() const
+std::shared_ptr<lmnet::Session> RTSPSession::GetNetworkSession() const
 {
-    return networkSession_;
+    return lmnetSession_;
 }
 
 std::weak_ptr<RTSPServer> RTSPSession::GetRTSPServer() const
@@ -373,4 +372,4 @@ RTPStatistics RTSPSession::GetRTPStatistics() const
     return stats;
 }
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp

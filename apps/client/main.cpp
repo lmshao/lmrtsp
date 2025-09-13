@@ -6,19 +6,19 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <network/tcp_client.h>
+#include <lmnet/tcp_client.h>
 
 #include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include "rtsp/rtsp_request.h"
-#include "rtsp/rtsp_response.h"
+#include "lmrtsp/rtsp_request.h"
+#include "lmrtsp/rtsp_response.h"
 
 using namespace lmshao;
 
-class RTSPClient : public network::IClientListener, public std::enable_shared_from_this<RTSPClient> {
+class RTSPClient : public lmnet::IClientListener, public std::enable_shared_from_this<RTSPClient> {
 public:
     void Start(const std::string &ip, uint16_t port, const std::string &stream_url)
     {
@@ -26,7 +26,7 @@ public:
         port_ = port;
         stream_url_ = stream_url;
 
-        tcp_client_ = network::TcpClient::Create(ip, port);
+        tcp_client_ = lmnet::TcpClient::Create(ip, port);
         tcp_client_->SetListener(shared_from_this());
         tcp_client_->Init();
         tcp_client_->Connect();
@@ -35,14 +35,14 @@ public:
         SendOptions();
     }
 
-    void OnReceive(network::socket_t fd, std::shared_ptr<coreutils::DataBuffer> buffer) override
+    void OnReceive(lmnet::socket_t fd, std::shared_ptr<lmcore::DataBuffer> buffer) override
     {
         std::string response_str(reinterpret_cast<const char *>(buffer->Data()), buffer->Size());
-        auto response = rtsp::RTSPResponse::FromString(response_str);
+        auto response = lmrtsp::RTSPResponse::FromString(response_str);
 
         std::cout << "Received response:\n" << response.ToString() << std::endl;
 
-        if (response.status_ == rtsp::StatusCode::OK) {
+        if (response.status_ == lmrtsp::StatusCode::OK) {
             if (cseq_ == 1) { // OPTIONS response
                 SendDescribe();
             } else if (cseq_ == 2) { // DESCRIBE response
@@ -59,9 +59,9 @@ public:
         }
     }
 
-    void OnClose(network::socket_t fd) override { std::cout << "Disconnected from server" << std::endl; }
+    void OnClose(lmnet::socket_t fd) override { std::cout << "Disconnected from server" << std::endl; }
 
-    void OnError(network::socket_t fd, const std::string &error) override
+    void OnError(lmnet::socket_t fd, const std::string &error) override
     {
         std::cerr << "Error: " << error << std::endl;
     }
@@ -70,7 +70,7 @@ private:
     void SendOptions()
     {
         cseq_ = 1;
-        auto req = rtsp::RTSPRequestFactory::CreateOptions(cseq_, stream_url_).Build();
+        auto req = lmrtsp::RTSPRequestFactory::CreateOptions(cseq_, stream_url_).Build();
         std::cout << "Sending request:\n" << req.ToString() << std::endl;
         tcp_client_->Send(req.ToString().c_str(), req.ToString().length());
     }
@@ -78,7 +78,7 @@ private:
     void SendDescribe()
     {
         cseq_ = 2;
-        auto req = rtsp::RTSPRequestFactory::CreateDescribe(cseq_, stream_url_).Build();
+        auto req = lmrtsp::RTSPRequestFactory::CreateDescribe(cseq_, stream_url_).Build();
         std::cout << "Sending request:\n" << req.ToString() << std::endl;
         tcp_client_->Send(req.ToString().c_str(), req.ToString().length());
     }
@@ -86,7 +86,7 @@ private:
     void SendSetup()
     {
         cseq_ = 3;
-        auto req = rtsp::RTSPRequestFactory::CreateSetup(cseq_, stream_url_ + "/track1")
+        auto req = lmrtsp::RTSPRequestFactory::CreateSetup(cseq_, stream_url_ + "/track1")
                        .SetTransport("RTP/AVP;unicast;client_port=1234-1235")
                        .Build();
         std::cout << "Sending request:\n" << req.ToString() << std::endl;
@@ -96,7 +96,7 @@ private:
     void SendPlay()
     {
         cseq_ = 4;
-        auto req = rtsp::RTSPRequestFactory::CreatePlay(cseq_, stream_url_).SetSession(session_id_).Build();
+        auto req = lmrtsp::RTSPRequestFactory::CreatePlay(cseq_, stream_url_).SetSession(session_id_).Build();
         std::cout << "Sending request:\n" << req.ToString() << std::endl;
         tcp_client_->Send(req.ToString().c_str(), req.ToString().length());
     }
@@ -104,7 +104,7 @@ private:
     void SendTeardown()
     {
         cseq_ = 5;
-        auto req = rtsp::RTSPRequestFactory::CreateTeardown(cseq_, stream_url_).SetSession(session_id_).Build();
+        auto req = lmrtsp::RTSPRequestFactory::CreateTeardown(cseq_, stream_url_).SetSession(session_id_).Build();
         std::cout << "Sending request:\n" << req.ToString() << std::endl;
         tcp_client_->Send(req.ToString().c_str(), req.ToString().length());
     }
@@ -112,7 +112,7 @@ private:
     std::string ip_;
     uint16_t port_;
     std::string stream_url_;
-    std::shared_ptr<network::TcpClient> tcp_client_;
+    std::shared_ptr<lmnet::TcpClient> tcp_client_;
     int cseq_ = 0;
     std::string session_id_;
 };

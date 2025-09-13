@@ -6,13 +6,13 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_RTSP_UTILS_H
-#define LMSHAO_RTSP_RTSP_UTILS_H
+#ifndef LMSHAO_LMRTSP_RTSP_UTILS_H
+#define LMSHAO_LMRTSP_RTSP_UTILS_H
 
 #include <string>
 #include <vector>
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 /**
  * @brief RTSP utility functions for string processing
@@ -47,6 +47,6 @@ private:
     ~RTSPUtils() = delete;
 };
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_RTSP_RTSP_UTILS_H
+#endif // LMSHAO_LMRTSP_RTSP_UTILS_H

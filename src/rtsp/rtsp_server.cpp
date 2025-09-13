@@ -8,15 +8,15 @@
 
 #include "rtsp_server.h"
 
-#include <network/tcp_server.h>
-#include <rtsp/rtsp_logger.h>
+#include "internal_logger.h"
+#include <lmnet/tcp_server.h>
 
-#include "rtsp/irtsp_server_callback.h"
+#include "irtsp_server_callback.h"
 #include "rtsp_response.h"
 #include "rtsp_server_listener.h"
 #include "rtsp_session.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 RTSPServer::RTSPServer()
 {
@@ -31,7 +31,7 @@ bool RTSPServer::Init(const std::string &ip, uint16_t port)
     serverPort_ = port;
 
     // Create TCP server
-    tcpServer_ = network::TcpServer::Create(ip, port);
+    tcpServer_ = lmnet::TcpServer::Create(ip, port);
     if (!tcpServer_) {
         RTSP_LOGE("Failed to create TCP server");
         return false;
@@ -129,14 +129,14 @@ void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPR
     }
 
     // Send response
-    auto networkSession = session->GetNetworkSession();
-    if (networkSession) {
+    auto lmnetSession = session->GetNetworkSession();
+    if (lmnetSession) {
         RTSP_LOGD("Send response: \n%s", response.ToString().c_str());
-        networkSession->Send(response.ToString());
+        lmnetSession->Send(response.ToString());
     }
 }
 
-void RTSPServer::HandleStatelessRequest(std::shared_ptr<network::Session> networkSession, const RTSPRequest &request)
+void RTSPServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request)
 {
     RTSP_LOGD("Handling stateless %s request", request.method_.c_str());
 
@@ -153,8 +153,8 @@ void RTSPServer::HandleStatelessRequest(std::shared_ptr<network::Session> networ
     } else if (request.method_ == METHOD_DESCRIBE) {
         // Notify callback for stream request
         std::string client_ip = "";
-        if (networkSession) {
-            client_ip = networkSession->host;
+        if (lmnetSession) {
+            client_ip = lmnetSession->host;
         }
         RTSP_LOGD("invoke OnStreamRequested");
         NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnStreamRequested(request.uri_, client_ip); });
@@ -168,13 +168,13 @@ void RTSPServer::HandleStatelessRequest(std::shared_ptr<network::Session> networ
     }
 
     // Send response
-    if (networkSession) {
+    if (lmnetSession) {
         RTSP_LOGD("Send stateless response: \n%s", response.ToString().c_str());
-        networkSession->Send(response.ToString());
+        lmnetSession->Send(response.ToString());
     }
 }
 
-void RTSPServer::SendErrorResponse(std::shared_ptr<network::Session> networkSession, const RTSPRequest &request,
+void RTSPServer::SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request,
                                    int statusCode, const std::string &reasonPhrase)
 {
     int cseq = 0;
@@ -204,15 +204,15 @@ void RTSPServer::SendErrorResponse(std::shared_ptr<network::Session> networkSess
     }
 
     // Send error response
-    if (networkSession) {
+    if (lmnetSession) {
         RTSP_LOGD("Send error response (%d %s): \n%s", statusCode, reasonPhrase.c_str(), response.ToString().c_str());
-        networkSession->Send(response.ToString());
+        lmnetSession->Send(response.ToString());
     }
 }
 
-std::shared_ptr<RTSPSession> RTSPServer::CreateSession(std::shared_ptr<network::Session> networkSession)
+std::shared_ptr<RTSPSession> RTSPServer::CreateSession(std::shared_ptr<lmnet::Session> lmnetSession)
 {
-    auto session = std::make_shared<RTSPSession>(networkSession, weak_from_this());
+    auto session = std::make_shared<RTSPSession>(lmnetSession, weak_from_this());
     {
         std::lock_guard<std::mutex> lock(sessionsMutex_);
         sessions_[session->GetSessionId()] = session;
@@ -431,4 +431,4 @@ void RTSPServer::NotifyCallback(std::function<void(IRTSPServerCallback *)> func)
     }
 }
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp

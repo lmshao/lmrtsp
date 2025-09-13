@@ -6,14 +6,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTP_RTP_SESSION_BUILDER_H
-#define LMSHAO_RTP_RTP_SESSION_BUILDER_H
+#ifndef LMSHAO_LMRTP_RTP_SESSION_BUILDER_H
+#define LMSHAO_LMRTP_RTP_SESSION_BUILDER_H
 
 #include <string>
 
-#include "rtp/rtp_session.h"
+#include "lmrtp/rtp_session.h"
 
-namespace lmshao::rtp {
+namespace lmshao::lmrtp {
 
 class RtpSessionBuilder {
 public:
@@ -38,6 +38,6 @@ private:
     uint16_t remote_port_ = 0;
 };
 
-} // namespace lmshao::rtp
+} // namespace lmshao::lmrtp
 
-#endif // LMSHAO_RTP_RTP_SESSION_BUILDER_H
+#endif // LMSHAO_LMRTP_RTP_SESSION_BUILDER_H

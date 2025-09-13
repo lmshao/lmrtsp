@@ -8,14 +8,14 @@
 
 #include "rtsp_request.h"
 
-#include <rtsp/rtsp_logger.h>
+#include "internal_logger.h"
 
 #include <algorithm>
 #include <sstream>
 
 #include "rtsp_utils.h"
 
-namespace lmshao::rtsp {
+namespace lmshao::lmrtsp {
 
 RequestHeader RequestHeader::FromString(const std::string &header_str)
 {
@@ -473,4 +473,4 @@ RTSPRequestBuilder RTSPRequestFactory::CreateRecord(int cseq, const std::string 
     return RTSPRequestBuilder().SetMethod(METHOD_RECORD).SetUri(uri).SetCSeq(cseq);
 }
 
-} // namespace lmshao::rtsp
+} // namespace lmshao::lmrtsp
