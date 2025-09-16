@@ -9,7 +9,6 @@
 #include "lmrtp/rtp_session_builder.h"
 
 #include "internal_logger.h"
-
 #include "lmrtp/h264_packetizer.h"
 #include "lmrtp/udp_transport.h"
 

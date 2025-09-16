@@ -24,18 +24,14 @@
 #include "irtsp_server_callback.h"
 #include "media_stream_info.h"
 
-// Forward declarations
 namespace lmshao::lmrtsp {
+using namespace lmshao::lmcore;
 class RTSPSession;
 class RTSPRequest;
 class RTSPServerListener;
-} // namespace lmshao::lmrtsp
-
-namespace lmshao::lmrtsp {
-using namespace lmshao::lmcore;
-class RTSPServer : public std::enable_shared_from_this<RTSPServer>, public Singleton<RTSPServer> {
+class RTSPServer : public std::enable_shared_from_this<RTSPServer>, public ManagedSingleton<RTSPServer> {
 public:
-    friend class Singleton<RTSPServer>;
+    friend class ManagedSingleton<RTSPServer>;
     friend class RTSPServerListener;
 
     ~RTSPServer() = default;

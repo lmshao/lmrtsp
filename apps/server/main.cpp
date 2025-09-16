@@ -13,9 +13,9 @@
 #include <iostream>
 #include <thread>
 
+#include "lmrtp/i_rtp_packetizer.h"
 #include "lmrtsp/media_stream.h"
 #include "lmrtsp/rtsp_session.h"
-#include "lmrtp/i_rtp_packetizer.h"
 #include "rtsp_server.h"
 
 using namespace lmshao::lmrtsp;

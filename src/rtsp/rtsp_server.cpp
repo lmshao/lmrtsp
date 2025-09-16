@@ -8,9 +8,9 @@
 
 #include "rtsp_server.h"
 
-#include "internal_logger.h"
 #include <lmnet/tcp_server.h>
 
+#include "internal_logger.h"
 #include "irtsp_server_callback.h"
 #include "rtsp_response.h"
 #include "rtsp_server_listener.h"

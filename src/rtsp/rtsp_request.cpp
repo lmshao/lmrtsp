@@ -8,11 +8,10 @@
 
 #include "rtsp_request.h"
 
-#include "internal_logger.h"
-
 #include <algorithm>
 #include <sstream>
 
+#include "internal_logger.h"
 #include "rtsp_utils.h"
 
 namespace lmshao::lmrtsp {
