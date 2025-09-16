@@ -8,14 +8,13 @@
 
 #include "rtsp_session.h"
 
-#include "internal_logger.h"
-
 #include <ctime>
 #include <functional>
 #include <random>
 #include <string>
 #include <unordered_map>
 
+#include "internal_logger.h"
 #include "media_stream.h"
 #include "rtsp_headers.h"
 #include "rtsp_response.h"

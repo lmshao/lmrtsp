@@ -42,9 +42,9 @@ public:
 };
 
 // Initial state - only accepts OPTIONS and DESCRIBE requests
-class InitialState : public RTSPSessionState, public lmcore::Singleton<InitialState> {
+class InitialState : public RTSPSessionState, public lmcore::ManagedSingleton<InitialState> {
 public:
-    friend class lmcore::Singleton<InitialState>;
+    friend class lmcore::ManagedSingleton<InitialState>;
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
@@ -64,9 +64,9 @@ protected:
 };
 
 // Ready state - SETUP completed, can accept PLAY requests
-class ReadyState : public RTSPSessionState, public lmcore::Singleton<ReadyState> {
+class ReadyState : public RTSPSessionState, public lmcore::ManagedSingleton<ReadyState> {
 public:
-    friend class lmcore::Singleton<ReadyState>;
+    friend class lmcore::ManagedSingleton<ReadyState>;
 
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
@@ -86,9 +86,9 @@ protected:
 };
 
 // Playing state - media stream is playing
-class PlayingState : public RTSPSessionState, public lmcore::Singleton<PlayingState> {
+class PlayingState : public RTSPSessionState, public lmcore::ManagedSingleton<PlayingState> {
 public:
-    friend class lmcore::Singleton<PlayingState>;
+    friend class lmcore::ManagedSingleton<PlayingState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;
@@ -107,9 +107,9 @@ protected:
 };
 
 // Paused state - media stream is paused
-class PausedState : public RTSPSessionState, public lmcore::Singleton<PausedState> {
+class PausedState : public RTSPSessionState, public lmcore::ManagedSingleton<PausedState> {
 public:
-    friend class lmcore::Singleton<PausedState>;
+    friend class lmcore::ManagedSingleton<PausedState>;
     RTSPResponse OnOptions(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnDescribe(RTSPSession *session, const RTSPRequest &request) override;
     RTSPResponse OnAnnounce(RTSPSession *session, const RTSPRequest &request) override;

@@ -8,11 +8,10 @@
 
 #include "media_stream.h"
 
-#include "internal_logger.h"
-
 #include <chrono>
 #include <vector>
 
+#include "internal_logger.h"
 #include "lmrtp/h264_packetizer.h"
 #include "rtsp_session.h"
 

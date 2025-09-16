@@ -80,7 +80,7 @@ else()
         # Neither system nor local lmcore found - show helpful error
         message(STATUS "")
         message(STATUS "========== DEPENDENCY ERROR ==========")
-        message(FATAL_ERROR 
+        message(FATAL_ERROR
             "Cannot find lmcore dependency!\n"
             "\n"
             "Searched locations:\n"
@@ -122,7 +122,7 @@ else()
         # Neither system nor local lmnet found - show helpful error
         message(STATUS "")
         message(STATUS "========== DEPENDENCY ERROR ==========")
-        message(FATAL_ERROR 
+        message(FATAL_ERROR
             "Cannot find lmnet dependency!\n"
             "\n"
             "Searched locations:\n"
@@ -192,37 +192,37 @@ message(STATUS "Found ${RTP_COUNT} RTP source files")
 # Static library
 if(BUILD_STATIC_LIBS)
     add_library(lmrtsp_static STATIC ${SOURCES})
-    
-    target_include_directories(lmrtsp_static PUBLIC 
+
+    target_include_directories(lmrtsp_static PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
-    
+
     # Link dependencies - prefer static to static linking
     if(lmcore_FOUND)
-        target_link_libraries(lmrtsp_static PUBLIC 
+        target_link_libraries(lmrtsp_static PUBLIC
             $<IF:$<TARGET_EXISTS:lmcore::lmcore-static>,lmcore::lmcore-static,lmcore::lmcore>
         )
     else()
         target_link_libraries(lmrtsp_static PUBLIC lmcore-static)
     endif()
-    
+
     if(lmnet_FOUND)
-        target_link_libraries(lmrtsp_static PUBLIC 
+        target_link_libraries(lmrtsp_static PUBLIC
             $<IF:$<TARGET_EXISTS:lmnet::lmnet_static>,lmnet::lmnet_static,lmnet::lmnet>
         )
     else()
         target_link_libraries(lmrtsp_static PUBLIC lmnet_static)
     endif()
-    
+
     target_link_libraries(lmrtsp_static PUBLIC Threads::Threads)
-    
+
     set_target_properties(lmrtsp_static PROPERTIES
         OUTPUT_NAME lmrtsp
         VERSION ${PROJECT_VERSION}
         SOVERSION ${PROJECT_VERSION_MAJOR}
     )
-    
+
     # Create alias for internal use
     add_library(lmrtsp::lmrtsp_static ALIAS lmrtsp_static)
     message(STATUS "Building static library: liblmrtsp.a")
@@ -231,29 +231,29 @@ endif()
 # Shared library  
 if(BUILD_SHARED_LIBS)
     add_library(lmrtsp_shared SHARED ${SOURCES})
-    
-    target_include_directories(lmrtsp_shared PUBLIC 
+
+    target_include_directories(lmrtsp_shared PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
     )
-    
+
     # Link dependencies - prefer shared to shared linking
     if(lmcore_FOUND)
         target_link_libraries(lmrtsp_shared PUBLIC lmcore::lmcore-shared)
     else()
         target_link_libraries(lmrtsp_shared PUBLIC lmcore-shared)
     endif()
-    
+
     if(lmnet_FOUND)
-        target_link_libraries(lmrtsp_shared PUBLIC 
+        target_link_libraries(lmrtsp_shared PUBLIC
             $<IF:$<TARGET_EXISTS:lmnet::lmnet_shared>,lmnet::lmnet_shared,lmnet::lmnet>
         )
     else()
         target_link_libraries(lmrtsp_shared PUBLIC lmnet_shared)
     endif()
-    
+
     target_link_libraries(lmrtsp_shared PUBLIC Threads::Threads)
-    
+
     set_target_properties(lmrtsp_shared PROPERTIES
         OUTPUT_NAME lmrtsp
         VERSION ${PROJECT_VERSION}
@@ -279,35 +279,35 @@ message(STATUS "Examples and tests will use ${DEFAULT_LIBRARY_TYPE} library")
 # Build examples
 if(BUILD_EXAMPLES)
     message(STATUS "Building lmrtsp examples...")
-    
+
     # Create examples directory in build folder
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/examples)
-    
+
     # Find all example source files
     file(GLOB EXAMPLE_SOURCES "examples/*.cpp")
-    
+
     # Create executables for each example
     foreach(EXAMPLE_SOURCE ${EXAMPLE_SOURCES})
         # Get filename without extension
         get_filename_component(EXAMPLE_NAME ${EXAMPLE_SOURCE} NAME_WE)
-        
+
         # Create executable with original filename
         add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE})
-        
+
         # Set include directories for examples
-        target_include_directories(${EXAMPLE_NAME} PRIVATE 
+        target_include_directories(${EXAMPLE_NAME} PRIVATE
             ${PROJECT_SOURCE_DIR}/include
         )
-        
-    # Link to the default library (static or shared)
-    target_link_libraries(${EXAMPLE_NAME} PRIVATE lmrtsp)
-        
+
+        # Link to the default library (static or shared)
+        target_link_libraries(${EXAMPLE_NAME} PRIVATE lmrtsp)
+
         # Set output directory
         set_target_properties(${EXAMPLE_NAME} PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/examples
         )
-        
-    message(STATUS "lmrtsp Example target: ${EXAMPLE_NAME}")
+
+        message(STATUS "lmrtsp Example target: ${EXAMPLE_NAME}")
     endforeach()
 endif()
 
@@ -372,19 +372,19 @@ if(ENABLE_INSTALL)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lmrtsp
     )
 
-# Create config file
-configure_package_config_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/lmrtspConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfig.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lmrtsp
-)
+    # Create config file
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/lmrtspConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/lmrtsp
+    )
 
-# Create version file
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfigVersion.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
-)
+    # Create version file
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/lmrtspConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
 
     # Install config files
     install(FILES
@@ -400,10 +400,6 @@ write_basic_package_version_file(
         @ONLY
     )
 
-    add_custom_target(uninstall_lmrtsp
-        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
-        COMMENT "Uninstalling lmrtsp library..."
-    )
     # Provide a convenient generic 'uninstall' target name for users
     add_custom_target(uninstall
         COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
@@ -425,7 +421,7 @@ message(STATUS "Build tests: ${BUILD_TESTS}")
 message(STATUS "Build applications: ${BUILD_APPS}")
 if(ENABLE_INSTALL)
     message(STATUS "Install support: ON")
-    message(STATUS "Uninstall support: ON (make uninstall_lmrtsp)")
+    message(STATUS "Uninstall support: ON (make uninstall)")
 else()
     message(STATUS "Install support: DISABLED (Windows platform)")
     message(STATUS "Uninstall support: DISABLED (Windows platform)")

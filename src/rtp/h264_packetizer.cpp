@@ -15,10 +15,10 @@
 #include <arpa/inet.h>
 #endif
 
-#include "internal_logger.h"
-
 #include <algorithm>
 #include <iostream>
+
+#include "internal_logger.h"
 
 namespace lmshao::lmrtp {
 
