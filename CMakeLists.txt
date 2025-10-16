@@ -148,8 +148,6 @@ endif()
 
 # Source files and include directories
 include_directories(${PROJECT_SOURCE_DIR}/include)
-include_directories(${PROJECT_SOURCE_DIR}/include/lmrtsp)
-include_directories(${PROJECT_SOURCE_DIR}/include/lmrtp)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
 # Collect RTSP source files

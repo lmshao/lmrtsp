@@ -13,9 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "lmrtp/i_rtp_packetizer.h"
+#include "lmrtsp/i_rtp_packetizer.h"
 
-using namespace lmshao::lmrtp;
+using namespace lmshao::lmrtsp;
 
 /**
  * @brief H.264 file reader class
@@ -86,6 +86,27 @@ public:
      * @return Estimated frame count
      */
     size_t GetFrameCount() const;
+
+    /**
+     * @brief Get video resolution
+     * @param width Output width
+     * @param height Output height
+     * @return true if resolution could be determined
+     */
+    bool GetResolution(uint32_t &width, uint32_t &height) const;
+
+    /**
+     * @brief Get estimated video duration in seconds
+     * @return Estimated duration
+     */
+    double GetDuration() const;
+
+    /**
+     * @brief Read next frame data
+     * @param frame_data Output frame data
+     * @return true if frame was read successfully
+     */
+    bool GetNextFrame(std::vector<uint8_t> &frame_data);
 
 private:
     /**

@@ -12,8 +12,8 @@
 #include <vector>
 
 #include "internal_logger.h"
-#include "lmrtp/h264_packetizer.h"
-#include "lmrtp/rtp_packet.h"
+#include "lmrtsp/h264_packetizer.h"
+#include "lmrtsp/rtp_packet.h"
 #include "rtsp_session.h"
 
 namespace lmshao::lmrtsp {
@@ -22,12 +22,12 @@ namespace lmshao::lmrtsp {
 MediaStream::MediaStream(const std::string &uri, const std::string &mediaType)
     : uri_(uri), mediaType_(mediaType), state_(StreamState::INIT)
 {
-    RTSP_LOGD("Created MediaStream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());
+    LMRTSP_LOGD("Created MediaStream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());
 }
 
 MediaStream::~MediaStream()
 {
-    RTSP_LOGD("Destroyed MediaStream for URI: %s", uri_.c_str());
+    LMRTSP_LOGD("Destroyed MediaStream for URI: %s", uri_.c_str());
 }
 
 std::string MediaStream::GetUri() const
@@ -76,18 +76,18 @@ RTPStream::~RTPStream()
 bool RTPStream::Setup(const std::string &transport, const std::string &client_ip)
 {
     clientIp_ = client_ip;
-    RTSP_LOGD("Setting up RTP stream with transport: %s", transport.c_str());
+    LMRTSP_LOGD("Setting up RTP stream with transport: %s", transport.c_str());
 
     // Check transport type
     if (transport.find("RTP/AVP") == std::string::npos) {
-        RTSP_LOGE("Unsupported transport protocol");
+        LMRTSP_LOGE("Unsupported transport protocol");
         return false;
     }
 
     // Check if it's unicast
     bool isUnicast = (transport.find("unicast") != std::string::npos);
     if (!isUnicast) {
-        RTSP_LOGE("Only unicast mode is supported");
+        LMRTSP_LOGE("Only unicast mode is supported");
         return false;
     }
 
@@ -99,13 +99,13 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
     if (isTcpTransport) {
         // TCP interleaved transport
         isTcpTransport_ = true;
-        RTSP_LOGD("Setting up TCP interleaved transport");
+        LMRTSP_LOGD("Setting up TCP interleaved transport");
     } else if (isUdpTransport) {
         // UDP transport
         isTcpTransport_ = false;
-        RTSP_LOGD("Setting up UDP transport");
+        LMRTSP_LOGD("Setting up UDP transport");
     } else {
-        RTSP_LOGE("Unsupported transport protocol");
+        LMRTSP_LOGE("Unsupported transport protocol");
         return false;
     }
 
@@ -127,7 +127,7 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
                 channelRange = channelRange.substr(firstNonSpace, lastNonSpace - firstNonSpace + 1);
             }
 
-            RTSP_LOGD("Parsed interleaved channel range: '%s'", channelRange.c_str());
+            LMRTSP_LOGD("Parsed interleaved channel range: '%s'", channelRange.c_str());
 
             size_t dashPos = channelRange.find('-');
             if (dashPos != std::string::npos) {
@@ -136,14 +136,14 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
                     std::string rtcpStr = channelRange.substr(dashPos + 1);
                     rtpInterleaved_ = static_cast<uint8_t>(std::stoi(rtpStr));
                     rtcpInterleaved_ = static_cast<uint8_t>(std::stoi(rtcpStr));
-                    RTSP_LOGD("TCP interleaved channels: RTP=%d, RTCP=%d", rtpInterleaved_, rtcpInterleaved_);
+                    LMRTSP_LOGD("TCP interleaved channels: RTP=%d, RTCP=%d", rtpInterleaved_, rtcpInterleaved_);
                 } catch (const std::exception &e) {
-                    RTSP_LOGE("Failed to parse interleaved channels: %s, using defaults", e.what());
+                    LMRTSP_LOGE("Failed to parse interleaved channels: %s, using defaults", e.what());
                     rtpInterleaved_ = 0;
                     rtcpInterleaved_ = 1;
                 }
             } else {
-                RTSP_LOGE("Invalid interleaved channel format, using defaults");
+                LMRTSP_LOGE("Invalid interleaved channel format, using defaults");
                 rtpInterleaved_ = 0;
                 rtcpInterleaved_ = 1;
             }
@@ -151,7 +151,7 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
             // If no interleaved channels specified, use defaults
             rtpInterleaved_ = 0;
             rtcpInterleaved_ = 1;
-            RTSP_LOGD("Using default TCP interleaved channels: RTP=%d, RTCP=%d", rtpInterleaved_, rtcpInterleaved_);
+            LMRTSP_LOGD("Using default TCP interleaved channels: RTP=%d, RTCP=%d", rtpInterleaved_, rtcpInterleaved_);
         }
 
         transportInfo_ = transport;
@@ -173,7 +173,7 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
                 portRange = portRange.substr(firstNonSpace, lastNonSpace - firstNonSpace + 1);
             }
 
-            RTSP_LOGD("Parsed client port range: '%s'", portRange.c_str());
+            LMRTSP_LOGD("Parsed client port range: '%s'", portRange.c_str());
 
             size_t dashPos = portRange.find('-');
             if (dashPos != std::string::npos) {
@@ -182,34 +182,34 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
                     std::string rtcpPortStr = portRange.substr(dashPos + 1);
                     clientRtpPort_ = static_cast<uint16_t>(std::stoi(rtpPortStr));
                     clientRtcpPort_ = static_cast<uint16_t>(std::stoi(rtcpPortStr));
-                    RTSP_LOGD("Client UDP ports: RTP=%d, RTCP=%d", clientRtpPort_, clientRtcpPort_);
+                    LMRTSP_LOGD("Client UDP ports: RTP=%d, RTCP=%d", clientRtpPort_, clientRtcpPort_);
                 } catch (const std::exception &e) {
-                    RTSP_LOGE("Failed to parse client ports: %s", e.what());
+                    LMRTSP_LOGE("Failed to parse client ports: %s", e.what());
                     return false;
                 }
             } else {
-                RTSP_LOGE("Invalid client_port format");
+                LMRTSP_LOGE("Invalid client_port format");
                 return false;
             }
         } else {
-            RTSP_LOGE("UDP transport requires client_port parameter");
+            LMRTSP_LOGE("UDP transport requires client_port parameter");
             return false;
         }
 
         // Create UDP clients for RTP and RTCP
         rtp_client_ = std::make_shared<UdpClient>(client_ip, clientRtpPort_);
         if (!rtp_client_->Init()) {
-            RTSP_LOGE("Failed to initialize RTP UDP client");
+            LMRTSP_LOGE("Failed to initialize RTP UDP client");
             return false;
         }
-        RTSP_LOGD("RTP UDP client initialized for %s:%d", client_ip.c_str(), clientRtpPort_);
+        LMRTSP_LOGD("RTP UDP client initialized for %s:%d", client_ip.c_str(), clientRtpPort_);
 
         rtcp_client_ = std::make_shared<UdpClient>(client_ip, clientRtcpPort_);
         if (!rtcp_client_->Init()) {
-            RTSP_LOGE("Failed to initialize RTCP UDP client");
+            LMRTSP_LOGE("Failed to initialize RTCP UDP client");
             return false;
         }
-        RTSP_LOGD("RTCP UDP client initialized for %s:%d", client_ip.c_str(), clientRtcpPort_);
+        LMRTSP_LOGD("RTCP UDP client initialized for %s:%d", client_ip.c_str(), clientRtcpPort_);
 
         // Allocate server ports (simplified: use any available ports)
         // In production, you'd want to manage a port pool
@@ -221,54 +221,54 @@ bool RTPStream::Setup(const std::string &transport, const std::string &client_ip
         snprintf(transportBuf, sizeof(transportBuf), "RTP/AVP/UDP;unicast;client_port=%d-%d;server_port=%d-%d",
                  clientRtpPort_, clientRtcpPort_, serverRtpPort_, serverRtcpPort_);
         transportInfo_ = transportBuf;
-        RTSP_LOGD("Transport info: %s", transportInfo_.c_str());
+        LMRTSP_LOGD("Transport info: %s", transportInfo_.c_str());
     }
 
     // Initialize H.264 packetizer
-    packetizer_ = std::make_unique<lmrtp::H264Packetizer>(12345, // SSRC
-                                                          0,     // Initial sequence number
-                                                          0,     // Initial timestamp
-                                                          1400   // MTU size
+    packetizer_ = std::make_unique<lmrtsp::H264Packetizer>(12345, // SSRC
+                                                           0,     // Initial sequence number
+                                                           0,     // Initial timestamp
+                                                           1400   // MTU size
     );
 
     // Update state
     state_ = StreamState::READY;
 
-    RTSP_LOGD("RTP stream setup successful");
+    LMRTSP_LOGD("RTP stream setup successful");
     return true;
 }
 
 bool RTPStream::Play(const std::string &range)
 {
-    RTSP_LOGD("Playing RTP stream, range: %s", range.c_str());
+    LMRTSP_LOGD("Playing RTP stream, range: %s", range.c_str());
 
     if (state_ != StreamState::READY && state_ != StreamState::PAUSED) {
-        RTSP_LOGE("Cannot play stream in current state");
+        LMRTSP_LOGE("Cannot play stream in current state");
         return false;
     }
 
     if (auto session = session_.lock()) {
-        RTSP_LOGD("Session is valid, ready to send frames for track %d", track_index_);
+        LMRTSP_LOGD("Session is valid, ready to send frames for track %d", track_index_);
         isActive_ = true;
         send_thread_ = std::thread(&RTPStream::SendMedia, this);
     } else {
-        RTSP_LOGE("Session is expired, cannot play stream");
+        LMRTSP_LOGE("Session is expired, cannot play stream");
         return false;
     }
 
     // Update state
     state_ = StreamState::PLAYING;
 
-    RTSP_LOGD("RTP stream play started");
+    LMRTSP_LOGD("RTP stream play started");
     return true;
 }
 
 bool RTPStream::Pause()
 {
-    RTSP_LOGD("Pausing RTP stream");
+    LMRTSP_LOGD("Pausing RTP stream");
 
     if (state_ != StreamState::PLAYING) {
-        RTSP_LOGE("Cannot pause stream in current state");
+        LMRTSP_LOGE("Cannot pause stream in current state");
         return false;
     }
 
@@ -277,16 +277,16 @@ bool RTPStream::Pause()
     // Update state
     state_ = StreamState::PAUSED;
 
-    RTSP_LOGD("RTP stream paused");
+    LMRTSP_LOGD("RTP stream paused");
     return true;
 }
 
 bool RTPStream::Teardown()
 {
-    RTSP_LOGD("Tearing down RTP stream");
+    LMRTSP_LOGD("Tearing down RTP stream");
 
     if (state_ == StreamState::INIT) {
-        RTSP_LOGD("Stream already in INIT state");
+        LMRTSP_LOGD("Stream already in INIT state");
         return true;
     }
 
@@ -316,7 +316,7 @@ bool RTPStream::Teardown()
     // Update state
     state_ = StreamState::INIT;
 
-    RTSP_LOGD("RTP stream teardown successful");
+    LMRTSP_LOGD("RTP stream teardown successful");
     return true;
 }
 
@@ -342,22 +342,22 @@ void RTPStream::PushFrame(MediaFrame &&frame)
 
 void RTPStream::OnReceive(std::shared_ptr<lmnet::Session> session, std::shared_ptr<lmcore::DataBuffer> data)
 {
-    RTSP_LOGD("RTPStream received a packet");
+    LMRTSP_LOGD("RTPStream received a packet");
 }
 
 void RTPStream::OnClose(std::shared_ptr<lmnet::Session> session)
 {
-    RTSP_LOGD("RTPStream session closed");
+    LMRTSP_LOGD("RTPStream session closed");
 }
 
 void RTPStream::OnError(std::shared_ptr<lmnet::Session> session, const std::string &error)
 {
-    RTSP_LOGE("RTPStream error: %s", error.c_str());
+    LMRTSP_LOGE("RTPStream error: %s", error.c_str());
 }
 
 void RTPStream::SendMedia()
 {
-    RTSP_LOGD("SendMedia thread started");
+    LMRTSP_LOGD("SendMedia thread started");
 
     while (isActive_) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
@@ -399,29 +399,29 @@ void RTPStream::SendMedia()
 
                             networkSession->Send(interleaved_data.data(), interleaved_data.size());
                         } else {
-                            RTSP_LOGE("No network session available for TCP interleaved transport");
+                            LMRTSP_LOGE("No network session available for TCP interleaved transport");
                         }
                     } else {
-                        RTSP_LOGE("Session expired, cannot send TCP interleaved data");
+                        LMRTSP_LOGE("Session expired, cannot send TCP interleaved data");
                     }
                 } else {
                     // UDP transport
                     if (!rtp_client_->Send(buffer.data(), buffer.size())) {
-                        RTSP_LOGE("Failed to send RTP packet via UDP");
+                        LMRTSP_LOGE("Failed to send RTP packet via UDP");
                     }
                 }
             }
         } else {
-            RTSP_LOGE("No packetizer available");
+            LMRTSP_LOGE("No packetizer available");
         }
     }
-    RTSP_LOGD("SendMedia thread finished");
+    LMRTSP_LOGD("SendMedia thread finished");
 }
 
 // MediaStreamFactory implementation
 std::shared_ptr<MediaStream> MediaStreamFactory::CreateStream(const std::string &uri, const std::string &mediaType)
 {
-    RTSP_LOGD("Creating media stream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());
+    LMRTSP_LOGD("Creating media stream for URI: %s, type: %s", uri.c_str(), mediaType.c_str());
 
     // Currently only supports RTP streams
     return std::make_shared<RTPStream>(uri, mediaType);

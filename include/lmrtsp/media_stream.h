@@ -21,11 +21,10 @@
 #include <string>
 #include <thread>
 
-#include "lmrtp/i_rtp_packetizer.h"
+#include "lmrtsp/i_rtp_packetizer.h"
 
 using namespace lmshao::lmnet;
 using namespace lmshao::lmcore;
-using namespace lmshao::lmrtp;
 
 namespace lmshao::lmrtsp {
 

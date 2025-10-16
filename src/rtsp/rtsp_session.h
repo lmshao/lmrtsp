@@ -21,8 +21,8 @@
 #include <string>
 #include <vector>
 
-#include "irtp_sender.h"
-#include "media_stream_info.h"
+#include "lmrtsp/irtp_sender.h"
+#include "lmrtsp/media_stream_info.h"
 #include "rtsp_request.h"
 #include "rtsp_response.h"
 

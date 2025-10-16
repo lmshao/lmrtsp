@@ -16,21 +16,23 @@
 namespace lmshao::lmrtsp {
 
 /**
- * @brief Get RTSP logger with auto-initialization for internal use
- * This function ensures the logger is initialized before first use
+ * @brief Get LMRTSP logger with automatic initialization
+ *
+ * Used internally by LMRTSP modules.
+ * Ensures the logger is initialized before first use.
  */
 inline lmshao::lmcore::Logger &GetLmrtspLoggerWithAutoInit()
 {
     static std::once_flag initFlag;
     std::call_once(initFlag, []() {
-        lmshao::lmcore::LoggerRegistry::RegisterModule<LmrtspModuleTag>("RTSP");
+        lmshao::lmcore::LoggerRegistry::RegisterModule<LmrtspModuleTag>("LMRTSP");
         InitLmrtspLogger();
     });
     return lmshao::lmcore::LoggerRegistry::GetLogger<LmrtspModuleTag>();
 }
 
-// Internal RTSP logging macros with auto-initialization and module tagging
-#define RTSP_LOGD(fmt, ...)                                                                                            \
+// Internal LMRTSP logging macros with auto-initialization and module tagging
+#define LMRTSP_LOGD(fmt, ...)                                                                                          \
     do {                                                                                                               \
         auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
         if (logger.ShouldLog(lmshao::lmcore::LogLevel::kDebug)) {                                                      \
@@ -39,7 +41,7 @@ inline lmshao::lmcore::Logger &GetLmrtspLoggerWithAutoInit()
         }                                                                                                              \
     } while (0)
 
-#define RTSP_LOGI(fmt, ...)                                                                                            \
+#define LMRTSP_LOGI(fmt, ...)                                                                                          \
     do {                                                                                                               \
         auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
         if (logger.ShouldLog(lmshao::lmcore::LogLevel::kInfo)) {                                                       \
@@ -48,7 +50,7 @@ inline lmshao::lmcore::Logger &GetLmrtspLoggerWithAutoInit()
         }                                                                                                              \
     } while (0)
 
-#define RTSP_LOGW(fmt, ...)                                                                                            \
+#define LMRTSP_LOGW(fmt, ...)                                                                                          \
     do {                                                                                                               \
         auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
         if (logger.ShouldLog(lmshao::lmcore::LogLevel::kWarn)) {                                                       \
@@ -57,7 +59,7 @@ inline lmshao::lmcore::Logger &GetLmrtspLoggerWithAutoInit()
         }                                                                                                              \
     } while (0)
 
-#define RTSP_LOGE(fmt, ...)                                                                                            \
+#define LMRTSP_LOGE(fmt, ...)                                                                                          \
     do {                                                                                                               \
         auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
         if (logger.ShouldLog(lmshao::lmcore::LogLevel::kError)) {                                                      \
@@ -66,7 +68,7 @@ inline lmshao::lmcore::Logger &GetLmrtspLoggerWithAutoInit()
         }                                                                                                              \
     } while (0)
 
-#define RTSP_LOGF(fmt, ...)                                                                                            \
+#define LMRTSP_LOGF(fmt, ...)                                                                                          \
     do {                                                                                                               \
         auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
         if (logger.ShouldLog(lmshao::lmcore::LogLevel::kFatal)) {                                                      \

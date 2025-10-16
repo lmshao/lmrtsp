@@ -6,20 +6,20 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_LMRTP_TCP_TRANSPORT_H
-#define LMSHAO_LMRTP_TCP_TRANSPORT_H
+#ifndef LMSHAO_LMRTSP_TCP_TRANSPORT_H
+#define LMSHAO_LMRTSP_TCP_TRANSPORT_H
 
 #include <lmnet/iclient_listener.h>
 #include <lmnet/tcp_client.h>
 
 #include <memory>
 
-#include "lmrtp/i_transport.h"
+#include "lmrtsp/i_transport.h"
 
 using namespace lmshao::lmnet;
 using namespace lmshao::lmcore;
 
-namespace lmshao::lmrtp {
+namespace lmshao::lmrtsp {
 
 class TcpTransport : public ITransport, public IClientListener, public std::enable_shared_from_this<TcpTransport> {
 public:
@@ -39,6 +39,6 @@ private:
     std::shared_ptr<TcpClient> tcp_client_;
 };
 
-} // namespace lmshao::lmrtp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_LMRTP_TCP_TRANSPORT_H
+#endif // LMSHAO_LMRTSP_TCP_TRANSPORT_H

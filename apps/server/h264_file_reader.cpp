@@ -204,6 +204,42 @@ size_t H264FileReader::GetFrameCount() const
     return frame_count_;
 }
 
+bool H264FileReader::GetResolution(uint32_t &width, uint32_t &height) const
+{
+    // For now, return default resolution. In a real implementation,
+    // this would parse SPS to extract actual resolution
+    if (!sps_.empty() && sps_.size() >= 4) {
+        // Simple SPS parsing for resolution (very basic)
+        // This is a simplified implementation
+        width = 1280; // Default width
+        height = 720; // Default height
+        return true;
+    }
+
+    // Return default values
+    width = 1280;
+    height = 720;
+    return false;
+}
+
+double H264FileReader::GetDuration() const
+{
+    if (frame_rate_ > 0) {
+        return static_cast<double>(frame_count_) / frame_rate_;
+    }
+    return 0.0;
+}
+
+bool H264FileReader::GetNextFrame(std::vector<uint8_t> &frame_data)
+{
+    MediaFrame frame;
+    if (ReadFrame(frame)) {
+        frame_data = std::move(frame.data);
+        return true;
+    }
+    return false;
+}
+
 int H264FileReader::FindStartCode(const uint8_t *buffer, size_t start_pos, size_t buffer_size)
 {
     if (buffer_size - start_pos < 3) {

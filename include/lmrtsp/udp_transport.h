@@ -6,18 +6,18 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_LMRTP_UDP_TRANSPORT_H
-#define LMSHAO_LMRTP_UDP_TRANSPORT_H
+#ifndef LMSHAO_LMRTSP_UDP_TRANSPORT_H
+#define LMSHAO_LMRTSP_UDP_TRANSPORT_H
 
 #include <lmnet/udp_client.h>
 
 #include <memory>
 
-#include "lmrtp/i_transport.h"
+#include "lmrtsp/i_transport.h"
 
 using namespace lmshao::lmnet;
 
-namespace lmshao::lmrtp {
+namespace lmshao::lmrtsp {
 
 class UdpTransport : public ITransport {
 public:
@@ -32,6 +32,6 @@ private:
     std::shared_ptr<UdpClient> udp_client_;
 };
 
-} // namespace lmshao::lmrtp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_LMRTP_UDP_TRANSPORT_H
+#endif // LMSHAO_LMRTSP_UDP_TRANSPORT_H

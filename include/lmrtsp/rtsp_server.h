@@ -21,8 +21,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "irtsp_server_callback.h"
-#include "media_stream_info.h"
+#include "lmrtsp/irtsp_server_callback.h"
+#include "lmrtsp/media_stream_info.h"
 
 namespace lmshao::lmrtsp {
 using namespace lmshao::lmcore;
