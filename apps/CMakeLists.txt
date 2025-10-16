@@ -9,10 +9,14 @@ if(BUILD_APPS)
 
     # RTSP Server
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/server/main.cpp")
-        add_executable(rtsp-server server/main.cpp)
+        add_executable(rtsp-server 
+            server/main.cpp
+            server/h264_file_reader.cpp
+        )
         target_include_directories(rtsp-server PRIVATE
             ${CMAKE_SOURCE_DIR}/include
             ${CMAKE_SOURCE_DIR}/lmnet/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/server
         )
         target_link_libraries(rtsp-server PRIVATE lmrtsp)
 

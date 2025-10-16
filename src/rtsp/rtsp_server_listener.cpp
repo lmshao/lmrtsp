@@ -11,6 +11,8 @@
 #include <lmcore/data_buffer.h>
 #include <lmnet/session.h>
 
+#include <algorithm>
+
 #include "internal_logger.h"
 #include "rtsp_request.h"
 #include "rtsp_server.h"
@@ -44,7 +46,22 @@ RTSPServerListener::RTSPServerListener(std::shared_ptr<RTSPServer> server) : rts
 
 void RTSPServerListener::OnError(std::shared_ptr<lmnet::Session> session, const std::string &errorInfo)
 {
-    RTSP_LOGE("Network error: %s", errorInfo.c_str());
+    RTSP_LOGE("Network error for client %s:%d - %s", session->host.c_str(), session->port, errorInfo.c_str());
+
+    // Log incomplete data if any exists
+    auto it = incompleteRequests_.find(session->fd);
+    if (it != incompleteRequests_.end()) {
+        RTSP_LOGW("Client %s:%d had incomplete request data (%zu bytes) when error occurred", session->host.c_str(),
+                  session->port, it->second.size());
+        // Log first 100 characters of incomplete data for debugging
+        size_t debugSize = (it->second.size() < 100) ? it->second.size() : 100;
+        std::string debugData = it->second.substr(0, debugSize);
+        for (char &c : debugData) {
+            if (c < 32 && c != '\r' && c != '\n')
+                c = '.';
+        }
+        RTSP_LOGW("Incomplete data: [%s]%s", debugData.c_str(), it->second.size() > 100 ? "..." : "");
+    }
 
     // Clean up incomplete request data
     incompleteRequests_.erase(session->fd);
@@ -110,10 +127,29 @@ void RTSPServerListener::OnReceive(std::shared_ptr<lmnet::Session> session, std:
     std::string data(reinterpret_cast<const char *>(buffer->Data()), buffer->Size());
     RTSP_LOGD("Received data from %s:%d, size: %zu", session->host.c_str(), session->port, data.size());
 
+    // Log raw data for debugging (first 200 characters)
+    size_t debugSize = (data.size() < 200) ? data.size() : 200;
+    std::string debugData = data.substr(0, debugSize);
+    // Replace non-printable characters with dots for logging
+    for (char &c : debugData) {
+        if (c < 32 && c != '\r' && c != '\n') {
+            c = '.';
+        }
+    }
+    RTSP_LOGD("Raw data content: [%s]%s", debugData.c_str(), data.size() > 200 ? "..." : "");
+
+    // Check if this is TCP interleaved data (starts with $)
+    if (!data.empty() && data[0] == '$') {
+        // This is TCP interleaved RTP/RTCP data, not an RTSP request
+        HandleInterleavedData(session, data);
+        return;
+    }
+
     // Check if there's previously incomplete request data
     auto it = incompleteRequests_.find(session->fd);
     if (it != incompleteRequests_.end()) {
         // Merge previous data
+        RTSP_LOGD("Found incomplete data (%zu bytes), merging with new data", it->second.size());
         data = it->second + data;
         incompleteRequests_.erase(it);
     }
@@ -141,10 +177,27 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
     size_t contentLengthPos = headerData.find(CONTENT_LENGTH);
     int contentLength = 0;
     if (contentLengthPos != std::string::npos) {
-        size_t valueStart = headerData.find_first_not_of(SP, contentLengthPos + 15);
-        size_t valueEnd = headerData.find(CRLF, valueStart);
-        if (valueStart != std::string::npos && valueEnd != std::string::npos) {
-            contentLength = std::stoi(headerData.substr(valueStart, valueEnd - valueStart));
+        size_t colonPos = headerData.find(':', contentLengthPos);
+        if (colonPos != std::string::npos) {
+            size_t valueStart = headerData.find_first_not_of(" \t", colonPos + 1);
+            size_t valueEnd = headerData.find(CRLF, valueStart);
+            if (valueStart != std::string::npos && valueEnd != std::string::npos) {
+                std::string lengthStr = headerData.substr(valueStart, valueEnd - valueStart);
+                // Remove any trailing whitespace
+                size_t lastNonSpace = lengthStr.find_last_not_of(" \t\r\n");
+                if (lastNonSpace != std::string::npos) {
+                    lengthStr = lengthStr.substr(0, lastNonSpace + 1);
+                }
+
+                try {
+                    if (!lengthStr.empty()) {
+                        contentLength = std::stoi(lengthStr);
+                    }
+                } catch (const std::exception &e) {
+                    RTSP_LOGE("Failed to parse Content-Length value: '%s', error: %s", lengthStr.c_str(), e.what());
+                    contentLength = 0;
+                }
+            }
         }
     }
 
@@ -161,6 +214,16 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
     try {
         auto request = RTSPRequest::FromString(completeRequest);
 
+        // Add detailed logging for request parsing
+        RTSP_LOGD("Parsed RTSP request - Method: [%s], URI: [%s], Version: [%s]", request.method_.c_str(),
+                  request.uri_.c_str(), request.version_.c_str());
+
+        // Check if request parsing was successful
+        if (request.method_.empty()) {
+            RTSP_LOGE("Failed to parse RTSP method from request. Request content:\n%s", completeRequest.c_str());
+            return false;
+        }
+
         // Get server instance
         auto server = rtspServer_.lock();
         if (!server) {
@@ -170,8 +233,10 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
 
         // Handle stateless requests (OPTIONS, DESCRIBE) directly without creating session
         if (request.method_ == METHOD_OPTIONS || request.method_ == METHOD_DESCRIBE) {
-            RTSP_LOGD("Handle stateless request: \n%s", completeRequest.c_str());
+            RTSP_LOGD("Handling stateless request [%s]: \n%s", request.method_.c_str(), completeRequest.c_str());
             server->HandleStatelessRequest(session, request);
+            // Return immediately after handling stateless request to avoid double processing
+            return true;
         } else {
             // Get or create RTSP session for stateful requests
             std::shared_ptr<RTSPSession> rtspSession = nullptr;
@@ -181,20 +246,23 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
             if (request.general_header_.find(SESSION) != request.general_header_.end()) {
                 sessionId = request.general_header_.at(SESSION);
                 rtspSession = server->GetSession(sessionId);
+                RTSP_LOGD("Found existing session ID: %s", sessionId.c_str());
             }
 
             // For SETUP request, create a new session if none exists
             // For other requests, session must already exist
             if (!rtspSession && request.method_ == METHOD_SETUP) {
+                RTSP_LOGD("Creating new RTSP session for SETUP request");
                 rtspSession = server->CreateSession(session);
             }
 
             // Handle request
             if (rtspSession) {
-                RTSP_LOGD("Handle request: \n%s", completeRequest.c_str());
+                RTSP_LOGD("Handling stateful request [%s]: \n%s", request.method_.c_str(), completeRequest.c_str());
                 server->HandleRequest(rtspSession, request);
             } else {
-                RTSP_LOGE("Failed to create or find RTSP session for method: %s", request.method_.c_str());
+                RTSP_LOGE("Failed to create or find RTSP session for method: [%s]. Request:\n%s",
+                          request.method_.c_str(), completeRequest.c_str());
                 // Send error response for requests that require a session but don't have one
                 server->SendErrorResponse(session, request, 454, "Session Not Found");
             }
@@ -220,6 +288,20 @@ void RTSPServerListener::HandleIncompleteData(std::shared_ptr<lmnet::Session> se
     incompleteRequests_[session->fd] = data;
     RTSP_LOGD("Stored incomplete request data for client %s:%d, size: %zu", session->host.c_str(), session->port,
               data.size());
+}
+
+void RTSPServerListener::HandleInterleavedData(std::shared_ptr<lmnet::Session> session, const std::string &data)
+{
+    // TCP interleaved data format: $<channel><length><data>
+    // This data should be ignored as it's from VLC (client to server RTCP feedback)
+    // and not needed for our simple streaming implementation
+
+    RTSP_LOGD("Received TCP interleaved data from %s:%d, size: %zu (ignored)", session->host.c_str(), session->port,
+              data.size());
+
+    // Note: In a complete implementation, we would parse this as RTCP feedback
+    // from the client and use it to adjust streaming parameters
+    // For our simple streaming server, we can safely ignore client RTCP packets
 }
 
 } // namespace lmshao::lmrtsp

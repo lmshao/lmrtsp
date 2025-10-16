@@ -56,15 +56,44 @@ std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
     RTP_LOGD("H264Packetizer: packetizing frame, size: %zu", frame_size);
 
     const uint8_t *nalu_start = find_nalu_start(frame_data, frame_size);
-    while (nalu_start) {
-        const uint8_t *next_nalu_start = find_nalu_start(nalu_start, frame_size - (nalu_start - frame_data));
-        size_t nalu_size = (next_nalu_start) ? (next_nalu_start - nalu_start - (next_nalu_start[-1] == 0 ? 4 : 3))
-                                             : (frame_size - (nalu_start - frame_data));
+    if (!nalu_start) {
+        RTP_LOGD("H264Packetizer: No NAL unit start code found");
+        return packets_;
+    }
 
-        if (nalu_size <= mtu_size_ - 12) { // 12 bytes for RTP header
-            PacketizeSingleNalu(nalu_start, nalu_size);
+    int nalu_count = 0;
+    while (nalu_start) {
+        // Search for next NAL unit starting from after current NAL header
+        size_t remaining_size = frame_size - (nalu_start - frame_data);
+        const uint8_t *next_nalu_start = nullptr;
+        if (remaining_size > 1) {
+            next_nalu_start = find_nalu_start(nalu_start + 1, remaining_size - 1);
+        }
+
+        size_t nalu_size;
+        if (next_nalu_start) {
+            // Calculate NAL size by finding the start code before next NAL
+            // Start codes are either 0x000001 (3 bytes) or 0x00000001 (4 bytes)
+            const uint8_t *nalu_end = next_nalu_start - 3;
+            if (nalu_end > nalu_start && nalu_end[-1] == 0) {
+                nalu_end--; // 4-byte start code
+            }
+            nalu_size = nalu_end - nalu_start;
         } else {
+            // Last NAL unit in frame
+            nalu_size = frame_size - (nalu_start - frame_data);
+        }
+
+        RTP_LOGD("H264Packetizer: NAL %d, size=%zu, MTU-12=%u", ++nalu_count, nalu_size, mtu_size_ - 12);
+
+        if (nalu_size > 0 && nalu_size <= mtu_size_ - 12) { // 12 bytes for RTP header
+            RTP_LOGD("H264Packetizer: Using single NALU packetization");
+            PacketizeSingleNalu(nalu_start, nalu_size);
+        } else if (nalu_size > mtu_size_ - 12) {
+            RTP_LOGD("H264Packetizer: Using FU-A fragmentation");
             PacketizeFuA(nalu_start, nalu_size);
+        } else {
+            RTP_LOGD("H264Packetizer: Skipping NAL with size 0");
         }
 
         nalu_start = next_nalu_start;

@@ -154,29 +154,37 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
     // Parse transport parameters
     rtpTransportParams_ = ParseTransportHeader(transport);
 
-    // Extract client ports from transport header
-    uint16_t clientRtpPort = 0, clientRtcpPort = 0;
-    size_t clientPortPos = transport.find("client_port=");
-    if (clientPortPos != std::string::npos) {
-        size_t portStart = clientPortPos + 12; // Length of "client_port="
-        size_t portEnd = transport.find(';', portStart);
-        if (portEnd == std::string::npos) {
-            portEnd = transport.length();
-        }
-        std::string portRange = transport.substr(portStart, portEnd - portStart);
-        size_t dashPos = portRange.find('-');
-        if (dashPos != std::string::npos) {
-            clientRtpPort = static_cast<uint16_t>(std::stoi(portRange.substr(0, dashPos)));
-            clientRtcpPort = static_cast<uint16_t>(std::stoi(portRange.substr(dashPos + 1)));
-        }
+    // Create RTP stream for this session
+    auto mediaStream = MediaStreamFactory::CreateStream(uri, "video");
+    if (!mediaStream) {
+        RTSP_LOGE("Failed to create media stream");
+        return false;
     }
 
-    // Allocate server ports (simple allocation for demo)
-    uint16_t serverRtpPort = 6000 + (std::hash<std::string>{}(sessionId_) % 1000) * 2;
-    uint16_t serverRtcpPort = serverRtpPort + 1;
+    // Set session reference for the media stream
+    mediaStream->SetSession(shared_from_this());
+    mediaStream->SetTrackIndex(0);
 
-    // Build transport info for response
-    transportInfo_ = transport + ";server_port=" + std::to_string(serverRtpPort) + "-" + std::to_string(serverRtcpPort);
+    // Get client IP for RTP stream setup
+    std::string clientIp = GetClientIP();
+    if (clientIp.empty()) {
+        RTSP_LOGE("Cannot determine client IP");
+        return false;
+    }
+
+    // Setup the media stream with transport parameters
+    if (!mediaStream->Setup(transport, clientIp)) {
+        RTSP_LOGE("Failed to setup media stream");
+        return false;
+    }
+
+    // Add media stream to session
+    std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
+    mediaStreams_.clear(); // Clear any existing streams
+    mediaStreams_.push_back(mediaStream);
+
+    // Get transport info from media stream
+    transportInfo_ = mediaStream->GetTransportInfo();
 
     // Set setup flag
     isSetup_ = true;
@@ -192,6 +200,15 @@ bool RTSPSession::PlayMedia(const std::string &uri, const std::string &range)
     if (!isSetup_) {
         RTSP_LOGE("Cannot play media: session not setup");
         return false;
+    }
+
+    // Start playing all media streams
+    std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
+    for (auto &stream : mediaStreams_) {
+        if (!stream->Play(range)) {
+            RTSP_LOGE("Failed to start playing media stream");
+            return false;
+        }
     }
 
     // Set playing state
@@ -211,6 +228,15 @@ bool RTSPSession::PauseMedia(const std::string &uri)
         return false;
     }
 
+    // Pause all media streams
+    std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
+    for (auto &stream : mediaStreams_) {
+        if (!stream->Pause()) {
+            RTSP_LOGE("Failed to pause media stream");
+            return false;
+        }
+    }
+
     // Set paused state
     isPaused_ = true;
     isPlaying_ = false;
@@ -223,13 +249,20 @@ bool RTSPSession::TeardownMedia(const std::string &uri)
 {
     RTSP_LOGD("Tearing down media for URI: %s", uri.c_str());
 
+    // Teardown all media streams
+    {
+        std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
+        for (auto &stream : mediaStreams_) {
+            stream->Teardown();
+        }
+        // Clear media streams
+        mediaStreams_.clear();
+    }
+
     // Reset all states
     isPlaying_ = false;
     isPaused_ = false;
     isSetup_ = false;
-
-    // Clear media streams
-    mediaStreams_.clear();
 
     RTSP_LOGD("Media teardown completed for session: %s", sessionId_.c_str());
     return true;
