@@ -32,7 +32,7 @@ inline void InitLmrtspLogger(lmshao::lmcore::LogLevel level =
                              const std::string &filename = "")
 {
     // Register module if not already registered
-    lmshao::lmcore::LoggerRegistry::RegisterModule<LmrtspModuleTag>("RTSP");
+    lmshao::lmcore::LoggerRegistry::RegisterModule<LmrtspModuleTag>("LMRTSP");
     lmshao::lmcore::LoggerRegistry::InitLogger<LmrtspModuleTag>(level, output, filename);
 }
 

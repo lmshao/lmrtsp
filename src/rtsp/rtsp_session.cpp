@@ -15,10 +15,10 @@
 #include <unordered_map>
 
 #include "internal_logger.h"
+#include "lmrtsp/rtsp_headers.h"
+#include "lmrtsp/rtsp_server.h"
 #include "media_stream.h"
-#include "rtsp_headers.h"
 #include "rtsp_response.h"
-#include "rtsp_server.h"
 #include "rtsp_session_state.h"
 
 namespace lmshao::lmrtsp {
@@ -35,7 +35,7 @@ RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession) : lmnetSe
     // Initialize state machine to Initial state
     currentState_ = InitialState::GetInstance();
 
-    RTSP_LOGD("RTSPSession created with ID: %s", sessionId_.c_str());
+    LMRTSP_LOGD("RTSPSession created with ID: %s", sessionId_.c_str());
 }
 
 RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RTSPServer> server)
@@ -50,12 +50,12 @@ RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak
     // Initialize state machine to Initial state
     currentState_ = InitialState::GetInstance();
 
-    RTSP_LOGD("RTSPSession created with ID: %s and server reference", sessionId_.c_str());
+    LMRTSP_LOGD("RTSPSession created with ID: %s and server reference", sessionId_.c_str());
 }
 
 RTSPSession::~RTSPSession()
 {
-    RTSP_LOGD("RTSPSession destroyed: %s", sessionId_.c_str());
+    LMRTSP_LOGD("RTSPSession destroyed: %s", sessionId_.c_str());
 
     // Clean up media streams
     mediaStreams_.clear();
@@ -149,7 +149,7 @@ std::weak_ptr<RTSPServer> RTSPSession::GetRTSPServer() const
 
 bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transport)
 {
-    RTSP_LOGD("Setting up media for URI: %s, Transport: %s", uri.c_str(), transport.c_str());
+    LMRTSP_LOGD("Setting up media for URI: %s, Transport: %s", uri.c_str(), transport.c_str());
 
     // Parse transport parameters
     rtpTransportParams_ = ParseTransportHeader(transport);
@@ -157,7 +157,7 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
     // Create RTP stream for this session
     auto mediaStream = MediaStreamFactory::CreateStream(uri, "video");
     if (!mediaStream) {
-        RTSP_LOGE("Failed to create media stream");
+        LMRTSP_LOGE("Failed to create media stream");
         return false;
     }
 
@@ -168,13 +168,13 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
     // Get client IP for RTP stream setup
     std::string clientIp = GetClientIP();
     if (clientIp.empty()) {
-        RTSP_LOGE("Cannot determine client IP");
+        LMRTSP_LOGE("Cannot determine client IP");
         return false;
     }
 
     // Setup the media stream with transport parameters
     if (!mediaStream->Setup(transport, clientIp)) {
-        RTSP_LOGE("Failed to setup media stream");
+        LMRTSP_LOGE("Failed to setup media stream");
         return false;
     }
 
@@ -189,16 +189,16 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
     // Set setup flag
     isSetup_ = true;
 
-    RTSP_LOGD("Media setup completed for session: %s, Transport: %s", sessionId_.c_str(), transportInfo_.c_str());
+    LMRTSP_LOGD("Media setup completed for session: %s, Transport: %s", sessionId_.c_str(), transportInfo_.c_str());
     return true;
 }
 
 bool RTSPSession::PlayMedia(const std::string &uri, const std::string &range)
 {
-    RTSP_LOGD("Playing media for URI: %s, Range: %s", uri.c_str(), range.c_str());
+    LMRTSP_LOGD("Playing media for URI: %s, Range: %s", uri.c_str(), range.c_str());
 
     if (!isSetup_) {
-        RTSP_LOGE("Cannot play media: session not setup");
+        LMRTSP_LOGE("Cannot play media: session not setup");
         return false;
     }
 
@@ -206,7 +206,7 @@ bool RTSPSession::PlayMedia(const std::string &uri, const std::string &range)
     std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
     for (auto &stream : mediaStreams_) {
         if (!stream->Play(range)) {
-            RTSP_LOGE("Failed to start playing media stream");
+            LMRTSP_LOGE("Failed to start playing media stream");
             return false;
         }
     }
@@ -215,16 +215,16 @@ bool RTSPSession::PlayMedia(const std::string &uri, const std::string &range)
     isPlaying_ = true;
     isPaused_ = false;
 
-    RTSP_LOGD("Media playback started for session: %s", sessionId_.c_str());
+    LMRTSP_LOGD("Media playback started for session: %s", sessionId_.c_str());
     return true;
 }
 
 bool RTSPSession::PauseMedia(const std::string &uri)
 {
-    RTSP_LOGD("Pausing media for URI: %s", uri.c_str());
+    LMRTSP_LOGD("Pausing media for URI: %s", uri.c_str());
 
     if (!isPlaying_) {
-        RTSP_LOGE("Cannot pause media: not currently playing");
+        LMRTSP_LOGE("Cannot pause media: not currently playing");
         return false;
     }
 
@@ -232,7 +232,7 @@ bool RTSPSession::PauseMedia(const std::string &uri)
     std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
     for (auto &stream : mediaStreams_) {
         if (!stream->Pause()) {
-            RTSP_LOGE("Failed to pause media stream");
+            LMRTSP_LOGE("Failed to pause media stream");
             return false;
         }
     }
@@ -241,13 +241,13 @@ bool RTSPSession::PauseMedia(const std::string &uri)
     isPaused_ = true;
     isPlaying_ = false;
 
-    RTSP_LOGD("Media playback paused for session: %s", sessionId_.c_str());
+    LMRTSP_LOGD("Media playback paused for session: %s", sessionId_.c_str());
     return true;
 }
 
 bool RTSPSession::TeardownMedia(const std::string &uri)
 {
-    RTSP_LOGD("Tearing down media for URI: %s", uri.c_str());
+    LMRTSP_LOGD("Tearing down media for URI: %s", uri.c_str());
 
     // Teardown all media streams
     {
@@ -264,7 +264,7 @@ bool RTSPSession::TeardownMedia(const std::string &uri)
     isPaused_ = false;
     isSetup_ = false;
 
-    RTSP_LOGD("Media teardown completed for session: %s", sessionId_.c_str());
+    LMRTSP_LOGD("Media teardown completed for session: %s", sessionId_.c_str());
     return true;
 }
 

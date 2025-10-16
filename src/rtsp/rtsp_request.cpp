@@ -73,7 +73,7 @@ RTSPRequest RTSPRequest::FromString(const std::string &req_str)
     RTSPRequest request;
 
     if (req_str.empty()) {
-        RTSP_LOGD("Empty request string received");
+        LMRTSP_LOGD("Empty request string received");
         return request;
     }
 
@@ -81,37 +81,37 @@ RTSPRequest RTSPRequest::FromString(const std::string &req_str)
     std::vector<std::string> lines = RTSPUtils::split(req_str, CRLF);
 
     if (lines.empty()) {
-        RTSP_LOGD("No lines found in request string");
+        LMRTSP_LOGD("No lines found in request string");
         return request;
     }
 
     // Parse the request line (first line)
     std::string request_line = lines[0];
-    RTSP_LOGD("Request line: [%s]", request_line.c_str());
+    LMRTSP_LOGD("Request line: [%s]", request_line.c_str());
 
     std::vector<std::string> request_parts = RTSPUtils::split(request_line, SP);
-    RTSP_LOGD("Request parts count: %zu", request_parts.size());
+    LMRTSP_LOGD("Request parts count: %zu", request_parts.size());
 
     if (request_parts.size() >= 3) {
-        RTSP_LOGD("Request parts: [%s] [%s] [%s]", request_parts[0].c_str(), request_parts[1].c_str(),
-                  request_parts[2].c_str());
+        LMRTSP_LOGD("Request parts: [%s] [%s] [%s]", request_parts[0].c_str(), request_parts[1].c_str(),
+                    request_parts[2].c_str());
 
         // Validate that the version looks like RTSP/x.x
         if (request_parts[2].find("RTSP/") == 0) {
             request.method_ = request_parts[0];
             request.uri_ = request_parts[1];
             request.version_ = request_parts[2];
-            RTSP_LOGD("Successfully parsed request line - Method: %s, URI: %s, Version: %s", request.method_.c_str(),
-                      request.uri_.c_str(), request.version_.c_str());
+            LMRTSP_LOGD("Successfully parsed request line - Method: %s, URI: %s, Version: %s", request.method_.c_str(),
+                        request.uri_.c_str(), request.version_.c_str());
         } else {
             // Invalid version format
-            RTSP_LOGE("Invalid RTSP version format: [%s]. Expected RTSP/x.x", request_parts[2].c_str());
+            LMRTSP_LOGE("Invalid RTSP version format: [%s]. Expected RTSP/x.x", request_parts[2].c_str());
             return request;
         }
     } else {
         // Invalid request line
-        RTSP_LOGE("Invalid request line format. Expected at least 3 parts, got %zu. Line: [%s]", request_parts.size(),
-                  request_line.c_str());
+        LMRTSP_LOGE("Invalid request line format. Expected at least 3 parts, got %zu. Line: [%s]", request_parts.size(),
+                    request_line.c_str());
         return request;
     }
 

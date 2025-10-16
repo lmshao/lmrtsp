@@ -15,15 +15,14 @@
 #include <memory>
 #include <thread>
 
-#include "lmrtp/i_rtp_packetizer.h"
-#include "lmrtsp/h264_file_reader.h"
+#include "h264_file_reader.h"
+#include "lmrtsp/i_rtp_packetizer.h"
 #include "lmrtsp/media_stream.h"
 #include "lmrtsp/media_stream_info.h"
+#include "lmrtsp/rtsp_server.h"
 #include "lmrtsp/rtsp_session.h"
-#include "rtsp_server.h"
 
 using namespace lmshao::lmrtsp;
-using namespace lmshao::lmrtp;
 
 // Global server instance for signal handling
 std::shared_ptr<RTSPServer> g_server;
@@ -108,8 +107,8 @@ int main(int argc, char *argv[])
 
     // Load video file if provided
     if (!video_file.empty()) {
-        g_h264_reader = std::make_shared<H264FileReader>();
-        if (!g_h264_reader->Open(video_file)) {
+        g_h264_reader = std::make_shared<H264FileReader>(video_file);
+        if (!g_h264_reader->Open()) {
             std::cerr << "Failed to open video file: " << video_file << std::endl;
             return 1;
         }

@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "lmrtp/h264_packetizer.h"
+#include "lmrtsp/h264_packetizer.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -20,7 +20,7 @@
 
 #include "internal_logger.h"
 
-namespace lmshao::lmrtp {
+namespace lmshao::lmrtsp {
 
 namespace {
 // Finds the start of a NAL unit. Returns a pointer to the first byte of the NAL unit payload (after the start code).
@@ -44,7 +44,7 @@ const uint8_t *find_nalu_start(const uint8_t *data, size_t size)
 H264Packetizer::H264Packetizer(uint32_t ssrc, uint16_t sequence_number, uint32_t timestamp, uint32_t mtu_size)
     : ssrc_(ssrc), sequence_number_(sequence_number), timestamp_(timestamp), mtu_size_(mtu_size)
 {
-    RTP_LOGD("H264Packetizer created: SSRC=0x%08X, MTU=%u", ssrc, mtu_size);
+    LMRTSP_LOGD("H264Packetizer created: SSRC=0x%08X, MTU=%u", ssrc, mtu_size);
 }
 
 std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
@@ -53,11 +53,11 @@ std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
     const uint8_t *frame_data = frame.data.data();
     size_t frame_size = frame.data.size();
 
-    RTP_LOGD("H264Packetizer: packetizing frame, size: %zu", frame_size);
+    LMRTSP_LOGD("H264Packetizer: packetizing frame, size: %zu", frame_size);
 
     const uint8_t *nalu_start = find_nalu_start(frame_data, frame_size);
     if (!nalu_start) {
-        RTP_LOGD("H264Packetizer: No NAL unit start code found");
+        LMRTSP_LOGD("H264Packetizer: No NAL unit start code found");
         return packets_;
     }
 
@@ -84,16 +84,16 @@ std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
             nalu_size = frame_size - (nalu_start - frame_data);
         }
 
-        RTP_LOGD("H264Packetizer: NAL %d, size=%zu, MTU-12=%u", ++nalu_count, nalu_size, mtu_size_ - 12);
+        LMRTSP_LOGD("H264Packetizer: NAL %d, size=%zu, MTU-12=%u", ++nalu_count, nalu_size, mtu_size_ - 12);
 
         if (nalu_size > 0 && nalu_size <= mtu_size_ - 12) { // 12 bytes for RTP header
-            RTP_LOGD("H264Packetizer: Using single NALU packetization");
+            LMRTSP_LOGD("H264Packetizer: Using single NALU packetization");
             PacketizeSingleNalu(nalu_start, nalu_size);
         } else if (nalu_size > mtu_size_ - 12) {
-            RTP_LOGD("H264Packetizer: Using FU-A fragmentation");
+            LMRTSP_LOGD("H264Packetizer: Using FU-A fragmentation");
             PacketizeFuA(nalu_start, nalu_size);
         } else {
-            RTP_LOGD("H264Packetizer: Skipping NAL with size 0");
+            LMRTSP_LOGD("H264Packetizer: Skipping NAL with size 0");
         }
 
         nalu_start = next_nalu_start;
@@ -103,7 +103,7 @@ std::vector<RtpPacket> H264Packetizer::packetize(const MediaFrame &frame)
         packets_.back().header.marker = 1;
     }
 
-    RTP_LOGD("H264Packetizer: generated %zu RTP packets", packets_.size());
+    LMRTSP_LOGD("H264Packetizer: generated %zu RTP packets", packets_.size());
     return packets_;
 }
 
@@ -168,4 +168,4 @@ void H264Packetizer::PacketizeFuA(const uint8_t *nalu, size_t nalu_size)
     }
 }
 
-} // namespace lmshao::lmrtp
+} // namespace lmshao::lmrtsp

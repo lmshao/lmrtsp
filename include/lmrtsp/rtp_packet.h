@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_LMRTP_RTP_PACKET_H
-#define LMSHAO_LMRTP_RTP_PACKET_H
+#ifndef LMSHAO_LMRTSP_RTP_PACKET_H
+#define LMSHAO_LMRTSP_RTP_PACKET_H
 
 #include <cstdint>
 #include <cstring>
@@ -28,7 +28,7 @@
 #include <endian.h>
 #endif
 
-namespace lmshao::lmrtp {
+namespace lmshao::lmrtsp {
 // Represents the fixed-size RTP header.
 // See RFC 3550 for details.
 struct RtpHeader {
@@ -119,6 +119,6 @@ public:
     }
 };
 
-} // namespace lmshao::lmrtp
+} // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_LMRTP_RTP_PACKET_H
+#endif // LMSHAO_LMRTSP_RTP_PACKET_H

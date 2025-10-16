@@ -9,8 +9,8 @@
 #include "rtsp_session_state.h"
 
 #include "internal_logger.h"
+#include "lmrtsp/rtsp_server.h"
 #include "rtsp_response.h"
-#include "rtsp_server.h"
 #include "rtsp_session.h"
 
 namespace lmshao::lmrtsp {
@@ -20,7 +20,7 @@ namespace {
 
 RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing OPTIONS request");
+    LMRTSP_LOGD("Processing OPTIONS request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RTSPResponseBuilder()
                         .SetStatus(StatusCode::OK)
@@ -32,7 +32,7 @@ RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
 
 RTSPResponse HandleDescribe(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing DESCRIBE request");
+    LMRTSP_LOGD("Processing DESCRIBE request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     RTSPResponseBuilder builder;
 
@@ -67,7 +67,7 @@ RTSPResponse HandleDescribe(RTSPSession *session, const RTSPRequest &request)
 
 RTSPResponse HandleGetParameter(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing GET_PARAMETER request");
+    LMRTSP_LOGD("Processing GET_PARAMETER request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
@@ -75,7 +75,7 @@ RTSPResponse HandleGetParameter(RTSPSession *session, const RTSPRequest &request
 
 RTSPResponse HandleSetParameter(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing SET_PARAMETER request");
+    LMRTSP_LOGD("Processing SET_PARAMETER request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
@@ -83,7 +83,7 @@ RTSPResponse HandleSetParameter(RTSPSession *session, const RTSPRequest &request
 
 RTSPResponse HandleAnnounce(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing ANNOUNCE request");
+    LMRTSP_LOGD("Processing ANNOUNCE request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
     return response;
@@ -91,7 +91,7 @@ RTSPResponse HandleAnnounce(RTSPSession *session, const RTSPRequest &request)
 
 RTSPResponse HandleRecord(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing RECORD request");
+    LMRTSP_LOGD("Processing RECORD request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RTSPResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
     return response;
@@ -132,7 +132,7 @@ RTSPResponse InitialState::OnSetParameter(RTSPSession *session, const RTSPReques
 
 RTSPResponse InitialState::OnSetup(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing SETUP request in InitialState");
+    LMRTSP_LOGD("Processing SETUP request in InitialState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     if (session->SetupMedia(request.uri_, request.general_header_.at("Transport"))) {
@@ -211,7 +211,7 @@ RTSPResponse ReadyState::OnSetup(RTSPSession *session, const RTSPRequest &reques
 
 RTSPResponse ReadyState::OnPlay(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing PLAY request in ReadyState");
+    LMRTSP_LOGD("Processing PLAY request in ReadyState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     std::string range = "";
@@ -243,7 +243,7 @@ RTSPResponse ReadyState::OnPause(RTSPSession *session, const RTSPRequest &reques
 
 RTSPResponse ReadyState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing TEARDOWN request in ReadyState");
+    LMRTSP_LOGD("Processing TEARDOWN request in ReadyState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     session->TeardownMedia(request.uri_);
@@ -300,7 +300,7 @@ RTSPResponse PlayingState::OnPlay(RTSPSession *session, const RTSPRequest &reque
 
 RTSPResponse PlayingState::OnPause(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing PAUSE request in PlayingState");
+    LMRTSP_LOGD("Processing PAUSE request in PlayingState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     if (session->PauseMedia(request.uri_)) {
@@ -315,7 +315,7 @@ RTSPResponse PlayingState::OnPause(RTSPSession *session, const RTSPRequest &requ
 
 RTSPResponse PlayingState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing TEARDOWN request in PlayingState");
+    LMRTSP_LOGD("Processing TEARDOWN request in PlayingState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     session->TeardownMedia(request.uri_);
@@ -365,7 +365,7 @@ RTSPResponse PausedState::OnSetup(RTSPSession *session, const RTSPRequest &reque
 
 RTSPResponse PausedState::OnPlay(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing PLAY request in PausedState");
+    LMRTSP_LOGD("Processing PLAY request in PausedState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     std::string range = "";
@@ -397,7 +397,7 @@ RTSPResponse PausedState::OnPause(RTSPSession *session, const RTSPRequest &reque
 
 RTSPResponse PausedState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
 {
-    RTSP_LOGD("Processing TEARDOWN request in PausedState");
+    LMRTSP_LOGD("Processing TEARDOWN request in PausedState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     session->TeardownMedia(request.uri_);
