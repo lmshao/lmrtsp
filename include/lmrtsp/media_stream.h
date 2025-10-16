@@ -121,6 +121,11 @@ private:
     std::atomic<bool> isActive_;
     std::thread send_thread_;
 
+    // TCP interleaved transport
+    bool isTcpTransport_ = false;
+    uint8_t rtpInterleaved_ = 0;
+    uint8_t rtcpInterleaved_ = 1;
+
     std::queue<MediaFrame> frame_queue_;
     std::mutex queue_mutex_;
     std::condition_variable queue_cv_;

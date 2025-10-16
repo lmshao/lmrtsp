@@ -38,6 +38,9 @@ private:
     // Handle incomplete request data
     void HandleIncompleteData(std::shared_ptr<lmnet::Session> session, const std::string &data);
 
+    // Handle TCP interleaved data (RTP/RTCP over RTSP)
+    void HandleInterleavedData(std::shared_ptr<lmnet::Session> session, const std::string &data);
+
     std::weak_ptr<RTSPServer> rtspServer_;
 
     // Store incomplete request data

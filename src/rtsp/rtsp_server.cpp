@@ -399,13 +399,14 @@ std::string RTSPServer::GenerateSDP(const std::string &stream_path, const std::s
     sdp += "t=0 0\r\n";
 
     if (stream_info->media_type == "video") {
-        sdp += "m=video " + std::to_string(server_port) + " RTP/AVP 96\r\n";
+        sdp += "m=video 0 RTP/AVP/TCP 96\r\n";
         sdp += "a=rtpmap:96 " + stream_info->codec + "/90000\r\n";
+        sdp += "a=interleaved=0-1\r\n";
         if (stream_info->width > 0 && stream_info->height > 0) {
             sdp += "a=framerate:" + std::to_string(stream_info->frame_rate) + "\r\n";
         }
     } else if (stream_info->media_type == "audio") {
-        sdp += "m=audio " + std::to_string(server_port) + " RTP/AVP 97\r\n";
+        sdp += "m=audio 0 RTP/AVP 97\r\n";
         sdp += "a=rtpmap:97 " + stream_info->codec + "/" + std::to_string(stream_info->sample_rate) + "\r\n";
     }
 

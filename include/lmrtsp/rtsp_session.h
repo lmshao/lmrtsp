@@ -109,6 +109,7 @@ private:
 
     // Media streams
     std::vector<std::shared_ptr<MediaStream>> mediaStreams_;
+    mutable std::mutex mediaStreamsMutex_;
     std::string sdpDescription_;
     std::string transportInfo_; // legacy
 

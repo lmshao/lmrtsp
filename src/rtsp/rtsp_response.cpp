@@ -536,7 +536,7 @@ RTSPResponseBuilder RTSPResponseFactory::CreateOptionsOK(int cseq)
         .SetStatus(StatusCode::OK)
         .SetCSeq(cseq)
         .SetPublic({METHOD_OPTIONS, METHOD_DESCRIBE, METHOD_SETUP, METHOD_TEARDOWN, METHOD_PLAY, METHOD_PAUSE,
-                    METHOD_ANNOUNCE, METHOD_RECORD});
+                    METHOD_ANNOUNCE, METHOD_RECORD, METHOD_GET_PARAMETER, METHOD_SET_PARAMETER});
 }
 
 RTSPResponseBuilder RTSPResponseFactory::CreateDescribeOK(int cseq)
