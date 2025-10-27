@@ -74,7 +74,8 @@ bool H264FileReader::ReadFrame(MediaFrame &frame)
         return false;
     }
 
-    frame.data.clear();
+    // Accumulate NALU bytes into a temporary vector first
+    std::vector<uint8_t> aggregated;
 
     // Find next NAL unit start code
     while (true) {
@@ -127,7 +128,7 @@ bool H264FileReader::ReadFrame(MediaFrame &frame)
             buffer_pos_ = start_code_pos + start_code_len;
 
             // If this is the first frame, continue to find the actual NALU data
-            if (frame.data.empty()) {
+            if (aggregated.empty()) {
                 continue;
             }
         }
@@ -142,11 +143,9 @@ bool H264FileReader::ReadFrame(MediaFrame &frame)
             nalu_end = buffer_end_;
         }
 
-        // Copy NALU data to frame
+        // Copy NALU data to temporary buffer
         if (nalu_end > buffer_pos_) {
-            size_t nalu_size = nalu_end - buffer_pos_;
-            frame.data.reserve(frame.data.size() + nalu_size);
-            frame.data.insert(frame.data.end(), read_buffer_.data() + buffer_pos_, read_buffer_.data() + nalu_end);
+            aggregated.insert(aggregated.end(), read_buffer_.data() + buffer_pos_, read_buffer_.data() + nalu_end);
         }
 
         if (next_start_code_pos >= 0) {
@@ -163,12 +162,13 @@ bool H264FileReader::ReadFrame(MediaFrame &frame)
         }
     }
 
-    if (frame.data.empty()) {
+    if (aggregated.empty()) {
         return false;
     }
 
-    // Set marker bit for complete frame (simplified logic)
-    frame.marker = true;
+    // Assign aggregated data into DataBuffer
+    frame.data = lmshao::lmcore::DataBuffer::Create(aggregated.size());
+    frame.data->Assign(aggregated.data(), aggregated.size());
 
     return true;
 }
@@ -234,7 +234,8 @@ bool H264FileReader::GetNextFrame(std::vector<uint8_t> &frame_data)
 {
     MediaFrame frame;
     if (ReadFrame(frame)) {
-        frame_data = std::move(frame.data);
+        frame_data.clear();
+        frame_data.insert(frame_data.end(), frame.data->Data(), frame.data->Data() + frame.data->Size());
         return true;
     }
     return false;
@@ -248,10 +249,10 @@ int H264FileReader::FindStartCode(const uint8_t *buffer, size_t start_pos, size_
 
     for (size_t i = start_pos; i <= buffer_size - 3; ++i) {
         if (buffer[i] == 0x00 && buffer[i + 1] == 0x00 && buffer[i + 2] == 0x01) {
-            return i;
+            return static_cast<int>(i);
         }
         if (i > 0 && buffer[i - 1] == 0x00 && buffer[i] == 0x00 && buffer[i + 1] == 0x00 && buffer[i + 2] == 0x01) {
-            return i - 1;
+            return static_cast<int>(i - 1);
         }
     }
 

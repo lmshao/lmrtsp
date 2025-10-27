@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include "lmrtsp/i_rtp_packetizer.h"
+#include "lmrtsp/rtsp_media_stream_manager.h"
 
 using namespace lmshao::lmrtsp;
 

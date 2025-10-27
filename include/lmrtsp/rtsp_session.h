@@ -21,8 +21,10 @@
 #include <string>
 #include <vector>
 
-#include "lmrtsp/irtp_sender.h"
+// #include "lmrtsp/i_rtp_packetizer.h"
+// #include "lmrtsp/irtp_sender.h"
 #include "lmrtsp/media_stream_info.h"
+#include "lmrtsp/rtsp_media_stream_manager.h"
 #include "lmrtsp/rtsp_request.h"
 #include "lmrtsp/rtsp_response.h"
 
@@ -31,6 +33,11 @@ namespace lmshao::lmrtsp {
 class RTSPSessionState;
 class MediaStream;
 class RTSPServer;
+
+namespace rtsp {
+class RtspMediaStreamManager;
+struct MediaFrame;
+} // namespace rtsp
 
 class RTSPSession : public std::enable_shared_from_this<RTSPSession> {
 public:
@@ -64,15 +71,15 @@ public:
     void SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_info);
     std::shared_ptr<MediaStreamInfo> GetMediaStreamInfo() const;
 
-    // RTP sender management
-    void SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender);
-    std::shared_ptr<IRTPSender> GetRTPSender() const;
-    bool HasRTPSender() const;
+    // RTP sender management (removed by request)
+    // void SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender);
+    // std::shared_ptr<IRTPSender> GetRTPSender() const;
+    // bool HasRTPSender() const;
 
-    // Transport parameters
-    void SetRTPTransportParams(const RTPTransportParams &params);
-    RTPTransportParams GetRTPTransportParams() const;
-    bool HasValidTransport() const;
+    // Transport parameters (removed by request)
+    // void SetRTPTransportParams(const RTPTransportParams &params);
+    // RTPTransportParams GetRTPTransportParams() const;
+    // bool HasValidTransport() const;
 
     // SDP management
     void SetSdpDescription(const std::string &sdp);
@@ -87,27 +94,38 @@ public:
     bool IsPaused() const;
     bool IsSetup() const;
 
-    // Statistics
-    RTPStatistics GetRTPStatistics() const;
+    // Statistics (removed by request)
+    // RTPStatistics GetRTPStatistics() const;
 
     // Session timeout management
     void UpdateLastActiveTime();
     bool IsExpired(uint32_t timeout_seconds) const;
     time_t GetLastActiveTime() const;
 
+    // New media frame interface for RtspMediaStreamManager
+    bool PushFrame(const lmrtsp::MediaFrame &frame);
+    std::string GetRtpInfo() const;
+
+    // TCP interleaved data sending (for TcpInterleavedTransportAdapter)
+    bool SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size);
+
 private:
     // Helper methods
     static std::string GenerateSessionId();
 
-    // Transport parsing
-    RTPTransportParams ParseTransportHeader(const std::string &transport) const;
+    // Transport parsing (removed by request)
+    // RTPTransportParams ParseTransportHeader(const std::string &transport) const;
 
     std::string sessionId_;
     std::shared_ptr<RTSPSessionState> currentState_;
     std::shared_ptr<lmnet::Session> lmnetSession_;
     std::weak_ptr<RTSPServer> rtspServer_;
 
-    // Media streams
+    // New media stream manager (replaces MediaStream)
+    std::unique_ptr<lmshao::lmrtsp::RtspMediaStreamManager> mediaStreamManager_;
+    mutable std::mutex mediaStreamManagerMutex_;
+
+    // Legacy media streams (for backward compatibility)
     std::vector<std::shared_ptr<MediaStream>> mediaStreams_;
     mutable std::mutex mediaStreamsMutex_;
     std::string sdpDescription_;
@@ -116,8 +134,8 @@ private:
     // Media stream info and RTP
     mutable std::mutex mediaInfoMutex_;
     std::shared_ptr<MediaStreamInfo> mediaStreamInfo_;
-    std::shared_ptr<IRTPSender> rtpSender_;
-    RTPTransportParams rtpTransportParams_;
+    // std::shared_ptr<IRTPSender> rtpSender_;
+    // RTPTransportParams rtpTransportParams_;
 
     // State flags
     std::atomic<bool> isPlaying_{false};

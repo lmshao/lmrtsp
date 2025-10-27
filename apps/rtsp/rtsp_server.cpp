@@ -6,8 +6,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "lmrtsp/rtsp_server.h"
+
 #include <lmnet/lmnet_logger.h>
-#include <lmrtsp/lmrtsp_logger.h>
 #include <signal.h>
 
 #include <chrono>
@@ -16,13 +17,14 @@
 #include <thread>
 
 #include "h264_file_reader.h"
-#include "lmrtsp/i_rtp_packetizer.h"
-#include "lmrtsp/media_stream.h"
+#include "lmnet/lmnet_logger.h"
+#include "lmrtsp/lmrtsp_logger.h"
 #include "lmrtsp/media_stream_info.h"
-#include "lmrtsp/rtsp_server.h"
 #include "lmrtsp/rtsp_session.h"
 
 using namespace lmshao::lmrtsp;
+using namespace lmshao::lmnet;
+using namespace lmshao::lmcore;
 
 // Global server instance for signal handling
 std::shared_ptr<RTSPServer> g_server;
@@ -157,6 +159,23 @@ int main(int argc, char *argv[])
         std::cout << "Usage: " << argv[0] << " [ip] [port] [video_file] [stream_path]" << std::endl;
         std::cout << "Example: " << argv[0] << " 0.0.0.0 8554 /home/liming/work/Luca-30s-720p.h264 /live" << std::endl;
         std::cout << std::endl;
+
+        // Register a default test stream so DESCRIBE/SETUP/PLAY work
+        auto stream_info = std::make_shared<MediaStreamInfo>();
+        stream_info->stream_path = stream_path;
+        stream_info->media_type = "video";
+        stream_info->codec = "H264";
+        stream_info->payload_type = 96;
+        stream_info->clock_rate = 90000;
+        stream_info->width = 1280;
+        stream_info->height = 720;
+        stream_info->frame_rate = 25;
+
+        if (!g_server->AddMediaStream(stream_path, stream_info)) {
+            std::cerr << "Failed to register test stream: " << stream_path << std::endl;
+            return 1;
+        }
+        std::cout << "Registered test stream: " << stream_path << " (H264 1280x720 @25fps)" << std::endl;
     }
 
     // Log using the logger registry directly
@@ -191,33 +210,31 @@ int main(int argc, char *argv[])
 
         for (auto &session_pair : sessions) {
             auto session = session_pair.second;
-            const auto &media_streams = session->GetMediaStreams();
 
-            for (const auto &stream : media_streams) {
-                if (stream->GetState() == StreamState::PLAYING) {
-                    has_playing_clients = true;
-                    auto rtp_stream = std::dynamic_pointer_cast<RTPStream>(stream);
+            // Check if session is playing
+            if (session->IsPlaying()) {
+                has_playing_clients = true;
 
-                    if (rtp_stream) {
-                        MediaFrame frame;
+                MediaFrame frame;
 
-                        if (g_h264_reader) {
-                            // Read real H.264 data from file
-                            std::vector<uint8_t> frame_data;
-                            if (g_h264_reader->GetNextFrame(frame_data)) {
-                                frame.data = std::move(frame_data);
-                                frame.timestamp = timestamp;
-                                frame.marker = true; // Mark as complete frame
-                                rtp_stream->PushFrame(std::move(frame));
-                            }
-                        } else {
-                            // Test mode - send dummy data
-                            frame.data.assign(1024, 0xAB);
-                            frame.timestamp = timestamp;
-                            frame.marker = false;
-                            rtp_stream->PushFrame(std::move(frame));
-                        }
+                if (g_h264_reader) {
+                    // Read real H.264 data from file
+                    std::vector<uint8_t> frame_data;
+                    if (g_h264_reader->GetNextFrame(frame_data)) {
+                        frame.data = DataBuffer::Create(frame_data.size());
+                        frame.data->Assign(frame_data.data(), frame_data.size());
+                        frame.timestamp = timestamp;
+                        session->PushFrame(std::move(frame));
                     }
+                } else {
+                    // Test mode - send dummy data
+                    {
+                        std::vector<uint8_t> dummy(1024, 0xAB);
+                        frame.data = DataBuffer::Create(dummy.size());
+                        frame.data->Assign(dummy.data(), dummy.size());
+                    }
+                    frame.timestamp = timestamp;
+                    session->PushFrame(std::move(frame));
                 }
             }
         }

@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp_session.h"
+#include "lmrtsp/rtsp_session.h"
 
 #include <ctime>
 #include <functional>
@@ -14,16 +14,19 @@
 #include <string>
 #include <unordered_map>
 
+#include "../rtp/i_rtp_transport_adapter.h"
 #include "internal_logger.h"
 #include "lmrtsp/rtsp_headers.h"
+#include "lmrtsp/rtsp_media_stream_manager.h"
 #include "lmrtsp/rtsp_server.h"
-#include "media_stream.h"
 #include "rtsp_response.h"
 #include "rtsp_session_state.h"
 
 namespace lmshao::lmrtsp {
 
-RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession) : lmnetSession_(lmnetSession), timeout_(60)
+RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession)
+    : lmnetSession_(lmnetSession), timeout_(60),
+      mediaStreamManager_(std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RTSPSession>()))
 { // Default 60 seconds timeout
 
     // Generate session ID
@@ -39,7 +42,8 @@ RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession) : lmnetSe
 }
 
 RTSPSession::RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RTSPServer> server)
-    : lmnetSession_(lmnetSession), rtspServer_(server), timeout_(60)
+    : lmnetSession_(lmnetSession), rtspServer_(server), timeout_(60),
+      mediaStreamManager_(std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RTSPSession>()))
 {
     // Generate session ID
     sessionId_ = GenerateSessionId();
@@ -151,40 +155,50 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
 {
     LMRTSP_LOGD("Setting up media for URI: %s, Transport: %s", uri.c_str(), transport.c_str());
 
-    // Parse transport parameters
-    rtpTransportParams_ = ParseTransportHeader(transport);
+    // Parse transport parameters (removed by request)
+    // rtpTransportParams_ = ParseTransportHeader(transport);
 
-    // Create RTP stream for this session
-    auto mediaStream = MediaStreamFactory::CreateStream(uri, "video");
-    if (!mediaStream) {
-        LMRTSP_LOGE("Failed to create media stream");
+    // Create new media stream manager
+    std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+
+    // Create transport config from parsed parameters
+    lmshao::lmrtsp::TransportConfig transportConfig;
+
+    // Determine transport type
+    if (transport.find("RTP/AVP/TCP") != std::string::npos) {
+        transportConfig.type = lmshao::lmrtsp::TransportConfig::Type::TCP_INTERLEAVED;
+        // Extract interleaved channels
+        size_t interleavedPos = transport.find("interleaved=");
+        if (interleavedPos != std::string::npos) {
+            std::string channelStr = transport.substr(interleavedPos + 12);
+            size_t dashPos = channelStr.find('-');
+            if (dashPos != std::string::npos) {
+                transportConfig.rtpChannel = std::stoi(channelStr.substr(0, dashPos));
+                transportConfig.rtcpChannel = std::stoi(channelStr.substr(dashPos + 1));
+            }
+        }
+    } else {
+        transportConfig.type = lmshao::lmrtsp::TransportConfig::Type::UDP;
+        transportConfig.client_ip = GetClientIP();
+        // transportConfig.client_rtp_port = rtpTransportParams_.client_rtp_port;
+        // transportConfig.client_rtcp_port = rtpTransportParams_.client_rtcp_port;
+        // transportConfig.server_rtp_port = rtpTransportParams_.server_rtp_port;
+        // transportConfig.server_rtcp_port = rtpTransportParams_.server_rtcp_port;
+    }
+
+    // Create media stream manager
+    mediaStreamManager_ =
+        std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RTSPSession>(shared_from_this()));
+
+    // Setup the media stream manager with transport config
+    if (!mediaStreamManager_->Setup(transportConfig)) {
+        LMRTSP_LOGE("Failed to setup media stream manager");
+        mediaStreamManager_.reset();
         return false;
     }
 
-    // Set session reference for the media stream
-    mediaStream->SetSession(shared_from_this());
-    mediaStream->SetTrackIndex(0);
-
-    // Get client IP for RTP stream setup
-    std::string clientIp = GetClientIP();
-    if (clientIp.empty()) {
-        LMRTSP_LOGE("Cannot determine client IP");
-        return false;
-    }
-
-    // Setup the media stream with transport parameters
-    if (!mediaStream->Setup(transport, clientIp)) {
-        LMRTSP_LOGE("Failed to setup media stream");
-        return false;
-    }
-
-    // Add media stream to session
-    std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
-    mediaStreams_.clear(); // Clear any existing streams
-    mediaStreams_.push_back(mediaStream);
-
-    // Get transport info from media stream
-    transportInfo_ = mediaStream->GetTransportInfo();
+    // Get transport info from media stream manager
+    transportInfo_ = mediaStreamManager_->GetTransportInfo();
 
     // Set setup flag
     isSetup_ = true;
@@ -202,13 +216,16 @@ bool RTSPSession::PlayMedia(const std::string &uri, const std::string &range)
         return false;
     }
 
-    // Start playing all media streams
-    std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
-    for (auto &stream : mediaStreams_) {
-        if (!stream->Play(range)) {
-            LMRTSP_LOGE("Failed to start playing media stream");
-            return false;
-        }
+    // Start playing media stream manager
+    std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+    if (!mediaStreamManager_) {
+        LMRTSP_LOGE("Media stream manager not initialized");
+        return false;
+    }
+
+    if (!mediaStreamManager_->Play()) {
+        LMRTSP_LOGE("Failed to start playing media stream");
+        return false;
     }
 
     // Set playing state
@@ -228,13 +245,16 @@ bool RTSPSession::PauseMedia(const std::string &uri)
         return false;
     }
 
-    // Pause all media streams
-    std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
-    for (auto &stream : mediaStreams_) {
-        if (!stream->Pause()) {
-            LMRTSP_LOGE("Failed to pause media stream");
-            return false;
-        }
+    // Pause media stream manager
+    std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+    if (!mediaStreamManager_) {
+        LMRTSP_LOGE("Media stream manager not initialized");
+        return false;
+    }
+
+    if (!mediaStreamManager_->Pause()) {
+        LMRTSP_LOGE("Failed to pause media stream");
+        return false;
     }
 
     // Set paused state
@@ -249,14 +269,13 @@ bool RTSPSession::TeardownMedia(const std::string &uri)
 {
     LMRTSP_LOGD("Tearing down media for URI: %s", uri.c_str());
 
-    // Teardown all media streams
+    // Teardown media stream manager
     {
-        std::lock_guard<std::mutex> lock(mediaStreamsMutex_);
-        for (auto &stream : mediaStreams_) {
-            stream->Teardown();
+        std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+        if (mediaStreamManager_) {
+            mediaStreamManager_->Teardown();
+            mediaStreamManager_.reset();
         }
-        // Clear media streams
-        mediaStreams_.clear();
     }
 
     // Reset all states
@@ -341,12 +360,12 @@ std::string RTSPSession::GenerateSessionId()
     return std::to_string(dis(gen));
 }
 
-RTPTransportParams RTSPSession::ParseTransportHeader(const std::string &transport) const
-{
-    RTPTransportParams params;
-    // TODO: Implement transport header parsing
-    return params;
-}
+// RTPTransportParams RTSPSession::ParseTransportHeader(const std::string &transport) const
+// {
+//     RTPTransportParams params;
+//     // TODO: Implement transport header parsing
+//     return params;
+// }
 
 void RTSPSession::SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_info)
 {
@@ -360,48 +379,97 @@ std::shared_ptr<MediaStreamInfo> RTSPSession::GetMediaStreamInfo() const
     return mediaStreamInfo_;
 }
 
-void RTSPSession::SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender)
+// void RTSPSession::SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender)
+// {
+//     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+//     rtpSender_ = rtp_sender;
+// }
+//
+// std::shared_ptr<IRTPSender> RTSPSession::GetRTPSender() const
+// {
+//     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+//     return rtpSender_;
+// }
+//
+// bool RTSPSession::HasRTPSender() const
+// {
+//     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+//     return rtpSender_ != nullptr;
+// }
+
+// void RTSPSession::SetRTPTransportParams(const RTPTransportParams &params)
+// {
+//     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+//     rtpTransportParams_ = params;
+// }
+//
+// RTPTransportParams RTSPSession::GetRTPTransportParams() const
+// {
+//     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+//     return rtpTransportParams_;
+// }
+//
+// bool RTSPSession::HasValidTransport() const
+// {
+//     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
+//     // TODO: Implement transport validation logic
+//     return true;
+// }
+
+// RTPStatistics RTSPSession::GetRTPStatistics() const
+// {
+//     RTPStatistics stats;
+//     // TODO: Implement RTP statistics collection
+//     return stats;
+// }
+
+bool RTSPSession::PushFrame(const lmrtsp::MediaFrame &frame)
 {
-    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
-    rtpSender_ = rtp_sender;
+    std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+    if (!mediaStreamManager_) {
+        LMRTSP_LOGE("Media stream manager not initialized");
+        return false;
+    }
+
+    if (!isPlaying_) {
+        LMRTSP_LOGW("Cannot push frame: session not in playing state");
+        return false;
+    }
+
+    return mediaStreamManager_->PushFrame(frame);
 }
 
-std::shared_ptr<IRTPSender> RTSPSession::GetRTPSender() const
+std::string RTSPSession::GetRtpInfo() const
 {
-    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
-    return rtpSender_;
+    std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+    if (!mediaStreamManager_) {
+        return "";
+    }
+
+    return mediaStreamManager_->GetRtpInfo();
 }
 
-bool RTSPSession::HasRTPSender() const
+bool RTSPSession::SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size)
 {
-    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
-    return rtpSender_ != nullptr;
-}
+    if (!lmnetSession_) {
+        LMRTSP_LOGE("Network session not available");
+        return false;
+    }
 
-void RTSPSession::SetRTPTransportParams(const RTPTransportParams &params)
-{
-    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
-    rtpTransportParams_ = params;
-}
+    // Create interleaved frame: $ + channel + length + data
+    std::vector<uint8_t> interleavedFrame;
+    interleavedFrame.reserve(4 + size);
 
-RTPTransportParams RTSPSession::GetRTPTransportParams() const
-{
-    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
-    return rtpTransportParams_;
-}
+    interleavedFrame.push_back('$');                // Magic byte
+    interleavedFrame.push_back(channel);            // Channel
+    interleavedFrame.push_back((size >> 8) & 0xFF); // Length high byte
+    interleavedFrame.push_back(size & 0xFF);        // Length low byte
 
-bool RTSPSession::HasValidTransport() const
-{
-    std::lock_guard<std::mutex> lock(mediaInfoMutex_);
-    // TODO: Implement transport validation logic
-    return true;
-}
+    // Append data
+    interleavedFrame.insert(interleavedFrame.end(), data, data + size);
 
-RTPStatistics RTSPSession::GetRTPStatistics() const
-{
-    RTPStatistics stats;
-    // TODO: Implement RTP statistics collection
-    return stats;
+    // Send via network session
+    return lmnetSession_->Send(interleavedFrame.data(), interleavedFrame.size());
 }
 
 } // namespace lmshao::lmrtsp
