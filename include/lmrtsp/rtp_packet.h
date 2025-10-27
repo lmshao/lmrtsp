@@ -10,113 +10,64 @@
 #define LMSHAO_LMRTSP_RTP_PACKET_H
 
 #include <cstdint>
-#include <cstring>
+#include <memory>
 #include <vector>
 
-// Platform-specific lmnet headers
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-// Windows doesn't define these byte order macros
-#ifndef __BYTE_ORDER
-#define __LITTLE_ENDIAN 1234
-#define __BIG_ENDIAN 4321
-#define __BYTE_ORDER __LITTLE_ENDIAN
-#endif
-#else
-#include <arpa/inet.h>
-#include <endian.h>
-#endif
+#include "lmcore/data_buffer.h"
 
 namespace lmshao::lmrtsp {
-// Represents the fixed-size RTP header.
-// See RFC 3550 for details.
-struct RtpHeader {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-    uint8_t csrc_count : 4;
-    uint8_t extension : 1;
-    uint8_t padding : 1;
-    uint8_t version : 2;
-    uint8_t payload_type : 7;
-    uint8_t marker : 1;
-#elif __BYTE_ORDER == __BIG_ENDIAN
-    uint8_t version : 2;
-    uint8_t padding : 1;
-    uint8_t extension : 1;
-    uint8_t csrc_count : 4;
-    uint8_t marker : 1;
-    uint8_t payload_type : 7;
-#else
-#error "Unsupported byte order"
-#endif
-    uint16_t sequence_number;
-    uint32_t timestamp;
-    uint32_t ssrc;
-};
 
-// Represents a full RTP packet, including header and payload.
+/**
+ * RtpPacket provides a structured representation of an RTP packet and
+ * utilities to serialize/deserialize using lmcore::DataBuffer.
+ * - Header layout follows RFC 3550 (V/P/X/CC, M/PT, sequence, timestamp, SSRC)
+ * - CSRC list, optional extension header, and payload are supported
+ */
 class RtpPacket {
 public:
-    RtpHeader header;
-    std::vector<uint32_t> csrc_list;
-    std::vector<uint8_t> payload;
+    // Fixed header fields (not using bitfields to avoid compiler packing issues)
+    uint8_t version = 2;      // RTP version (must be 2)
+    uint8_t padding = 0;      // Padding flag
+    uint8_t extension = 0;    // Extension flag
+    uint8_t csrc_count = 0;   // Number of CSRC identifiers
+    uint8_t marker = 0;       // Marker bit
+    uint8_t payload_type = 0; // Payload type (7 bits)
 
-    RtpPacket()
-    {
-        header.version = 2;
-        header.padding = 0;
-        header.extension = 0;
-        header.csrc_count = 0;
-        header.marker = 0;
-    }
+    uint16_t sequence_number = 0; // Sequence number
+    uint32_t timestamp = 0;       // Timestamp
+    uint32_t ssrc = 0;            // Synchronization source
 
-    // Serialize the packet into a byte buffer for lmnet transmission.
-    std::vector<uint8_t> serialize() const
-    {
-        std::vector<uint8_t> buffer(sizeof(RtpHeader));
-        // Copy header and convert to lmnet byte order
-        RtpHeader net_header = header;
-        net_header.sequence_number = htons(header.sequence_number);
-        net_header.timestamp = htonl(header.timestamp);
-        net_header.ssrc = htonl(header.ssrc);
+    // Optional headers
+    std::vector<uint32_t> csrc_list;     // CSRC identifiers
+    uint16_t extension_profile = 0;      // Extension header profile (if extension == 1)
+    std::vector<uint8_t> extension_data; // Extension data (length must be a multiple of 4)
 
-        memcpy(buffer.data(), &net_header, sizeof(RtpHeader));
+    // Payload stored in a DataBuffer
+    std::shared_ptr<lmcore::DataBuffer> payload; // RTP payload
 
-        // Append payload
-        buffer.insert(buffer.end(), payload.begin(), payload.end());
+    RtpPacket() = default;
 
-        return buffer;
-    }
+    // Compute the serialized header size (without payload)
+    size_t HeaderSize() const;
 
-    // Parse a byte buffer from the lmnet into an RtpPacket.
-    bool parse(const std::vector<uint8_t> &buffer)
-    {
-        if (buffer.size() < sizeof(RtpHeader)) {
-            return false;
-        }
+    // Total packet size after serialization (header + payload)
+    size_t Size() const;
 
-        memcpy(&header, buffer.data(), sizeof(RtpHeader));
+    // Basic validity checks before serialization
+    bool Validate() const;
 
-        // Convert from lmnet byte order
-        header.sequence_number = ntohs(header.sequence_number);
-        header.timestamp = ntohl(header.timestamp);
-        header.ssrc = ntohl(header.ssrc);
+    // Serialize to a DataBuffer in network byte order
+    std::shared_ptr<lmcore::DataBuffer> Serialize() const;
 
-        if (header.version != 2) {
-            return false;
-        }
+    // Parse from a raw buffer (char* + length) in network byte order
+    bool Parse(char *data, size_t length);
 
-        size_t header_size = sizeof(RtpHeader) + header.csrc_count * sizeof(uint32_t);
-        if (buffer.size() < header_size) {
-            return false;
-        }
+    // Parse from a DataBuffer in network byte order
+    bool Parse(const lmcore::DataBuffer &buf);
 
-        // For simplicity, we are not parsing CSRC list and extension header for now.
-
-        payload.assign(buffer.begin() + header_size, buffer.end());
-
-        return true;
-    }
+    // Convenience: deserialize and return a shared_ptr
+    static std::shared_ptr<RtpPacket> Deserialize(char *data, size_t length);
+    static std::shared_ptr<RtpPacket> Deserialize(const lmcore::DataBuffer &buf);
 };
 
 } // namespace lmshao::lmrtsp
