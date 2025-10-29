@@ -8,8 +8,6 @@
 
 #include "rtp_depacketizer_aac.h"
 
-#include <cstring>
-
 namespace lmshao::lmrtsp {
 
 void RtpDepacketizerAac::FlushFrame()
@@ -19,7 +17,7 @@ void RtpDepacketizerAac::FlushFrame()
         return;
 
     auto buffer = std::make_shared<lmcore::DataBuffer>(pending_.size());
-    std::memcpy(buffer->Data(), pending_.data(), pending_.size());
+    buffer->Assign(pending_.data(), pending_.size());
 
     auto frame = std::make_shared<MediaFrame>();
     frame->timestamp = current_timestamp_;

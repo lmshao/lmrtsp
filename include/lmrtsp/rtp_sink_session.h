@@ -9,12 +9,74 @@
 #ifndef LMSHAO_LMRTSP_RTP_SINK_SESSION_H
 #define LMSHAO_LMRTSP_RTP_SINK_SESSION_H
 
+#include <memory>
+#include <string>
+
+#include "lmrtsp/media_types.h"
+#include "lmrtsp/transport_config.h"
+
 namespace lmshao::lmrtsp {
+
+class IRtpTransportAdapter;
+class IRtpDepacketizer;
+
+class RtpSinkSessionListener {
+public:
+    virtual ~RtpSinkSessionListener() = default;
+
+    virtual void OnFrame(const std::shared_ptr<MediaFrame> &frame) = 0;
+    virtual void OnError(int code, const std::string &message) = 0;
+};
+
+struct RtpSinkSessionConfig {
+    std::string session_id;
+    uint32_t expected_ssrc = 0;
+
+    MediaType video_type = MediaType::H264;
+    uint8_t video_payload_type = 96;
+
+    TransportConfig transport;
+    uint32_t recv_buffer_size = 65536;
+};
 
 class RtpSinkSession {
 public:
     RtpSinkSession();
     ~RtpSinkSession();
+
+    bool Initialize(const RtpSinkSessionConfig &config);
+
+    bool Start();
+    void Stop();
+
+    void SetListener(std::shared_ptr<RtpSinkSessionListener> listener);
+
+    bool IsRunning() const { return running_; }
+
+private:
+    class DepacketizerListener;
+    class TransportListener;
+
+    // Internal data handling methods
+    void HandleRtpData(std::shared_ptr<lmcore::DataBuffer> buffer);
+    void HandleRtcpData(std::shared_ptr<lmcore::DataBuffer> buffer);
+    void HandleFrame(const std::shared_ptr<MediaFrame> &frame);
+    void HandleDepacketizerError(int code, const std::string &message);
+
+    RtpSinkSessionConfig config_{};
+    bool initialized_ = false;
+    bool running_ = false;
+
+    uint32_t last_timestamp_ = 0;
+    uint16_t last_sequence_number_ = 0;
+
+    std::unique_ptr<IRtpDepacketizer> video_depacketizer_;
+    std::weak_ptr<RtpSinkSessionListener> listener_;
+    std::unique_ptr<IRtpTransportAdapter> transport_adapter_;
+
+    // Internal listeners
+    std::shared_ptr<DepacketizerListener> depacketizer_listener_;
+    std::shared_ptr<TransportListener> transport_listener_;
 };
 
 } // namespace lmshao::lmrtsp
