@@ -49,7 +49,7 @@ void RtpPacketizerAac::SubmitFrame(const std::shared_ptr<MediaFrame> &frame)
         packet->marker = is_last ? 1 : 0;
 
         auto payload = std::make_shared<lmcore::DataBuffer>(chunk);
-        std::memcpy(payload->Data(), data + offset, chunk);
+        payload->Assign(data + offset, chunk);
         packet->payload = payload;
 
         if (auto l2 = listener_.lock())

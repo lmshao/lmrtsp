@@ -186,9 +186,14 @@ public:
         // Serialize packet and send
         auto serialized = packet->Serialize();
         if (serialized && serialized->Size() > 0) {
-            transport_->SendPacket(serialized->Data(), serialized->Size());
-            LMRTSP_LOGI("Sent RTP packet with SSRC %u, seq %u, timestamp %u, payload type %u, size %u", packet->ssrc,
-                        packet->sequence_number, packet->timestamp, packet->payload_type, serialized->Size());
+            bool success = transport_->SendPacket(serialized->Data(), serialized->Size());
+            if (!success) {
+                LMRTSP_LOGE("Failed to send RTP packet - SSRC %u, seq %u, size %u", packet->ssrc,
+                            packet->sequence_number, serialized->Size());
+            } else {
+                LMRTSP_LOGD("Sent RTP packet - SSRC %u, seq %u, timestamp %u, payload type %u, size %u", packet->ssrc,
+                            packet->sequence_number, packet->timestamp, packet->payload_type, serialized->Size());
+            }
         }
     }
 

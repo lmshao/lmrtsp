@@ -1,11 +1,3 @@
-/**
- * @author SHAO Liming <lmshao@163.com>
- * @copyright Copyright (c) 2025 SHAO Liming
- * @license MIT
- *
- * SPDX-License-Identifier: MIT
- */
-
 #include "tcp_interleaved_transport_adapter.h"
 
 #include <sstream>
@@ -84,7 +76,7 @@ void TcpInterleavedTransportAdapter::Close()
 {
     isSetup_ = false;
     transportInfo_.clear();
-    // Note: No need to close RTSP session as it's managed externally
+    // Note: Don't close RTSP session as it's managed externally
 }
 
 std::string TcpInterleavedTransportAdapter::GetTransportInfo() const
