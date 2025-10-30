@@ -105,6 +105,7 @@ public:
     // New media frame interface for RtspMediaStreamManager
     bool PushFrame(const lmrtsp::MediaFrame &frame);
     std::string GetRtpInfo() const;
+    std::string GetStreamUri() const; // Get saved stream URI for RTP-Info in PLAY response
 
     // TCP interleaved data sending (for TcpInterleavedTransportAdapter)
     bool SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size);
@@ -145,6 +146,9 @@ private:
     // Session timeout
     uint32_t timeout_;                   // Session timeout (seconds)
     std::atomic<time_t> lastActiveTime_; // Last active time
+
+    // Stream URI for RTP-Info in PLAY response
+    std::string streamUri_;
 };
 
 } // namespace lmshao::lmrtsp

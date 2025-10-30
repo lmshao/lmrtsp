@@ -226,7 +226,7 @@ RTSPResponse ReadyState::OnPlay(RTSPSession *session, const RTSPRequest &request
                             .SetCSeq(cseq)
                             .SetSession(session->GetSessionId())
                             .SetRange(range.empty() ? "npt=0-" : range)
-                            .SetRTPInfo("url=" + request.uri_ + ";" + session->GetRtpInfo())
+                            .SetRTPInfo("url=" + session->GetStreamUri() + ";" + session->GetRtpInfo())
                             .Build();
         return response;
     } else {
@@ -381,7 +381,7 @@ RTSPResponse PausedState::OnPlay(RTSPSession *session, const RTSPRequest &reques
                             .SetCSeq(cseq)
                             .SetSession(session->GetSessionId())
                             .SetRange(range.empty() ? "npt=0-" : range)
-                            .SetRTPInfo("url=" + request.uri_ + ";" + session->GetRtpInfo())
+                            .SetRTPInfo("url=" + session->GetStreamUri() + ";" + session->GetRtpInfo())
                             .Build();
         return response;
     } else {

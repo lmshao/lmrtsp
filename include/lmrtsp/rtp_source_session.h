@@ -51,6 +51,10 @@ public:
     // Media frame sending
     bool SendFrame(const std::shared_ptr<MediaFrame> &frame);
 
+    // Get transport info for RTSP response
+    std::string GetTransportInfo() const;
+    IRtpTransportAdapter *GetTransportAdapter() const { return transport_adapter_.get(); }
+
 private:
     // Forward declaration for listener
     class PacketizerListener;

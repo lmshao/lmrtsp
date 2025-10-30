@@ -74,101 +74,67 @@ bool H264FileReader::ReadFrame(MediaFrame &frame)
         return false;
     }
 
-    // Accumulate NALU bytes into a temporary vector first
-    std::vector<uint8_t> aggregated;
+    // Read pure NALU data (without start code) using stream-based approach
+    // Reference: rtp_pusher.cpp ReadNextNALU implementation
+    std::vector<uint8_t> nalu_data;
+    uint8_t byte;
+    uint32_t start_code_candidate = 0;
+    bool found_start = false;
 
-    // Find next NAL unit start code
-    while (true) {
-        // Ensure we have enough data in buffer
-        if (buffer_end_ - buffer_pos_ < 4 && !eof_reached_) {
-            // Move remaining data to beginning of buffer
-            if (buffer_pos_ < buffer_end_) {
-                std::memmove(read_buffer_.data(), read_buffer_.data() + buffer_pos_, buffer_end_ - buffer_pos_);
-                buffer_end_ -= buffer_pos_;
-            } else {
-                buffer_end_ = 0;
-            }
-            buffer_pos_ = 0;
+    // Look for the next start code
+    while (file_.read(reinterpret_cast<char *>(&byte), 1)) {
+        start_code_candidate = (start_code_candidate << 8) | byte;
 
-            // Read more data
-            file_.read(reinterpret_cast<char *>(read_buffer_.data() + buffer_end_), BUFFER_SIZE - buffer_end_);
-            size_t bytes_read = file_.gcount();
-            buffer_end_ += bytes_read;
-
-            if (bytes_read == 0) {
-                eof_reached_ = true;
-                if (buffer_end_ == 0) {
-                    return false;
-                }
-            }
-        }
-
-        if (buffer_end_ - buffer_pos_ < 4) {
-            return false;
-        }
-
-        // Look for start code (0x00000001 or 0x000001)
-        int start_code_pos = FindStartCode(read_buffer_.data(), buffer_pos_, buffer_end_);
-        if (start_code_pos < 0) {
-            // No start code found, move to end of buffer
-            buffer_pos_ = buffer_end_;
-            if (eof_reached_) {
-                return false;
-            }
-            continue;
-        }
-
-        // Skip the current start code if we're at it
-        if (start_code_pos == static_cast<int>(buffer_pos_)) {
-            // Determine start code length (3 or 4 bytes)
-            int start_code_len = 3;
-            if (start_code_pos > 0 && read_buffer_[start_code_pos - 1] == 0x00) {
-                start_code_len = 4;
-            }
-            buffer_pos_ = start_code_pos + start_code_len;
-
-            // If this is the first frame, continue to find the actual NALU data
-            if (aggregated.empty()) {
-                continue;
-            }
-        }
-
-        // Find next start code to determine NALU end
-        int next_start_code_pos = FindStartCode(read_buffer_.data(), buffer_pos_, buffer_end_);
-
-        size_t nalu_end;
-        if (next_start_code_pos >= 0) {
-            nalu_end = next_start_code_pos;
-        } else {
-            nalu_end = buffer_end_;
-        }
-
-        // Copy NALU data to temporary buffer
-        if (nalu_end > buffer_pos_) {
-            aggregated.insert(aggregated.end(), read_buffer_.data() + buffer_pos_, read_buffer_.data() + nalu_end);
-        }
-
-        if (next_start_code_pos >= 0) {
-            // Found complete NALU
-            buffer_pos_ = next_start_code_pos;
+        // Check for 4-byte start code (0x00000001)
+        if (start_code_candidate == 0x00000001) {
+            found_start = true;
             break;
-        } else {
-            // Need more data
-            buffer_pos_ = buffer_end_;
-            if (eof_reached_) {
-                // This is the last NALU
-                break;
-            }
+        }
+        // Check for 3-byte start code (0x000001)
+        else if ((start_code_candidate & 0x00FFFFFF) == 0x000001) {
+            found_start = true;
+            break;
         }
     }
 
-    if (aggregated.empty()) {
+    if (!found_start) {
+        eof_reached_ = true;
         return false;
     }
 
-    // Assign aggregated data into DataBuffer
-    frame.data = lmshao::lmcore::DataBuffer::Create(aggregated.size());
-    frame.data->Assign(aggregated.data(), aggregated.size());
+    // Now read NALU data until next start code or EOF
+    uint32_t next_start_candidate = 0;
+
+    while (file_.read(reinterpret_cast<char *>(&byte), 1)) {
+        next_start_candidate = (next_start_candidate << 8) | byte;
+
+        // Check for next start code
+        if (next_start_candidate == 0x00000001) {
+            file_.seekg(-4, std::ios::cur);
+            break;
+        } else if ((next_start_candidate & 0x00FFFFFF) == 0x000001) {
+            file_.seekg(-3, std::ios::cur);
+            break;
+        }
+
+        nalu_data.push_back(byte);
+    }
+
+    if (nalu_data.empty()) {
+        return false;
+    }
+
+    // Prepend 4-byte start code (0x00000001) before NALU data
+    // Reference: rtp_pusher.cpp uses the same approach
+    uint8_t start_code[] = {0x00, 0x00, 0x00, 0x01};
+    std::vector<uint8_t> frame_with_startcode;
+    frame_with_startcode.reserve(4 + nalu_data.size());
+    frame_with_startcode.insert(frame_with_startcode.end(), start_code, start_code + 4);
+    frame_with_startcode.insert(frame_with_startcode.end(), nalu_data.begin(), nalu_data.end());
+
+    // Assign frame data with start code into DataBuffer
+    frame.data = lmshao::lmcore::DataBuffer::Create(frame_with_startcode.size());
+    frame.data->Assign(frame_with_startcode.data(), frame_with_startcode.size());
 
     return true;
 }
@@ -277,29 +243,58 @@ void H264FileReader::ExtractParameterSets()
 
     // Look for SPS and PPS
     for (size_t i = 0; i < bytes_read - 4; ++i) {
+        // Check for 4-byte start code (0x00000001)
         if (temp_buffer[i] == 0x00 && temp_buffer[i + 1] == 0x00 && temp_buffer[i + 2] == 0x00 &&
             temp_buffer[i + 3] == 0x01) {
 
             uint8_t nalu_type = temp_buffer[i + 4] & 0x1F;
 
-            // Find end of this NALU
-            size_t nalu_start = i + 4;
-            size_t nalu_end = bytes_read;
+            // Only process SPS and PPS
+            if (nalu_type != 7 && nalu_type != 8) {
+                continue;
+            }
 
+            // Find end of this NALU by searching for next start code
+            size_t nalu_start = i + 4;
+            size_t nalu_end = nalu_start; // Start searching from nalu_start
+            bool found_end = false;
+
+            // Search for next 4-byte start code
             for (size_t j = nalu_start + 1; j < bytes_read - 3; ++j) {
-                if (temp_buffer[j] == 0x00 && temp_buffer[j + 1] == 0x00 && temp_buffer[j + 2] == 0x00 &&
-                    temp_buffer[j + 3] == 0x01) {
+                if (temp_buffer[j] == 0x00 && temp_buffer[j + 1] == 0x00 &&
+                    (temp_buffer[j + 2] == 0x00 && temp_buffer[j + 3] == 0x01)) {
                     nalu_end = j;
+                    found_end = true;
+                    break;
+                }
+                // Also check for 3-byte start code (0x000001)
+                if (temp_buffer[j] == 0x00 && temp_buffer[j + 1] == 0x00 && temp_buffer[j + 2] == 0x01) {
+                    nalu_end = j;
+                    found_end = true;
                     break;
                 }
             }
 
-            if (nalu_type == 7) { // SPS
-                sps_.assign(temp_buffer.begin() + nalu_start, temp_buffer.begin() + nalu_end);
-                std::cout << "Found SPS, size: " << sps_.size() << " bytes" << std::endl;
-            } else if (nalu_type == 8) { // PPS
-                pps_.assign(temp_buffer.begin() + nalu_start, temp_buffer.begin() + nalu_end);
-                std::cout << "Found PPS, size: " << pps_.size() << " bytes" << std::endl;
+            // If no end found, limit to reasonable size (SPS/PPS are typically small)
+            if (!found_end) {
+                nalu_end = std::min(nalu_start + 256, bytes_read);
+            }
+
+            // Sanity check: SPS/PPS should be relatively small
+            size_t nalu_size = nalu_end - nalu_start;
+            if (nalu_size > 0 && nalu_size < 512) {
+                if (nalu_type == 7) { // SPS
+                    sps_.assign(temp_buffer.begin() + nalu_start, temp_buffer.begin() + nalu_end);
+                    std::cout << "Found SPS, size: " << sps_.size() << " bytes" << std::endl;
+                } else if (nalu_type == 8) { // PPS
+                    pps_.assign(temp_buffer.begin() + nalu_start, temp_buffer.begin() + nalu_end);
+                    std::cout << "Found PPS, size: " << pps_.size() << " bytes" << std::endl;
+                }
+            }
+
+            // If we found both, we're done
+            if (!sps_.empty() && !pps_.empty()) {
+                break;
             }
         }
     }

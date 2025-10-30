@@ -29,8 +29,7 @@
 namespace lmshao {
 namespace lmrtsp {
 class RTSPSession;
-// Add forward declaration for RtpSession
-class RtpSession;
+class RtpSourceSession;
 
 // Dummy media frame for build-only mode
 // struct MediaFrame {
@@ -126,17 +125,8 @@ private:
      */
     void ProcessFrame(const lmrtsp::MediaFrame &frame);
 
-    /**
-     * Create transport adapter based on configuration
-     * @param config Transport configuration
-     * @return Unique pointer to transport adapter
-     */
-    std::unique_ptr<lmshao::lmrtsp::IRtpTransportAdapter>
-    CreateTransportAdapter(const lmshao::lmrtsp::TransportConfig &config);
-
     std::weak_ptr<lmshao::lmrtsp::RTSPSession> rtsp_session_;
-    std::shared_ptr<lmrtsp::RtpSession> rtp_session_;
-    std::unique_ptr<lmshao::lmrtsp::IRtpTransportAdapter> transport_adapter_;
+    std::unique_ptr<RtpSourceSession> rtp_session_;
 
     // Persist the transport config to build proper Transport header
     lmshao::lmrtsp::TransportConfig transport_config_{};
@@ -151,7 +141,7 @@ private:
     std::condition_variable queue_condition_;
 
     // Send thread
-    std::unique_ptr<std::thread> send_thread_;
+    std::thread send_thread_;
 
     // RTP parameters
     uint16_t sequence_number_;

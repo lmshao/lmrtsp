@@ -43,6 +43,12 @@ public:
 
     void SetOnDataListener(std::shared_ptr<UdpRtpTransportAdapterListener> listener) { listener_ = listener; }
 
+    // Port getters for dynamically allocated ports
+    uint16_t GetServerRtpPort() const { return server_rtp_port_; }
+    uint16_t GetServerRtcpPort() const { return server_rtcp_port_; }
+    uint16_t GetClientRtpPort() const { return client_rtp_port_; }
+    uint16_t GetClientRtcpPort() const { return client_rtcp_port_; }
+
 private:
     void OnRtpDataReceived(std::shared_ptr<lmnet::DataBuffer> buffer) const;
     void OnRtcpDataReceived(std::shared_ptr<lmnet::DataBuffer> buffer) const;
