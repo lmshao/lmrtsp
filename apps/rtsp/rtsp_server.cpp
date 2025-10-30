@@ -102,6 +102,10 @@ int main(int argc, char *argv[])
     std::string video_file = argv[3];
     std::string stream_path = argv[4];
 
+    // Debug: Print raw arguments
+    std::cout << "DEBUG - Raw argv[4]: [" << argv[4] << "]" << std::endl;
+    std::cout << "DEBUG - Initial stream_path: [" << stream_path << "]" << std::endl;
+
     // Parse port number
     try {
         port = static_cast<uint16_t>(std::stoi(argv[2]));
@@ -115,9 +119,11 @@ int main(int argc, char *argv[])
     }
 
     // Ensure stream path starts with '/'
+    std::cout << "DEBUG - Before path normalization: [" << stream_path << "]" << std::endl;
     if (stream_path[0] != '/') {
         stream_path = "/" + stream_path;
     }
+    std::cout << "DEBUG - After path normalization: [" << stream_path << "]" << std::endl;
 
     // Register signal handler
     signal(SIGINT, signalHandler);

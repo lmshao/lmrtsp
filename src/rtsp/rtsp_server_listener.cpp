@@ -11,8 +11,6 @@
 #include <lmcore/data_buffer.h>
 #include <lmnet/session.h>
 
-#include <algorithm>
-
 #include "internal_logger.h"
 #include "lmrtsp/rtsp_server.h"
 #include "lmrtsp/rtsp_session.h"
