@@ -180,10 +180,34 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
     } else {
         transportConfig.type = lmshao::lmrtsp::TransportConfig::Type::UDP;
         transportConfig.client_ip = GetClientIP();
-        // transportConfig.client_rtp_port = rtpTransportParams_.client_rtp_port;
-        // transportConfig.client_rtcp_port = rtpTransportParams_.client_rtcp_port;
-        // transportConfig.server_rtp_port = rtpTransportParams_.server_rtp_port;
-        // transportConfig.server_rtcp_port = rtpTransportParams_.server_rtcp_port;
+        transportConfig.mode = lmshao::lmrtsp::TransportConfig::Mode::SOURCE;
+
+        // Parse client_port parameter
+        size_t clientPortPos = transport.find("client_port=");
+        if (clientPortPos != std::string::npos) {
+            std::string portStr = transport.substr(clientPortPos + 12);
+            size_t dashPos = portStr.find('-');
+            size_t semicolonPos = portStr.find(';');
+
+            if (dashPos != std::string::npos) {
+                std::string rtpPortStr = portStr.substr(0, dashPos);
+                std::string rtcpPortStr = portStr.substr(
+                    dashPos + 1, semicolonPos != std::string::npos ? semicolonPos - dashPos - 1 : std::string::npos);
+
+                try {
+                    transportConfig.client_rtp_port = std::stoi(rtpPortStr);
+                    transportConfig.client_rtcp_port = std::stoi(rtcpPortStr);
+                    LMRTSP_LOGD("Parsed client ports: RTP=%u, RTCP=%u", transportConfig.client_rtp_port,
+                                transportConfig.client_rtcp_port);
+                } catch (...) {
+                    LMRTSP_LOGW("Failed to parse client port numbers");
+                }
+            }
+        }
+
+        // Server ports will be allocated dynamically (set to 0)
+        transportConfig.server_rtp_port = 0;
+        transportConfig.server_rtcp_port = 0;
     }
 
     // Create media stream manager
@@ -199,6 +223,9 @@ bool RTSPSession::SetupMedia(const std::string &uri, const std::string &transpor
 
     // Get transport info from media stream manager
     transportInfo_ = mediaStreamManager_->GetTransportInfo();
+
+    // Save stream URI for RTP-Info in PLAY response
+    streamUri_ = uri;
 
     // Set setup flag
     isSetup_ = true;
@@ -447,6 +474,11 @@ std::string RTSPSession::GetRtpInfo() const
     }
 
     return mediaStreamManager_->GetRtpInfo();
+}
+
+std::string RTSPSession::GetStreamUri() const
+{
+    return streamUri_;
 }
 
 bool RTSPSession::SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size)

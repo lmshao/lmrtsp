@@ -18,6 +18,39 @@
 
 namespace lmshao::lmrtsp {
 
+// Base64 encoding table
+static const char kBase64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// Helper function to encode SPS/PPS to Base64
+static std::string Base64Encode(const std::vector<uint8_t> &data)
+{
+    std::string result;
+    result.reserve((data.size() + 2) / 3 * 4);
+
+    size_t i = 0;
+    while (i + 2 < data.size()) {
+        result += kBase64Table[(data[i] >> 2) & 0x3F];
+        result += kBase64Table[((data[i] & 0x03) << 4) | ((data[i + 1] & 0xF0) >> 4)];
+        result += kBase64Table[((data[i + 1] & 0x0F) << 2) | ((data[i + 2] & 0xC0) >> 6)];
+        result += kBase64Table[data[i + 2] & 0x3F];
+        i += 3;
+    }
+
+    if (i < data.size()) {
+        result += kBase64Table[(data[i] >> 2) & 0x3F];
+        if (i + 1 < data.size()) {
+            result += kBase64Table[((data[i] & 0x03) << 4) | ((data[i + 1] & 0xF0) >> 4)];
+            result += kBase64Table[((data[i + 1] & 0x0F) << 2)];
+        } else {
+            result += kBase64Table[(data[i] & 0x03) << 4];
+            result += '=';
+        }
+        result += '=';
+    }
+
+    return result;
+}
+
 RTSPServer::RTSPServer()
 {
     LMRTSP_LOGD("RTSPServer constructor called");
@@ -397,20 +430,49 @@ std::string RTSPServer::GenerateSDP(const std::string &stream_path, const std::s
     sdp += "s=RTSP Session\r\n";
     sdp += "c=IN IP4 " + server_ip + "\r\n";
     sdp += "t=0 0\r\n";
+    sdp += "a=range:npt=0-\r\n"; // Add range attribute for VLC compatibility
+
+    // Session-level control attribute - use wildcard
+    sdp += "a=control:*\r\n";
 
     if (stream_info->media_type == "video") {
-        sdp += "m=video 0 RTP/AVP/TCP 96\r\n";
-        sdp += "a=rtpmap:96 " + stream_info->codec + "/90000\r\n";
-        sdp += "a=interleaved=0-1\r\n";
+        // Use UDP mode (RTP/AVP), not TCP
+        sdp += "m=video 0 RTP/AVP " + std::to_string(stream_info->payload_type) + "\r\n";
+        sdp += "a=rtpmap:" + std::to_string(stream_info->payload_type) + " " + stream_info->codec + "/" +
+               std::to_string(stream_info->clock_rate) + "\r\n";
+
+        // Add fmtp with H.264 parameters if available
+        if (stream_info->codec == "H264" && !stream_info->sps.empty() && !stream_info->pps.empty()) {
+            // Extract profile-level-id from SPS (bytes 1-3)
+            std::string profileLevelId = "42001f"; // Default: Baseline Profile Level 3.1
+            if (stream_info->sps.size() >= 4) {
+                char buf[7];
+                snprintf(buf, sizeof(buf), "%02x%02x%02x", stream_info->sps[1], stream_info->sps[2],
+                         stream_info->sps[3]);
+                profileLevelId = buf;
+            }
+
+            // Base64 encode SPS and PPS
+            std::string spsBase64 = Base64Encode(stream_info->sps);
+            std::string ppsBase64 = Base64Encode(stream_info->pps);
+
+            sdp += "a=fmtp:" + std::to_string(stream_info->payload_type) +
+                   " packetization-mode=1;profile-level-id=" + profileLevelId + ";sprop-parameter-sets=" + spsBase64 +
+                   "," + ppsBase64 + "\r\n";
+        }
+
         if (stream_info->width > 0 && stream_info->height > 0) {
             sdp += "a=framerate:" + std::to_string(stream_info->frame_rate) + "\r\n";
         }
-    } else if (stream_info->media_type == "audio") {
-        sdp += "m=audio 0 RTP/AVP 97\r\n";
-        sdp += "a=rtpmap:97 " + stream_info->codec + "/" + std::to_string(stream_info->sample_rate) + "\r\n";
-    }
 
-    sdp += "a=control:" + stream_path + "\r\n";
+        // Media-level control attribute - use relative path
+        sdp += "a=control:track0\r\n";
+    } else if (stream_info->media_type == "audio") {
+        sdp += "m=audio 0 RTP/AVP " + std::to_string(stream_info->payload_type) + "\r\n";
+        sdp += "a=rtpmap:" + std::to_string(stream_info->payload_type) + " " + stream_info->codec + "/" +
+               std::to_string(stream_info->sample_rate) + "\r\n";
+        sdp += "a=control:track1\r\n";
+    }
 
     return sdp;
 }

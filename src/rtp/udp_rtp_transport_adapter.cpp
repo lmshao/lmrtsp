@@ -325,6 +325,20 @@ bool UdpRtpTransportAdapter::InitializeUdpClients()
     uint16_t rtp_local_port = 0;
     uint16_t rtcp_local_port = 0;
     if (config_.mode == TransportConfig::Mode::SOURCE) {
+        // Allocate server ports if not specified
+        if (server_rtp_port_ == 0 || (rtcp_enabled && server_rtcp_port_ == 0)) {
+            uint16_t allocated_port = FindAvailablePortPair();
+            if (allocated_port == 0) {
+                LMRTSP_LOGE("Failed to allocate server port pair for UDP clients");
+                return false;
+            }
+            server_rtp_port_ = allocated_port;
+            if (rtcp_enabled) {
+                server_rtcp_port_ = allocated_port + 1;
+            }
+            LMRTSP_LOGI("Allocated local ports for SOURCE mode: RTP={}, RTCP={}", server_rtp_port_,
+                        rtcp_enabled ? server_rtcp_port_ : 0);
+        }
         rtp_local_port = server_rtp_port_;
         rtcp_local_port = server_rtcp_port_;
     }

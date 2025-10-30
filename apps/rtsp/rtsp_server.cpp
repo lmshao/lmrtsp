@@ -52,42 +52,71 @@ void signalHandler(int signum)
 
 void printUsage(const char *program_name)
 {
-    std::cout << "Usage: " << program_name << " [ip] [port] [video_file] [stream_path]" << std::endl;
-    std::cout << "  ip:        Server IP address (default: 0.0.0.0)" << std::endl;
-    std::cout << "  port:      Server port (default: 8554)" << std::endl;
-    std::cout << "  video_file: Path to H.264 video file (optional)" << std::endl;
-    std::cout << "  stream_path: Stream path (default: /live)" << std::endl;
-    std::cout << std::endl;
+    std::cout << "\nRTSP Server - Usage\n" << std::endl;
+    std::cout << "Usage: " << program_name << " <ip> <port> <video_file> <stream_path>\n" << std::endl;
+
+    std::cout << "Parameters:" << std::endl;
+    std::cout << "  ip          Server IP (127.0.0.1 for localhost, 0.0.0.0 for all interfaces)" << std::endl;
+    std::cout << "  port        Port number (default: 8554)" << std::endl;
+    std::cout << "  video_file  H.264 video file path" << std::endl;
+    std::cout << "  stream_path Stream path (e.g., /live)\n" << std::endl;
+
     std::cout << "Example:" << std::endl;
-    std::cout << "  " << program_name << " 0.0.0.0 8554 /home/liming/work/Luca-30s-720p.h264 /live" << std::endl;
-    std::cout << "  " << program_name << " 127.0.0.1 8554" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Access URL: rtsp://[ip]:[port][stream_path]" << std::endl;
+    std::cout << "  " << program_name << " 127.0.0.1 8554 D:\\video\\test.h264 /live\n" << std::endl;
+
+    std::cout << "Playback:" << std::endl;
+    std::cout << "  ffplay -rtsp_transport udp rtsp://127.0.0.1:8554/live" << std::endl;
+    std::cout << "  vlc rtsp://127.0.0.1:8554/live\n" << std::endl;
+
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help  Show this help message\n" << std::endl;
 }
 
 int main(int argc, char *argv[])
 {
-    // Parse command line arguments
-    std::string ip = "0.0.0.0";
-    uint16_t port = 8554;
-    std::string video_file;
-    std::string stream_path = "/live";
+    // Check for help flag or no arguments
+    if (argc == 1) {
+        std::cerr << "Error: Missing required arguments\n" << std::endl;
+        printUsage(argv[0]);
+        return 1;
+    }
 
-    // Expected usage: ./rtsp-server [ip] [port] [video_file] [stream_path]
-    if (argc >= 2) {
-        ip = argv[1];
-    }
-    if (argc >= 3) {
-        port = static_cast<uint16_t>(std::stoi(argv[2]));
-    }
-    if (argc >= 4) {
-        video_file = argv[3];
-    }
-    if (argc >= 5) {
-        stream_path = argv[4];
-        if (stream_path[0] != '/') {
-            stream_path = "/" + stream_path;
+    if (argc == 2) {
+        std::string arg = argv[1];
+        if (arg == "-h" || arg == "--help") {
+            printUsage(argv[0]);
+            return 0;
         }
+    }
+
+    // Require all 4 parameters
+    if (argc < 5) {
+        std::cerr << "Error: All 4 parameters are required\n" << std::endl;
+        printUsage(argv[0]);
+        return 1;
+    }
+
+    // Parse command line arguments
+    std::string ip = argv[1];
+    uint16_t port = 0;
+    std::string video_file = argv[3];
+    std::string stream_path = argv[4];
+
+    // Parse port number
+    try {
+        port = static_cast<uint16_t>(std::stoi(argv[2]));
+        if (port == 0) {
+            std::cerr << "Error: Invalid port number (must be 1-65535)" << std::endl;
+            return 1;
+        }
+    } catch (...) {
+        std::cerr << "Error: Invalid port number: " << argv[2] << std::endl;
+        return 1;
+    }
+
+    // Ensure stream path starts with '/'
+    if (stream_path[0] != '/') {
+        stream_path = "/" + stream_path;
     }
 
     // Register signal handler

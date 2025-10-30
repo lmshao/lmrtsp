@@ -74,6 +74,15 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
         return false; // Unsupported transport type
     }
 
+    // Setup transport immediately (needed for port allocation)
+    if (transport_adapter_) {
+        if (!transport_adapter_->Setup(config_.transport)) {
+            LMRTSP_LOGE("Failed to setup transport in Initialize");
+            transport_adapter_.reset();
+            return false;
+        }
+    }
+
     // Create video packetizer
     if (config_.video_type == MediaType::H264) {
         video_packetizer_ =
@@ -108,13 +117,14 @@ bool RtpSourceSession::Start()
         return true; // Already running
     }
 
-    // Setup transport
-    if (!transport_adapter_->Setup(config_.transport)) {
-        LMRTSP_LOGE("Failed to setup transport");
+    // Transport is already setup in Initialize(), just mark as running
+    if (!transport_adapter_ || !transport_adapter_->IsActive()) {
+        LMRTSP_LOGE("Transport not ready");
         return false;
     }
 
     running_ = true;
+    LMRTSP_LOGD("RTP source session started");
     return true;
 }
 
@@ -134,6 +144,14 @@ void RtpSourceSession::Stop()
         transport_adapter_->Close();
         transport_adapter_.reset();
     }
+}
+
+std::string RtpSourceSession::GetTransportInfo() const
+{
+    if (transport_adapter_) {
+        return transport_adapter_->GetTransportInfo();
+    }
+    return "";
 }
 
 bool RtpSourceSession::SendFrame(const std::shared_ptr<MediaFrame> &frame)
