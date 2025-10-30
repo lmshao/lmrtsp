@@ -8,7 +8,6 @@
 
 #include "rtsp_response.h"
 
-#include <algorithm>
 #include <sstream>
 
 #include "rtsp_utils.h"

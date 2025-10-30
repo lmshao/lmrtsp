@@ -52,6 +52,22 @@ if(BUILD_APPS)
         message(STATUS "Added application: rtsp_client")
     endif()
 
+    # Simple RTSP Client (standalone)
+    if(EXISTS "${RTSP_APP_DIR}/rtsp_client_simple.cpp")
+        add_executable(rtsp_client_simple
+            rtsp/rtsp_client_simple.cpp
+        )
+        target_include_directories(rtsp_client_simple PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/rtsp
+        )
+
+        set_target_properties(rtsp_client_simple PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/apps
+        )
+
+        message(STATUS "Added application: rtsp_client_simple")
+    endif()
+
     # RTP Pusher (H.264 stream pusher)
     if(EXISTS "${RTP_APP_DIR}/rtp_pusher.cpp")
         add_executable(rtp_pusher
