@@ -11,7 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-#include "../internal_logger.h"
+#include "internal_logger.h"
 
 namespace lmshao::lmrtsp {
 
@@ -118,7 +118,7 @@ void RtpPacketizerH264::SubmitFrame(const std::shared_ptr<MediaFrame> &frame)
         LMRTSP_LOGI("NALU #%d - size: %u, last_nalu: %s", nalu_count, nalu_size, last_nalu ? "true" : "false");
 
         // Use Single NALU if fits MTU, otherwise FU-A
-        size_t max_payload = mtu_size_ - RtpHeaderSize();
+        size_t max_payload = mtuSize_ - RtpHeaderSize();
         if (nalu_size <= max_payload) {
             LMRTSP_LOGI("Using Single NALU packetization for NALU #%d", nalu_count);
             PacketizeSingleNalu(nalu_payload, nalu_size, timestamp, last_nalu);
@@ -140,8 +140,8 @@ void RtpPacketizerH264::PacketizeSingleNalu(const uint8_t *nalu, size_t nalu_siz
 
     auto packet = std::make_shared<RtpPacket>();
     packet->version = 2;
-    packet->payload_type = payload_type_;
-    packet->sequence_number = sequence_number_++;
+    packet->payload_type = payloadType_;
+    packet->sequence_number = sequenceNumber_++;
     packet->timestamp = timestamp;
     packet->ssrc = ssrc_;
     packet->marker = last_nalu ? 1 : 0;
@@ -171,7 +171,7 @@ void RtpPacketizerH264::PacketizeFuA(const uint8_t *nalu, size_t nalu_size, uint
     const uint8_t fu_indicator = static_cast<uint8_t>((F << 7) | (NRI << 5) | 28);
 
     // Available payload per fragment (excluding 2 bytes FU headers)
-    size_t max_fragment = mtu_size_ - RtpHeaderSize() - 2;
+    size_t max_fragment = mtuSize_ - RtpHeaderSize() - 2;
     if (max_fragment <= 0)
         return;
 
@@ -189,8 +189,8 @@ void RtpPacketizerH264::PacketizeFuA(const uint8_t *nalu, size_t nalu_size, uint
 
         auto packet = std::make_shared<RtpPacket>();
         packet->version = 2;
-        packet->payload_type = payload_type_;
-        packet->sequence_number = sequence_number_++;
+        packet->payload_type = payloadType_;
+        packet->sequence_number = sequenceNumber_++;
         packet->timestamp = timestamp;
         packet->ssrc = ssrc_;
         packet->marker = (is_last_fragment && last_nalu) ? 1 : 0;

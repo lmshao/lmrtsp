@@ -27,7 +27,7 @@ using namespace lmshao::lmnet;
 using namespace lmshao::lmcore;
 
 // Global server instance for signal handling
-std::shared_ptr<RTSPServer> g_server;
+std::shared_ptr<RtspServer> g_server;
 std::atomic<bool> g_running{true};
 
 // H.264 file reader
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     InitLmrtspLogger(lmshao::lmcore::LogLevel::kDebug);
 
     // Get RTSP server instance
-    g_server = RTSPServer::GetInstance();
+    g_server = RtspServer::GetInstance();
 
     std::cout << "Initializing RTSP server, listening address: " << ip << ":" << port << std::endl;
 

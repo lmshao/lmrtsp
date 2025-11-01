@@ -53,7 +53,7 @@ public:
 
     // Get transport info for RTSP response
     std::string GetTransportInfo() const;
-    IRtpTransportAdapter *GetTransportAdapter() const { return transport_adapter_.get(); }
+    IRtpTransportAdapter *GetTransportAdapter() const { return transportAdapter_.get(); }
 
 private:
     // Forward declaration for listener
@@ -64,13 +64,13 @@ private:
     bool running_ = false;
 
     // RTP state
-    uint16_t sequence_number_ = 0;
+    uint16_t sequenceNumber_ = 0;
     uint32_t timestamp_ = 0;
 
     // Transport and packetizers
-    std::unique_ptr<IRtpTransportAdapter> transport_adapter_;
-    std::unique_ptr<IRtpPacketizer> video_packetizer_;
-    std::shared_ptr<IRtpPacketizerListener> video_listener_;
+    std::unique_ptr<IRtpTransportAdapter> transportAdapter_;
+    std::unique_ptr<IRtpPacketizer> videoPacketizer_;
+    std::shared_ptr<IRtpPacketizerListener> videoListener_;
 };
 
 } // namespace lmshao::lmrtsp

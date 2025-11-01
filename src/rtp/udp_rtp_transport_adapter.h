@@ -44,10 +44,10 @@ public:
     void SetOnDataListener(std::shared_ptr<UdpRtpTransportAdapterListener> listener) { listener_ = listener; }
 
     // Port getters for dynamically allocated ports
-    uint16_t GetServerRtpPort() const { return server_rtp_port_; }
-    uint16_t GetServerRtcpPort() const { return server_rtcp_port_; }
-    uint16_t GetClientRtpPort() const { return client_rtp_port_; }
-    uint16_t GetClientRtcpPort() const { return client_rtcp_port_; }
+    uint16_t GetServerRtpPort() const { return serverRtpPort_; }
+    uint16_t GetServerRtcpPort() const { return serverRtcpPort_; }
+    uint16_t GetClientRtpPort() const { return clientRtpPort_; }
+    uint16_t GetClientRtcpPort() const { return clientRtcpPort_; }
 
 private:
     void OnRtpDataReceived(std::shared_ptr<lmnet::DataBuffer> buffer) const;
@@ -97,10 +97,10 @@ private:
 
     // Endpoint info
     std::string client_ip_{};
-    uint16_t client_rtp_port_{0};
-    uint16_t client_rtcp_port_{0};
-    uint16_t server_rtp_port_{0};
-    uint16_t server_rtcp_port_{0};
+    uint16_t clientRtpPort_{0};
+    uint16_t clientRtcpPort_{0};
+    uint16_t serverRtpPort_{0};
+    uint16_t serverRtcpPort_{0};
 
     // UDP networking (lmnet)
     std::shared_ptr<lmnet::UdpClient> rtp_client_{};

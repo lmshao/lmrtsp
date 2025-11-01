@@ -17,7 +17,7 @@ namespace lmshao::lmrtsp {
 /**
  * @brief RTSP utility functions for string processing
  */
-class RTSPUtils {
+class RtspUtils {
 public:
     /**
      * @brief Trim whitespace from both ends of a string
@@ -43,8 +43,8 @@ public:
 
 private:
     // Prevent instantiation
-    RTSPUtils() = delete;
-    ~RTSPUtils() = delete;
+    RtspUtils() = delete;
+    ~RtspUtils() = delete;
 };
 
 } // namespace lmshao::lmrtsp

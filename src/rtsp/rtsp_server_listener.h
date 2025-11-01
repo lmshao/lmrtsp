@@ -18,12 +18,12 @@
 
 namespace lmshao::lmrtsp {
 
-class RTSPServer;
+class RtspServer;
 
 // Observer pattern: RTSP server listener
-class RTSPServerListener : public lmnet::IServerListener {
+class RtspServerListener : public lmnet::IServerListener {
 public:
-    explicit RTSPServerListener(std::shared_ptr<RTSPServer> server);
+    explicit RtspServerListener(std::shared_ptr<RtspServer> server);
 
     // Implement IServerListener interface
     void OnError(std::shared_ptr<lmnet::Session> session, const std::string &errorInfo) override;
@@ -41,7 +41,7 @@ private:
     // Handle TCP interleaved data (RTP/RTCP over RTSP)
     void HandleInterleavedData(std::shared_ptr<lmnet::Session> session, const std::string &data);
 
-    std::weak_ptr<RTSPServer> rtspServer_;
+    std::weak_ptr<RtspServer> rtspServer_;
 
     // Store incomplete request data
     std::unordered_map<lmnet::socket_t, std::string> incompleteRequests_;

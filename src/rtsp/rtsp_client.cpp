@@ -10,7 +10,7 @@
 
 #include <regex>
 
-#include "../internal_logger.h"
+#include "internal_logger.h"
 #include "lmnet/iclient_listener.h"
 #include "lmnet/tcp_client.h"
 #include "lmrtsp/rtsp_client_session.h"
@@ -21,9 +21,9 @@
 namespace lmshao::lmrtsp {
 
 // TCP Client Listener implementation
-class RTSPClient::TcpClientListener : public lmnet::IClientListener {
+class RtspClient::TcpClientListener : public lmnet::IClientListener {
 public:
-    explicit TcpClientListener(std::weak_ptr<RTSPClient> client) : client_(client) {}
+    explicit TcpClientListener(std::weak_ptr<RtspClient> client) : client_(client) {}
 
     void OnReceive(lmnet::socket_t fd, std::shared_ptr<lmnet::DataBuffer> buffer) override
     {
@@ -32,7 +32,7 @@ public:
             LMRTSP_LOGD("Received RTSP response: %s", response_str.c_str());
 
             try {
-                RTSPResponse response = RTSPResponse::FromString(response_str);
+                RtspResponse response = RtspResponse::FromString(response_str);
                 client->HandleResponse(response);
             } catch (const std::exception &e) {
                 LMRTSP_LOGE("Failed to parse RTSP response: %s", e.what());
@@ -46,7 +46,7 @@ public:
         if (auto client = client_.lock()) {
             LMRTSP_LOGI("RTSP client disconnected from server");
             client->connected_.store(false);
-            client->NotifyCallback([client](IRTSPClientCallback *cb) { cb->OnDisconnected(client->baseUrl_); });
+            client->NotifyCallback([client](IRtspClientCallback *cb) { cb->OnDisconnected(client->baseUrl_); });
         }
     }
 
@@ -59,26 +59,26 @@ public:
     }
 
 private:
-    std::weak_ptr<RTSPClient> client_;
+    std::weak_ptr<RtspClient> client_;
 };
 
-// RTSPClient implementation
-RTSPClient::RTSPClient()
+// RtspClient implementation
+RtspClient::RtspClient()
 {
     // tcpListener_ will be created in Connect() method when we know the server IP and port
 }
 
-RTSPClient::RTSPClient(std::shared_ptr<IRTSPClientCallback> callback) : callback_(callback)
+RtspClient::RtspClient(std::shared_ptr<IRtspClientCallback> callback) : callback_(callback)
 {
     // tcpListener_ will be created in Connect() method when we know the server IP and port
 }
 
-RTSPClient::~RTSPClient()
+RtspClient::~RtspClient()
 {
     Disconnect();
 }
 
-bool RTSPClient::Connect(const std::string &url, int timeout_ms)
+bool RtspClient::Connect(const std::string &url, int timeout_ms)
 {
     try {
         ParseUrl(url, serverIP_, serverPort_, baseUrl_);
@@ -113,7 +113,7 @@ bool RTSPClient::Connect(const std::string &url, int timeout_ms)
     }
 }
 
-bool RTSPClient::Disconnect()
+bool RtspClient::Disconnect()
 {
     try {
         // Teardown all sessions
@@ -137,12 +137,12 @@ bool RTSPClient::Disconnect()
     }
 }
 
-bool RTSPClient::IsConnected() const
+bool RtspClient::IsConnected() const
 {
     return connected_.load();
 }
 
-bool RTSPClient::Options(const std::string &url)
+bool RtspClient::Options(const std::string &url)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -150,7 +150,7 @@ bool RTSPClient::Options(const std::string &url)
     }
 
     try {
-        RTSPRequest request;
+        RtspRequest request;
         request.method_ = "OPTIONS";
         request.uri_ = url;
         request.version_ = RTSP_VERSION;
@@ -168,7 +168,7 @@ bool RTSPClient::Options(const std::string &url)
     }
 }
 
-bool RTSPClient::Describe(const std::string &url)
+bool RtspClient::Describe(const std::string &url)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -176,7 +176,7 @@ bool RTSPClient::Describe(const std::string &url)
     }
 
     try {
-        RTSPRequest request;
+        RtspRequest request;
         request.method_ = "DESCRIBE";
         request.uri_ = url;
         request.version_ = RTSP_VERSION;
@@ -195,7 +195,7 @@ bool RTSPClient::Describe(const std::string &url)
     }
 }
 
-bool RTSPClient::Setup(const std::string &url, const std::string &transport)
+bool RtspClient::Setup(const std::string &url, const std::string &transport)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -203,7 +203,7 @@ bool RTSPClient::Setup(const std::string &url, const std::string &transport)
     }
 
     try {
-        RTSPRequest request;
+        RtspRequest request;
         request.method_ = "SETUP";
         request.uri_ = url;
         request.version_ = RTSP_VERSION;
@@ -222,7 +222,7 @@ bool RTSPClient::Setup(const std::string &url, const std::string &transport)
     }
 }
 
-bool RTSPClient::Play(const std::string &url)
+bool RtspClient::Play(const std::string &url)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -230,7 +230,7 @@ bool RTSPClient::Play(const std::string &url)
     }
 
     try {
-        RTSPRequest request;
+        RtspRequest request;
         request.method_ = "PLAY";
         request.uri_ = url;
         request.version_ = RTSP_VERSION;
@@ -248,7 +248,7 @@ bool RTSPClient::Play(const std::string &url)
     }
 }
 
-bool RTSPClient::Pause(const std::string &url)
+bool RtspClient::Pause(const std::string &url)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -256,7 +256,7 @@ bool RTSPClient::Pause(const std::string &url)
     }
 
     try {
-        RTSPRequest request;
+        RtspRequest request;
         request.method_ = "PAUSE";
         request.uri_ = url;
         request.version_ = RTSP_VERSION;
@@ -274,7 +274,7 @@ bool RTSPClient::Pause(const std::string &url)
     }
 }
 
-bool RTSPClient::Teardown(const std::string &url)
+bool RtspClient::Teardown(const std::string &url)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -282,7 +282,7 @@ bool RTSPClient::Teardown(const std::string &url)
     }
 
     try {
-        RTSPRequest request;
+        RtspRequest request;
         request.method_ = "TEARDOWN";
         request.uri_ = url;
         request.version_ = RTSP_VERSION;
@@ -300,10 +300,10 @@ bool RTSPClient::Teardown(const std::string &url)
     }
 }
 
-std::shared_ptr<RTSPClientSession> RTSPClient::CreateSession(const std::string &url)
+std::shared_ptr<RtspClientSession> RtspClient::CreateSession(const std::string &url)
 {
     try {
-        auto session = std::make_shared<RTSPClientSession>(url, shared_from_this());
+        auto session = std::make_shared<RtspClientSession>(url, shared_from_this());
         if (session->Initialize()) {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
             sessions_[session->GetSessionId()] = session;
@@ -319,7 +319,7 @@ std::shared_ptr<RTSPClientSession> RTSPClient::CreateSession(const std::string &
     }
 }
 
-void RTSPClient::RemoveSession(const std::string &session_id)
+void RtspClient::RemoveSession(const std::string &session_id)
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     auto it = sessions_.find(session_id);
@@ -330,69 +330,69 @@ void RTSPClient::RemoveSession(const std::string &session_id)
     }
 }
 
-std::shared_ptr<RTSPClientSession> RTSPClient::GetSession(const std::string &session_id)
+std::shared_ptr<RtspClientSession> RtspClient::GetSession(const std::string &session_id)
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     auto it = sessions_.find(session_id);
     return (it != sessions_.end()) ? it->second : nullptr;
 }
 
-void RTSPClient::SetCallback(std::shared_ptr<IRTSPClientCallback> callback)
+void RtspClient::SetCallback(std::shared_ptr<IRtspClientCallback> callback)
 {
     std::lock_guard<std::mutex> lock(callbackMutex_);
     callback_ = callback;
 }
 
-std::shared_ptr<IRTSPClientCallback> RTSPClient::GetCallback() const
+std::shared_ptr<IRtspClientCallback> RtspClient::GetCallback() const
 {
     std::lock_guard<std::mutex> lock(callbackMutex_);
     return callback_;
 }
 
-void RTSPClient::SetUserAgent(const std::string &user_agent)
+void RtspClient::SetUserAgent(const std::string &user_agent)
 {
     userAgent_ = user_agent;
 }
 
-std::string RTSPClient::GetUserAgent() const
+std::string RtspClient::GetUserAgent() const
 {
     return userAgent_;
 }
 
-void RTSPClient::SetTimeout(int timeout_ms)
+void RtspClient::SetTimeout(int timeout_ms)
 {
     timeoutMs_ = timeout_ms;
 }
 
-int RTSPClient::GetTimeout() const
+int RtspClient::GetTimeout() const
 {
     return timeoutMs_;
 }
 
-std::string RTSPClient::GetServerIP() const
+std::string RtspClient::GetServerIP() const
 {
     return serverIP_;
 }
 
-uint16_t RTSPClient::GetServerPort() const
+uint16_t RtspClient::GetServerPort() const
 {
     return serverPort_;
 }
 
-size_t RTSPClient::GetSessionCount() const
+size_t RtspClient::GetSessionCount() const
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     return sessions_.size();
 }
 
 // Private methods
-std::string RTSPClient::GenerateCSeq()
+std::string RtspClient::GenerateCSeq()
 {
     std::lock_guard<std::mutex> lock(requestMutex_);
     return std::to_string(cseq_++);
 }
 
-bool RTSPClient::SendRequest(const RTSPRequest &request)
+bool RtspClient::SendRequest(const RtspRequest &request)
 {
     if (!connected_.load()) {
         LMRTSP_LOGE("Not connected to server");
@@ -416,7 +416,7 @@ bool RTSPClient::SendRequest(const RTSPRequest &request)
     }
 }
 
-void RTSPClient::HandleResponse(const RTSPResponse &response)
+void RtspClient::HandleResponse(const RtspResponse &response)
 {
     LMRTSP_LOGD("Handling RTSP response: %d %s", static_cast<int>(response.status_),
                 GetReasonPhrase(response.status_).c_str());
@@ -440,8 +440,8 @@ void RTSPClient::HandleResponse(const RTSPResponse &response)
                 auto content_type_it = response.general_header_.find("Content-Type");
                 if (content_type_it != response.general_header_.end() && content_type_it->second == "application/sdp") {
                     // DESCRIBE response
-                    if (response.message_body_) {
-                        session->HandleDescribeResponse(*response.message_body_);
+                    if (response.messageBody_) {
+                        session->HandleDescribeResponse(*response.messageBody_);
                     }
                 } else {
                     // Other responses
@@ -466,7 +466,7 @@ void RTSPClient::HandleResponse(const RTSPResponse &response)
     }
 }
 
-void RTSPClient::ParseUrl(const std::string &url, std::string &host, uint16_t &port, std::string &path)
+void RtspClient::ParseUrl(const std::string &url, std::string &host, uint16_t &port, std::string &path)
 {
     std::regex rtsp_regex(R"(rtsp://([^:]+)(?::(\d+))?(.*))");
     std::smatch matches;
@@ -489,14 +489,14 @@ void RTSPClient::ParseUrl(const std::string &url, std::string &host, uint16_t &p
     }
 }
 
-void RTSPClient::NotifyError(int error_code, const std::string &error_message)
+void RtspClient::NotifyError(int error_code, const std::string &error_message)
 {
-    NotifyCallback([this, error_code, error_message](IRTSPClientCallback *cb) {
+    NotifyCallback([this, error_code, error_message](IRtspClientCallback *cb) {
         cb->OnError(baseUrl_, error_code, error_message);
     });
 }
 
-void RTSPClient::NotifyCallback(std::function<void(IRTSPClientCallback *)> func)
+void RtspClient::NotifyCallback(std::function<void(IRtspClientCallback *)> func)
 {
     std::lock_guard<std::mutex> lock(callbackMutex_);
     if (callback_) {

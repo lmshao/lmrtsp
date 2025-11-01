@@ -8,8 +8,7 @@
 
 #include "rtp_depacketizer_h264.h"
 
-#include <cstdio>
-#include <cstring>
+#include "internal_logger.h"
 
 namespace lmshao::lmrtsp {
 
@@ -21,16 +20,16 @@ static inline void AppendStartCode(std::vector<uint8_t> &dst)
 
 void RtpDepacketizerH264::FlushFrame()
 {
-    printf("[H264Depacketizer] FlushFrame called\n");
-    printf("[H264Depacketizer] have_frame_data_: %s\n", have_frame_data_ ? "true" : "false");
-    printf("[H264Depacketizer] pending_.size(): %zu\n", pending_.size());
+    LMRTSP_LOGD("FlushFrame called");
+    LMRTSP_LOGD("haveFrameData_: %s", haveFrameData_ ? "true" : "false");
+    LMRTSP_LOGD("pending_.size(): %zu", pending_.size());
 
     auto l = listener_.lock();
-    printf("[H264Depacketizer] listener_.lock() result: %s\n", l ? "valid" : "null");
+    LMRTSP_LOGD("listener_.lock() result: %s", l ? "valid" : "null");
 
-    if (!have_frame_data_ || pending_.empty() || !l) {
-        printf("[H264Depacketizer] Early return - have_frame_data_: %s, pending_.empty(): %s, listener: %s\n",
-               have_frame_data_ ? "true" : "false", pending_.empty() ? "true" : "false", l ? "valid" : "null");
+    if (!haveFrameData_ || pending_.empty() || !l) {
+        LMRTSP_LOGD("Early return - haveFrameData_: %s, pending_.empty(): %s, listener: %s",
+                    haveFrameData_ ? "true" : "false", pending_.empty() ? "true" : "false", l ? "valid" : "null");
         return;
     }
 
@@ -38,64 +37,63 @@ void RtpDepacketizerH264::FlushFrame()
     buffer->Assign(pending_.data(), pending_.size());
 
     auto frame = std::make_shared<MediaFrame>();
-    frame->timestamp = current_timestamp_;
+    frame->timestamp = currentTimestamp_;
     frame->media_type = MediaType::H264;
     frame->data = buffer;
 
-    printf("[H264Depacketizer] Calling listener->OnFrame with frame size: %zu\n", pending_.size());
+    LMRTSP_LOGD("Calling listener->OnFrame with frame size: %zu", pending_.size());
     l->OnFrame(frame);
 
     pending_.clear();
-    have_frame_data_ = false;
-    fua_active_ = false;
+    haveFrameData_ = false;
+    fuaActive_ = false;
 }
 
 void RtpDepacketizerH264::ResetState()
 {
-    printf("[H264Depacketizer] Resetting state due to packet loss\n");
+    LMRTSP_LOGD("Resetting state due to packet loss");
     pending_.clear();
-    have_frame_data_ = false;
-    fua_active_ = false;
+    haveFrameData_ = false;
+    fuaActive_ = false;
 }
 
 void RtpDepacketizerH264::SubmitPacket(const std::shared_ptr<RtpPacket> &packet)
 {
     if (!packet) {
-        printf("[H264Depacketizer] SubmitPacket: packet is null\n");
+        LMRTSP_LOGD("SubmitPacket: packet is null");
         return;
     }
 
-    printf("[H264Depacketizer] SubmitPacket: timestamp=%u, seq=%u, marker=%d\n", packet->timestamp,
-           packet->sequence_number, packet->marker);
+    LMRTSP_LOGD("SubmitPacket: timestamp=%u, seq=%u, marker=%d", packet->timestamp, packet->sequence_number,
+                packet->marker);
 
     // Check for sequence number gap
-    if (sequence_initialized_) {
-        uint16_t expected_seq = static_cast<uint16_t>(last_sequence_number_ + 1);
+    if (sequenceInitialized_) {
+        uint16_t expected_seq = static_cast<uint16_t>(lastSequenceNumber_ + 1);
         if (packet->sequence_number != expected_seq) {
-            printf("[H264Depacketizer] Sequence gap detected: got %u, expected %u\n", packet->sequence_number,
-                   expected_seq);
+            LMRTSP_LOGD("Sequence gap detected: got %u, expected %u", packet->sequence_number, expected_seq);
             // Only discard if we're in the middle of a fragmented unit (FU-A)
-            if (fua_active_) {
-                printf("[H264Depacketizer] Gap during FU-A - discarding incomplete frame\n");
+            if (fuaActive_) {
+                LMRTSP_LOGD("Gap during FU-A - discarding incomplete frame");
                 ResetState();
             }
             // If not in FU-A, we can continue safely
         }
     }
-    last_sequence_number_ = packet->sequence_number;
-    sequence_initialized_ = true;
+    lastSequenceNumber_ = packet->sequence_number;
+    sequenceInitialized_ = true;
 
     // If timestamp changes and we have a pending frame, flush previous
-    if (have_frame_data_ && packet->timestamp != current_timestamp_) {
-        printf("[H264Depacketizer] Timestamp changed, flushing previous frame\n");
+    if (haveFrameData_ && packet->timestamp != currentTimestamp_) {
+        LMRTSP_LOGD("Timestamp changed, flushing previous frame");
         FlushFrame();
     }
 
-    current_timestamp_ = packet->timestamp;
+    currentTimestamp_ = packet->timestamp;
 
     auto payload = packet->payload;
     if (!payload || payload->Size() == 0) {
-        printf("[H264Depacketizer] Empty payload, size: %zu\n", payload ? payload->Size() : 0);
+        LMRTSP_LOGD("Empty payload, size: %zu", payload ? payload->Size() : 0);
         return;
     }
 
@@ -103,22 +101,22 @@ void RtpDepacketizerH264::SubmitPacket(const std::shared_ptr<RtpPacket> &packet)
     size_t size = payload->Size();
 
     if (size == 0) {
-        printf("[H264Depacketizer] Zero size payload\n");
+        LMRTSP_LOGD("Zero size payload");
         return;
     }
 
     uint8_t nal_or_fu_indicator = data[0];
     uint8_t nal_type = nal_or_fu_indicator & 0x1F;
 
-    printf("[H264Depacketizer] NAL type: %d, payload size: %zu\n", nal_type, size);
+    LMRTSP_LOGD("NAL type: %d, payload size: %zu", nal_type, size);
 
     if (nal_type >= 1 && nal_type <= 23) {
         // Single NALU
-        printf("[H264Depacketizer] Processing single NALU\n");
+        LMRTSP_LOGD("Processing single NALU");
         AppendStartCode(pending_);
         pending_.insert(pending_.end(), data, data + size);
-        have_frame_data_ = true;
-        fua_active_ = false;
+        haveFrameData_ = true;
+        fuaActive_ = false;
     } else if (nal_type == 28 && size >= 2) {
         // FU-A
         uint8_t fu_header = data[1];
@@ -126,8 +124,7 @@ void RtpDepacketizerH264::SubmitPacket(const std::shared_ptr<RtpPacket> &packet)
         bool end = (fu_header & 0x40) != 0;
         uint8_t original_nal_type = fu_header & 0x1F;
 
-        printf("[H264Depacketizer] Processing FU-A: start=%d, end=%d, original_nal_type=%d\n", start, end,
-               original_nal_type);
+        LMRTSP_LOGD("Processing FU-A: start=%d, end=%d, original_nal_type=%d", start, end, original_nal_type);
 
         uint8_t F = (nal_or_fu_indicator & 0x80) >> 7;
         uint8_t NRI = (nal_or_fu_indicator & 0x60) >> 5;
@@ -139,25 +136,25 @@ void RtpDepacketizerH264::SubmitPacket(const std::shared_ptr<RtpPacket> &packet)
         if (start) {
             AppendStartCode(pending_);
             pending_.push_back(reconstructed_nal_header);
-            fua_active_ = true;
+            fuaActive_ = true;
         }
 
         if (fragment_size > 0) {
             pending_.insert(pending_.end(), fragment, fragment + fragment_size);
-            have_frame_data_ = true;
+            haveFrameData_ = true;
         }
 
         if (end) {
-            fua_active_ = false;
+            fuaActive_ = false;
         }
     } else {
         // Unsupported NAL types like STAP-A (24), etc. For simplicity, ignore.
-        printf("[H264Depacketizer] Unsupported NAL type: %d\n", nal_type);
+        LMRTSP_LOGD("Unsupported NAL type: %d", nal_type);
     }
 
     if (packet->marker) {
         // End of access unit
-        printf("[H264Depacketizer] Marker bit set, flushing frame\n");
+        LMRTSP_LOGD("Marker bit set, flushing frame");
         FlushFrame();
     }
 }

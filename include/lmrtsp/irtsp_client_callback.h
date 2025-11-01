@@ -24,9 +24,9 @@ class MediaFrame;
  * This interface defines callback methods for RTSP client to notify
  * upper layer applications about various events.
  */
-class IRTSPClientCallback {
+class IRtspClientCallback {
 public:
-    virtual ~IRTSPClientCallback() = default;
+    virtual ~IRtspClientCallback() = default;
 
     /**
      * @brief Connection established event

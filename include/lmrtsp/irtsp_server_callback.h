@@ -19,9 +19,9 @@ namespace lmshao::lmrtsp {
  * This interface defines callback methods for RTSP server to notify
  * upper layer applications about various events.
  */
-class IRTSPServerCallback {
+class IRtspServerCallback {
 public:
-    virtual ~IRTSPServerCallback() = default;
+    virtual ~IRtspServerCallback() = default;
 
     /**
      * @brief Client connection event

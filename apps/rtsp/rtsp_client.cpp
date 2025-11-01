@@ -33,7 +33,7 @@ void SignalHandler(int signal)
     g_running = false;
 }
 
-class SimpleRTSPClient : public IRTSPClientCallback, public std::enable_shared_from_this<SimpleRTSPClient> {
+class SimpleRTSPClient : public IRtspClientCallback, public std::enable_shared_from_this<SimpleRTSPClient> {
 public:
     explicit SimpleRTSPClient(const std::string &output_file)
         : output_filename_(output_file), frames_received_(0), total_bytes_received_(0)
@@ -59,7 +59,7 @@ public:
         }
 
         // Create RTSP client - callback will be set after initialization
-        client_ = std::make_shared<RTSPClient>();
+        client_ = std::make_shared<RtspClient>();
         client_->SetUserAgent("lmrtsp-client-demo/1.0");
         // Note: callback set in main after shared_ptr is created
 
@@ -103,7 +103,7 @@ public:
             auto last_stats_time = std::chrono::steady_clock::now();
             const auto stats_interval = std::chrono::seconds(5);
 
-            while (g_running && session_ && session_->GetState() == RTSPClientSessionState::PLAYING) {
+            while (g_running && session_ && session_->GetState() == RtspClientSessionState::PLAYING) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
                 // Print statistics every 5 seconds
@@ -202,7 +202,7 @@ private:
         std::cout << "==================\n" << std::endl;
     }
 
-    // IRTSPClientCallback implementation
+    // IRtspClientCallback implementation
     void OnConnected(const std::string &server_url) override
     {
         std::cout << "✓ Connected to: " << server_url << std::endl;
@@ -308,8 +308,8 @@ private:
     std::string rtsp_url_;
     std::string output_filename_;
     std::ofstream output_file_;
-    std::shared_ptr<RTSPClient> client_;
-    std::shared_ptr<RTSPClientSession> session_;
+    std::shared_ptr<RtspClient> client_;
+    std::shared_ptr<RtspClientSession> session_;
     std::atomic<size_t> frames_received_{0};
     std::atomic<size_t> total_bytes_received_{0};
 };

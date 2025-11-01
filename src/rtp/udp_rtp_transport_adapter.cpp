@@ -16,7 +16,7 @@
 
 #include <sstream>
 
-#include "../internal_logger.h"
+#include "internal_logger.h"
 
 namespace lmshao::lmrtsp {
 
@@ -81,8 +81,7 @@ void UdpRtpTransportAdapter::UdpClientReceiveListener::OnError(lmnet::socket_t f
 
 // UdpRtpTransportAdapter implementation
 UdpRtpTransportAdapter::UdpRtpTransportAdapter()
-    : client_rtp_port_(0), client_rtcp_port_(0), server_rtp_port_(0), server_rtcp_port_(0), unicast_(true),
-      active_(false)
+    : clientRtpPort_(0), clientRtcpPort_(0), serverRtpPort_(0), serverRtcpPort_(0), unicast_(true), active_(false)
 {
 }
 
@@ -97,10 +96,10 @@ bool UdpRtpTransportAdapter::Setup(const TransportConfig &config)
 
     // Extract client information from config
     client_ip_ = config.client_ip;
-    client_rtp_port_ = config.client_rtp_port;
-    client_rtcp_port_ = config.client_rtcp_port;
-    server_rtp_port_ = config.server_rtp_port;
-    server_rtcp_port_ = config.server_rtcp_port;
+    clientRtpPort_ = config.client_rtp_port;
+    clientRtcpPort_ = config.client_rtcp_port;
+    serverRtpPort_ = config.server_rtp_port;
+    serverRtcpPort_ = config.server_rtcp_port;
     unicast_ = config.unicast;
 
     bool success = false;
@@ -129,7 +128,7 @@ bool UdpRtpTransportAdapter::SendPacket(const uint8_t *data, size_t size)
         return false;
     }
 
-    if (client_ip_.empty() || client_rtp_port_ == 0) {
+    if (client_ip_.empty() || clientRtpPort_ == 0) {
         LMRTSP_LOGE("Client RTP address not configured");
         return false;
     }
@@ -155,7 +154,7 @@ bool UdpRtpTransportAdapter::SendPacket(const uint8_t *data, size_t size)
     }
 
     if (!result) {
-        LMRTSP_LOGE("Failed to send RTP packet to %s:%u", client_ip_.c_str(), client_rtp_port_);
+        LMRTSP_LOGE("Failed to send RTP packet to %s:%u", client_ip_.c_str(), clientRtpPort_);
     }
 
     return result;
@@ -174,7 +173,7 @@ bool UdpRtpTransportAdapter::SendRtcpPacket(const uint8_t *data, size_t size)
         return false;
     }
 
-    if (client_ip_.empty() || client_rtcp_port_ == 0) {
+    if (client_ip_.empty() || clientRtcpPort_ == 0) {
         LMRTSP_LOGE("Client RTCP address not configured");
         return false;
     }
@@ -200,7 +199,7 @@ bool UdpRtpTransportAdapter::SendRtcpPacket(const uint8_t *data, size_t size)
     }
 
     if (!result) {
-        LMRTSP_LOGE("Failed to send RTCP packet to %s:%u", client_ip_.c_str(), client_rtcp_port_);
+        LMRTSP_LOGE("Failed to send RTCP packet to %s:%u", client_ip_.c_str(), clientRtcpPort_);
     }
 
     return result;
@@ -241,8 +240,8 @@ void UdpRtpTransportAdapter::Close()
 std::string UdpRtpTransportAdapter::GetTransportInfo() const
 {
     std::ostringstream oss;
-    oss << "UDP;unicast;client_port=" << client_rtp_port_ << "-" << client_rtcp_port_
-        << ";server_port=" << server_rtp_port_ << "-" << server_rtcp_port_;
+    oss << "UDP;unicast;client_port=" << clientRtpPort_ << "-" << clientRtcpPort_ << ";server_port=" << serverRtpPort_
+        << "-" << serverRtcpPort_;
     return oss.str();
 }
 
@@ -254,37 +253,37 @@ bool UdpRtpTransportAdapter::IsActive() const
 bool UdpRtpTransportAdapter::InitializeUdpServers()
 {
     bool rtcp_enabled = IsRtcpEnabled();
-    if (server_rtp_port_ == 0 || (rtcp_enabled && server_rtcp_port_ == 0)) {
+    if (serverRtpPort_ == 0 || (rtcp_enabled && serverRtcpPort_ == 0)) {
         uint16_t allocated_port = FindAvailablePortPair();
         if (allocated_port == 0) {
             LMRTSP_LOGE("Failed to allocate server port pair");
             return false;
         }
-        server_rtp_port_ = allocated_port;
+        serverRtpPort_ = allocated_port;
         if (rtcp_enabled) {
-            server_rtcp_port_ = allocated_port + 1;
+            serverRtcpPort_ = allocated_port + 1;
         }
-        LMRTSP_LOGI("Allocated server ports: RTP={}, RTCP={}", server_rtp_port_, rtcp_enabled ? server_rtcp_port_ : 0);
+        LMRTSP_LOGI("Allocated server ports: RTP={}, RTCP={}", serverRtpPort_, rtcp_enabled ? serverRtcpPort_ : 0);
     }
 
     // Create RTP server (always required)
-    rtp_server_ = lmnet::UdpServer::Create(server_rtp_port_);
+    rtp_server_ = lmnet::UdpServer::Create(serverRtpPort_);
     if (!rtp_server_) {
-        LMRTSP_LOGE("Failed to create RTP server on port %u", server_rtp_port_);
+        LMRTSP_LOGE("Failed to create RTP server on port %u", serverRtpPort_);
         return false;
     }
     rtp_server_listener_ = std::make_shared<UdpServerReceiveListener>(this, ListenerMode::RTP);
     rtp_server_->SetListener(rtp_server_listener_);
     if (!(rtp_server_->Init() && rtp_server_->Start())) {
-        LMRTSP_LOGE("Failed to start RTP server on port %u", server_rtp_port_);
+        LMRTSP_LOGE("Failed to start RTP server on port %u", serverRtpPort_);
         return false;
     }
 
     // Create RTCP server only if RTCP is enabled
     if (rtcp_enabled) {
-        rtcp_server_ = lmnet::UdpServer::Create(server_rtcp_port_);
+        rtcp_server_ = lmnet::UdpServer::Create(serverRtcpPort_);
         if (!rtcp_server_) {
-            LMRTSP_LOGE("Failed to create RTCP server on port %u", server_rtcp_port_);
+            LMRTSP_LOGE("Failed to create RTCP server on port %u", serverRtcpPort_);
             rtp_server_->Stop();
             rtp_server_.reset();
             return false;
@@ -292,16 +291,16 @@ bool UdpRtpTransportAdapter::InitializeUdpServers()
         rtcp_server_listener_ = std::make_shared<UdpServerReceiveListener>(this, ListenerMode::RTCP);
         rtcp_server_->SetListener(rtcp_server_listener_);
         if (!(rtcp_server_->Init() && rtcp_server_->Start())) {
-            LMRTSP_LOGE("Failed to start RTCP server on port %u", server_rtcp_port_);
+            LMRTSP_LOGE("Failed to start RTCP server on port %u", serverRtcpPort_);
             if (rtp_server_) {
                 rtp_server_->Stop();
                 rtp_server_.reset();
             }
             return false;
         }
-        LMRTSP_LOGI("UDP servers initialized: RTP port %u, RTCP port %u", server_rtp_port_, server_rtcp_port_);
+        LMRTSP_LOGI("UDP servers initialized: RTP port %u, RTCP port %u", serverRtpPort_, serverRtcpPort_);
     } else {
-        LMRTSP_LOGI("UDP servers initialized: RTP port %u (RTCP disabled)", server_rtp_port_);
+        LMRTSP_LOGI("UDP servers initialized: RTP port %u (RTCP disabled)", serverRtpPort_);
     }
 
     return true;
@@ -309,7 +308,7 @@ bool UdpRtpTransportAdapter::InitializeUdpServers()
 
 bool UdpRtpTransportAdapter::InitializeUdpClients()
 {
-    if (client_ip_.empty() || client_rtp_port_ == 0) {
+    if (client_ip_.empty() || clientRtpPort_ == 0) {
         LMRTSP_LOGE("Client address not configured for UDP clients");
         return false;
     }
@@ -317,7 +316,7 @@ bool UdpRtpTransportAdapter::InitializeUdpClients()
     bool rtcp_enabled = IsRtcpEnabled();
 
     // Check RTCP configuration when RTCP is enabled
-    if (rtcp_enabled && client_rtcp_port_ == 0) {
+    if (rtcp_enabled && clientRtcpPort_ == 0) {
         LMRTSP_LOGE("Client RTCP port not configured but RTCP is enabled");
         return false;
     }
@@ -326,32 +325,32 @@ bool UdpRtpTransportAdapter::InitializeUdpClients()
     uint16_t rtcp_local_port = 0;
     if (config_.mode == TransportConfig::Mode::SOURCE) {
         // Allocate server ports if not specified
-        if (server_rtp_port_ == 0 || (rtcp_enabled && server_rtcp_port_ == 0)) {
+        if (serverRtpPort_ == 0 || (rtcp_enabled && serverRtcpPort_ == 0)) {
             uint16_t allocated_port = FindAvailablePortPair();
             if (allocated_port == 0) {
                 LMRTSP_LOGE("Failed to allocate server port pair for UDP clients");
                 return false;
             }
-            server_rtp_port_ = allocated_port;
+            serverRtpPort_ = allocated_port;
             if (rtcp_enabled) {
-                server_rtcp_port_ = allocated_port + 1;
+                serverRtcpPort_ = allocated_port + 1;
             }
-            LMRTSP_LOGI("Allocated local ports for SOURCE mode: RTP={}, RTCP={}", server_rtp_port_,
-                        rtcp_enabled ? server_rtcp_port_ : 0);
+            LMRTSP_LOGI("Allocated local ports for SOURCE mode: RTP={}, RTCP={}", serverRtpPort_,
+                        rtcp_enabled ? serverRtcpPort_ : 0);
         }
-        rtp_local_port = server_rtp_port_;
-        rtcp_local_port = server_rtcp_port_;
+        rtp_local_port = serverRtpPort_;
+        rtcp_local_port = serverRtcpPort_;
     }
 
     // Create RTP client (always required)
-    rtp_client_ = lmnet::UdpClient::Create(client_ip_, client_rtp_port_, "", rtp_local_port);
+    rtp_client_ = lmnet::UdpClient::Create(client_ip_, clientRtpPort_, "", rtp_local_port);
     if (!rtp_client_) {
-        LMRTSP_LOGE("Failed to create RTP client for %s:%u, local_port=%u", client_ip_.c_str(), client_rtp_port_,
+        LMRTSP_LOGE("Failed to create RTP client for %s:%u, local_port=%u", client_ip_.c_str(), clientRtpPort_,
                     rtp_local_port);
         return false;
     }
     if (!rtp_client_->Init()) {
-        LMRTSP_LOGE("Failed to init RTP client for %s:%u, local_port=%u", client_ip_.c_str(), client_rtp_port_,
+        LMRTSP_LOGE("Failed to init RTP client for %s:%u, local_port=%u", client_ip_.c_str(), clientRtpPort_,
                     rtp_local_port);
         return false;
     }
@@ -360,15 +359,15 @@ bool UdpRtpTransportAdapter::InitializeUdpClients()
 
     // Create RTCP client only if RTCP is enabled
     if (rtcp_enabled) {
-        rtcp_client_ = lmnet::UdpClient::Create(client_ip_, client_rtcp_port_, "", rtcp_local_port);
+        rtcp_client_ = lmnet::UdpClient::Create(client_ip_, clientRtcpPort_, "", rtcp_local_port);
         if (!rtcp_client_) {
-            LMRTSP_LOGE("Failed to create RTCP client for %s:%u, local_port=%u", client_ip_.c_str(), client_rtcp_port_,
+            LMRTSP_LOGE("Failed to create RTCP client for %s:%u, local_port=%u", client_ip_.c_str(), clientRtcpPort_,
                         rtcp_local_port);
             rtp_client_->Close();
             return false;
         }
         if (!rtcp_client_->Init()) {
-            LMRTSP_LOGE("Failed to init RTCP client for %s:%u, local_port=%u", client_ip_.c_str(), client_rtcp_port_,
+            LMRTSP_LOGE("Failed to init RTCP client for %s:%u, local_port=%u", client_ip_.c_str(), clientRtcpPort_,
                         rtcp_local_port);
             rtp_client_->Close();
             return false;
@@ -377,11 +376,11 @@ bool UdpRtpTransportAdapter::InitializeUdpClients()
         rtcp_client_->SetListener(rtcp_client_listener_);
 
         LMRTSP_LOGI("UDP clients configured: remote %s:%u(RTP), %s:%u(RTCP); local bind %u(RTP), %u(RTCP)",
-                    client_ip_.c_str(), client_rtp_port_, client_ip_.c_str(), client_rtcp_port_, rtp_local_port,
+                    client_ip_.c_str(), clientRtpPort_, client_ip_.c_str(), clientRtcpPort_, rtp_local_port,
                     rtcp_local_port);
     } else {
         LMRTSP_LOGI("UDP clients configured: remote %s:%u(RTP); local bind %u(RTP) (RTCP disabled)", client_ip_.c_str(),
-                    client_rtp_port_, rtp_local_port);
+                    clientRtpPort_, rtp_local_port);
     }
 
     return true;

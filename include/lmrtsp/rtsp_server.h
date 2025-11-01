@@ -26,15 +26,15 @@
 
 namespace lmshao::lmrtsp {
 using namespace lmshao::lmcore;
-class RTSPSession;
-class RTSPRequest;
-class RTSPServerListener;
-class RTSPServer : public std::enable_shared_from_this<RTSPServer>, public ManagedSingleton<RTSPServer> {
+class RtspSession;
+class RtspRequest;
+class RtspServerListener;
+class RtspServer : public std::enable_shared_from_this<RtspServer>, public ManagedSingleton<RtspServer> {
 public:
-    friend class ManagedSingleton<RTSPServer>;
-    friend class RTSPServerListener;
+    friend class ManagedSingleton<RtspServer>;
+    friend class RtspServerListener;
 
-    ~RTSPServer() = default;
+    ~RtspServer() = default;
 
     // Basic server functionality
     bool Init(const std::string &ip, uint16_t port);
@@ -43,18 +43,18 @@ public:
     bool IsRunning() const;
 
     // Session management
-    void HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPRequest &request);
-    void HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request);
-    void SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request, int statusCode,
+    void HandleRequest(std::shared_ptr<RtspSession> session, const RtspRequest &request);
+    void HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RtspRequest &request);
+    void SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RtspRequest &request, int statusCode,
                            const std::string &reasonPhrase);
-    std::shared_ptr<RTSPSession> CreateSession(std::shared_ptr<lmnet::Session> lmnetSession);
+    std::shared_ptr<RtspSession> CreateSession(std::shared_ptr<lmnet::Session> lmnetSession);
     void RemoveSession(const std::string &sessionId);
-    std::shared_ptr<RTSPSession> GetSession(const std::string &sessionId);
-    std::unordered_map<std::string, std::shared_ptr<RTSPSession>> GetSessions();
+    std::shared_ptr<RtspSession> GetSession(const std::string &sessionId);
+    std::unordered_map<std::string, std::shared_ptr<RtspSession>> GetSessions();
 
     // Callback interface
-    void SetCallback(std::shared_ptr<IRTSPServerCallback> callback);
-    std::shared_ptr<IRTSPServerCallback> GetCallback() const;
+    void SetCallback(std::shared_ptr<IRtspServerCallback> callback);
+    std::shared_ptr<IRtspServerCallback> GetCallback() const;
 
     // Media stream management
     bool AddMediaStream(const std::string &stream_path, std::shared_ptr<MediaStreamInfo> stream_info);
@@ -75,11 +75,11 @@ public:
     uint16_t GetServerPort() const;
 
 protected:
-    RTSPServer();
+    RtspServer();
 
 private:
     // Network related
-    std::shared_ptr<RTSPServerListener> serverListener_;
+    std::shared_ptr<RtspServerListener> serverListener_;
     std::shared_ptr<lmnet::TcpServer> tcpServer_;
     std::string serverIP_;
     uint16_t serverPort_;
@@ -87,19 +87,19 @@ private:
 
     // Session management
     mutable std::mutex sessionsMutex_;
-    std::unordered_map<std::string, std::shared_ptr<RTSPSession>> sessions_;
+    std::unordered_map<std::string, std::shared_ptr<RtspSession>> sessions_;
 
     // Callback interface
     mutable std::mutex callbackMutex_;
-    std::shared_ptr<IRTSPServerCallback> callback_;
+    std::shared_ptr<IRtspServerCallback> callback_;
 
     // Media stream management
     mutable std::mutex streamsMutex_;
     std::map<std::string, std::shared_ptr<MediaStreamInfo>> mediaStreams_;
 
     // Internal helper methods
-    std::string GetClientIP(std::shared_ptr<RTSPSession> session) const;
-    void NotifyCallback(std::function<void(IRTSPServerCallback *)> func);
+    std::string GetClientIP(std::shared_ptr<RtspSession> session) const;
+    void NotifyCallback(std::function<void(IRtspServerCallback *)> func);
 };
 
 } // namespace lmshao::lmrtsp

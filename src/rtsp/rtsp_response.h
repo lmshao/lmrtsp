@@ -72,7 +72,7 @@ enum class StatusCode : uint16_t {
     BadGateway = 502,
     ServiceUnavailable = 503,
     GatewayTimeout = 504,
-    RTSPVersionNotSupported = 505,
+    RtspVersionNotSupported = 505,
     OptionNotSupported = 551
 };
 
@@ -88,90 +88,90 @@ public:
 
 public:
     std::optional<std::string> location_;
-    std::optional<std::string> proxy_authenticate_;
-    std::vector<std::string> public_methods_;
-    std::optional<std::string> retry_after_;
+    std::optional<std::string> proxyAuthenticate_;
+    std::vector<std::string> publicMethods_;
+    std::optional<std::string> retryAfter_;
     std::optional<std::string> server_;
     std::optional<std::string> vary_;
-    std::optional<std::string> www_authenticate_;
-    std::optional<std::string> rtp_info_;
-    std::vector<std::string> custom_header_;
+    std::optional<std::string> wwwAuthenticate_;
+    std::optional<std::string> rtpInfo_;
+    std::vector<std::string> customHeader_;
 };
 
 // RTSP Response class
-class RTSPResponse {
+class RtspResponse {
 public:
-    RTSPResponse() : version_(RTSP_VERSION), status_(StatusCode::OK) {}
+    RtspResponse() : version_(RTSP_VERSION), status_(StatusCode::OK) {}
     std::string ToString() const;
-    static RTSPResponse FromString(const std::string &resp_str);
+    static RtspResponse FromString(const std::string &resp_str);
 
 public:
     std::string version_;
     StatusCode status_;
     std::map<std::string, std::string> general_header_;
-    ResponseHeader response_header_;
+    ResponseHeader responseHeader_;
     std::map<std::string, std::string> entity_header_;
-    std::optional<std::string> message_body_;
+    std::optional<std::string> messageBody_;
 };
 
 // Builder class for constructing RTSP responses
-class RTSPResponseBuilder {
+class RtspResponseBuilder {
 
 public:
-    RTSPResponseBuilder();
+    RtspResponseBuilder();
 
     // Status setting
-    RTSPResponseBuilder &SetStatus(StatusCode status);
-    RTSPResponseBuilder &SetCSeq(int cseq);
+    RtspResponseBuilder &SetStatus(StatusCode status);
+    RtspResponseBuilder &SetCSeq(int cseq);
 
     // General headers
-    RTSPResponseBuilder &SetSession(const std::string &session);
-    RTSPResponseBuilder &SetTransport(const std::string &transport);
-    RTSPResponseBuilder &SetRange(const std::string &range);
-    RTSPResponseBuilder &SetDate(const std::string &date);
+    RtspResponseBuilder &SetSession(const std::string &session);
+    RtspResponseBuilder &SetTransport(const std::string &transport);
+    RtspResponseBuilder &SetRange(const std::string &range);
+    RtspResponseBuilder &SetDate(const std::string &date);
 
     // Response headers
-    RTSPResponseBuilder &SetLocation(const std::string &location);
-    RTSPResponseBuilder &SetServer(const std::string &server);
-    RTSPResponseBuilder &SetPublic(const std::vector<std::string> &methods);
-    RTSPResponseBuilder &SetPublic(const std::string &methods_str);
-    RTSPResponseBuilder &SetWWWAuthenticate(const std::string &auth);
-    RTSPResponseBuilder &SetRTPInfo(const std::string &rtp_info);
-    RTSPResponseBuilder &AddCustomHeader(const std::string &header);
+    RtspResponseBuilder &SetLocation(const std::string &location);
+    RtspResponseBuilder &SetServer(const std::string &server);
+    RtspResponseBuilder &SetPublic(const std::vector<std::string> &methods);
+    RtspResponseBuilder &SetPublic(const std::string &methods_str);
+    RtspResponseBuilder &SetWWWAuthenticate(const std::string &auth);
+    RtspResponseBuilder &SetRTPInfo(const std::string &rtp_info);
+    RtspResponseBuilder &AddCustomHeader(const std::string &header);
 
     // Entity headers
-    RTSPResponseBuilder &SetContentType(const std::string &content_type);
-    RTSPResponseBuilder &SetContentLength(size_t length);
+    RtspResponseBuilder &SetContentType(const std::string &content_type);
+    RtspResponseBuilder &SetContentLength(size_t length);
 
     // Message body
-    RTSPResponseBuilder &SetMessageBody(const std::string &body);
-    RTSPResponseBuilder &SetSdp(const std::string &sdp);
+    RtspResponseBuilder &SetMessageBody(const std::string &body);
+    RtspResponseBuilder &SetSdp(const std::string &sdp);
 
     // Build the final response
-    RTSPResponse Build() const;
+    RtspResponse Build() const;
 
 private:
-    RTSPResponse response_;
+    RtspResponse response_;
 };
 
 // Factory methods for common response types
-class RTSPResponseFactory {
+class RtspResponseFactory {
 public:
-    static RTSPResponseBuilder CreateOK(int cseq);
-    static RTSPResponseBuilder CreateOptionsOK(int cseq);
-    static RTSPResponseBuilder CreateDescribeOK(int cseq);
-    static RTSPResponseBuilder CreateSetupOK(int cseq);
-    static RTSPResponseBuilder CreatePlayOK(int cseq);
-    static RTSPResponseBuilder CreatePauseOK(int cseq);
-    static RTSPResponseBuilder CreateTeardownOK(int cseq);
-    static RTSPResponseBuilder CreateError(StatusCode status, int cseq);
-    static RTSPResponseBuilder CreateBadRequest(int cseq);
-    static RTSPResponseBuilder CreateUnauthorized(int cseq);
-    static RTSPResponseBuilder CreateNotFound(int cseq);
-    static RTSPResponseBuilder CreateMethodNotAllowed(int cseq);
-    static RTSPResponseBuilder CreateSessionNotFound(int cseq);
-    static RTSPResponseBuilder CreateInternalServerError(int cseq);
-    static RTSPResponseBuilder CreateNotImplemented(int cseq);
+    static RtspResponseBuilder CreateOK(int cseq);
+    static RtspResponseBuilder CreateOptionsOK(int cseq);
+    static RtspResponseBuilder CreateDescribeOK(int cseq);
+    static RtspResponseBuilder CreateSetupOK(int cseq);
+    static RtspResponseBuilder CreatePlayOK(int cseq);
+    static RtspResponseBuilder CreatePauseOK(int cseq);
+    static RtspResponseBuilder CreateTeardownOK(int cseq);
+    static RtspResponseBuilder CreateError(StatusCode status, int cseq);
+    static RtspResponseBuilder CreateBadRequest(int cseq);
+    static RtspResponseBuilder CreateUnauthorized(int cseq);
+    static RtspResponseBuilder CreateNotFound(int cseq);
+    static RtspResponseBuilder CreateMethodNotAllowed(int cseq);
+    static RtspResponseBuilder CreateSessionNotFound(int cseq);
+    static RtspResponseBuilder CreateInternalServerError(int cseq);
+    static RtspResponseBuilder CreateNotImplemented(int cseq);
 };
 
 } // namespace lmshao::lmrtsp

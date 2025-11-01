@@ -27,7 +27,7 @@
 
 namespace lmshao::lmrtsp {
 
-class RTSPClientSession;
+class RtspClientSession;
 
 /**
  * @brief RTSP Client class for connecting to RTSP servers
@@ -35,11 +35,11 @@ class RTSPClientSession;
  * This class manages connections to RTSP servers and handles the RTSP protocol.
  * It supports basic RTSP methods: OPTIONS, DESCRIBE, SETUP, PLAY, PAUSE, TEARDOWN.
  */
-class RTSPClient : public std::enable_shared_from_this<RTSPClient> {
+class RtspClient : public std::enable_shared_from_this<RtspClient> {
 public:
-    RTSPClient();
-    explicit RTSPClient(std::shared_ptr<IRTSPClientCallback> callback);
-    ~RTSPClient();
+    RtspClient();
+    explicit RtspClient(std::shared_ptr<IRtspClientCallback> callback);
+    ~RtspClient();
 
     // Connection management
     bool Connect(const std::string &url, int timeout_ms = 5000);
@@ -55,13 +55,13 @@ public:
     bool Teardown(const std::string &url);
 
     // Session management
-    std::shared_ptr<RTSPClientSession> CreateSession(const std::string &url);
+    std::shared_ptr<RtspClientSession> CreateSession(const std::string &url);
     void RemoveSession(const std::string &session_id);
-    std::shared_ptr<RTSPClientSession> GetSession(const std::string &session_id);
+    std::shared_ptr<RtspClientSession> GetSession(const std::string &session_id);
 
     // Callback management
-    void SetCallback(std::shared_ptr<IRTSPClientCallback> callback);
-    std::shared_ptr<IRTSPClientCallback> GetCallback() const;
+    void SetCallback(std::shared_ptr<IRtspClientCallback> callback);
+    std::shared_ptr<IRtspClientCallback> GetCallback() const;
 
     // Configuration
     void SetUserAgent(const std::string &user_agent);
@@ -85,11 +85,11 @@ private:
 
     // Session management
     mutable std::mutex sessionsMutex_;
-    std::unordered_map<std::string, std::shared_ptr<RTSPClientSession>> sessions_;
+    std::unordered_map<std::string, std::shared_ptr<RtspClientSession>> sessions_;
 
     // Callback interface
     mutable std::mutex callbackMutex_;
-    std::shared_ptr<IRTSPClientCallback> callback_;
+    std::shared_ptr<IRtspClientCallback> callback_;
 
     // Configuration
     std::string userAgent_ = "lmrtsp-client/1.0";
@@ -101,13 +101,13 @@ private:
 
     // Internal helper methods
     std::string GenerateCSeq();
-    bool SendRequest(const RTSPRequest &request);
-    void HandleResponse(const RTSPResponse &response);
+    bool SendRequest(const RtspRequest &request);
+    void HandleResponse(const RtspResponse &response);
     void ParseUrl(const std::string &url, std::string &host, uint16_t &port, std::string &path);
 
     // Error handling
     void NotifyError(int error_code, const std::string &error_message);
-    void NotifyCallback(std::function<void(IRTSPClientCallback *)> func);
+    void NotifyCallback(std::function<void(IRtspClientCallback *)> func);
 
     // TCP client listener
     class TcpClientListener;

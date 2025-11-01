@@ -19,16 +19,16 @@
 namespace lmshao::lmrtsp {
 
 // Helper function: Get all session IDs
-// Since RTSPServer class doesn't provide GetAllSessions method, we need an alternative
-// This function is a temporary solution, in actual application RTSPServer class should be modified to add
+// Since RtspServer class doesn't provide GetAllSessions method, we need an alternative
+// This function is a temporary solution, in actual application RtspServer class should be modified to add
 // GetAllSessions method
-std::vector<std::string> GetSessionIds(std::shared_ptr<RTSPServer> server)
+std::vector<std::string> GetSessionIds(std::shared_ptr<RtspServer> server)
 {
     std::vector<std::string> sessionIds;
 
     // Note: This is a temporary implementation, we actually cannot get all session IDs
-    // Because RTSPServer class doesn't provide method to access sessions_ member
-    // In actual application, RTSPServer class should be modified to add GetAllSessions method
+    // Because RtspServer class doesn't provide method to access sessions_ member
+    // In actual application, RtspServer class should be modified to add GetAllSessions method
 
     // Since we cannot get all sessions, return an empty list here
     // This means we cannot properly clean up RTSP sessions related to disconnected lmnet sessions
@@ -37,12 +37,12 @@ std::vector<std::string> GetSessionIds(std::shared_ptr<RTSPServer> server)
     return sessionIds;
 }
 
-RTSPServerListener::RTSPServerListener(std::shared_ptr<RTSPServer> server) : rtspServer_(server)
+RtspServerListener::RtspServerListener(std::shared_ptr<RtspServer> server) : rtspServer_(server)
 {
-    LMRTSP_LOGD("RTSPServerListener created");
+    LMRTSP_LOGD("RtspServerListener created");
 }
 
-void RTSPServerListener::OnError(std::shared_ptr<lmnet::Session> session, const std::string &errorInfo)
+void RtspServerListener::OnError(std::shared_ptr<lmnet::Session> session, const std::string &errorInfo)
 {
     LMRTSP_LOGE("Network error for client %s:%d - %s", session->host.c_str(), session->port, errorInfo.c_str());
 
@@ -67,11 +67,11 @@ void RTSPServerListener::OnError(std::shared_ptr<lmnet::Session> session, const 
     // Notify callback
     auto server = rtspServer_.lock();
     if (server) {
-        server->NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnError(session->host, -1, errorInfo); });
+        server->NotifyCallback([&](IRtspServerCallback *callback) { callback->OnError(session->host, -1, errorInfo); });
     }
 }
 
-void RTSPServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
+void RtspServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
 {
     LMRTSP_LOGD("Client disconnected: %s:%d", session->host.c_str(), session->port);
 
@@ -81,7 +81,7 @@ void RTSPServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
     // Notify callback about client disconnection
     auto server = rtspServer_.lock();
     if (server) {
-        server->NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnClientDisconnected(session->host); });
+        server->NotifyCallback([&](IRtspServerCallback *callback) { callback->OnClientDisconnected(session->host); });
 
         // Traverse all sessions to find RTSP sessions using this lmnet session
         // Note: We need to traverse all sessions and check if lmnet sessions match
@@ -90,8 +90,8 @@ void RTSPServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
         // Get all session IDs and check lmnet sessions
         auto sessions = server->GetSessions();
         for (const auto &pair : sessions) {
-            auto rtspSession = pair.second;
-            if (rtspSession && rtspSession->GetNetworkSession() == session) {
+            auto RtspSession = pair.second;
+            if (RtspSession && RtspSession->GetNetworkSession() == session) {
                 // Found related session, mark for deletion
                 sessionsToRemove.push_back(pair.first);
             }
@@ -104,14 +104,14 @@ void RTSPServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
     }
 }
 
-void RTSPServerListener::OnAccept(std::shared_ptr<lmnet::Session> session)
+void RtspServerListener::OnAccept(std::shared_ptr<lmnet::Session> session)
 {
     LMRTSP_LOGD("New client connected: %s:%d", session->host.c_str(), session->port);
 
     // Notify callback about client connection
     auto server = rtspServer_.lock();
     if (server) {
-        server->NotifyCallback([&](IRTSPServerCallback *callback) {
+        server->NotifyCallback([&](IRtspServerCallback *callback) {
             callback->OnClientConnected(session->host, ""); // User-Agent will be obtained from RTSP request
         });
     }
@@ -119,7 +119,7 @@ void RTSPServerListener::OnAccept(std::shared_ptr<lmnet::Session> session)
     // Don't create RTSP session at this stage, wait until first RTSP request arrives
 }
 
-void RTSPServerListener::OnReceive(std::shared_ptr<lmnet::Session> session, std::shared_ptr<lmcore::DataBuffer> buffer)
+void RtspServerListener::OnReceive(std::shared_ptr<lmnet::Session> session, std::shared_ptr<lmcore::DataBuffer> buffer)
 {
     // Get received data
     std::string data(reinterpret_cast<const char *>(buffer->Data()), buffer->Size());
@@ -159,7 +159,7 @@ void RTSPServerListener::OnReceive(std::shared_ptr<lmnet::Session> session, std:
     }
 }
 
-bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_ptr<lmnet::Session> session)
+bool RtspServerListener::ParseRTSPRequest(const std::string &data, std::shared_ptr<lmnet::Session> session)
 {
     // Check if it's a complete RTSP request
     // RTSP request ends with \r\n\r\n, or if there's message body, need to check Content-Length
@@ -208,9 +208,9 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
     // Extract complete request data
     std::string completeRequest = data.substr(0, headerEnd + 4 + contentLength);
 
-    // Use RTSPRequest::FromString to parse request
+    // Use RtspRequest::FromString to parse request
     try {
-        auto request = RTSPRequest::FromString(completeRequest);
+        auto request = RtspRequest::FromString(completeRequest);
 
         // Add detailed logging for request parsing
         LMRTSP_LOGD("Parsed RTSP request - Method: [%s], URI: [%s], Version: [%s]", request.method_.c_str(),
@@ -237,27 +237,27 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
             return true;
         } else {
             // Get or create RTSP session for stateful requests
-            std::shared_ptr<RTSPSession> rtspSession = nullptr;
+            std::shared_ptr<RtspSession> RtspSession = nullptr;
 
             // Check if session ID already exists
             std::string sessionId;
             if (request.general_header_.find(SESSION) != request.general_header_.end()) {
                 sessionId = request.general_header_.at(SESSION);
-                rtspSession = server->GetSession(sessionId);
+                RtspSession = server->GetSession(sessionId);
                 LMRTSP_LOGD("Found existing session ID: %s", sessionId.c_str());
             }
 
             // For SETUP request, create a new session if none exists
             // For other requests, session must already exist
-            if (!rtspSession && request.method_ == METHOD_SETUP) {
+            if (!RtspSession && request.method_ == METHOD_SETUP) {
                 LMRTSP_LOGD("Creating new RTSP session for SETUP request");
-                rtspSession = server->CreateSession(session);
+                RtspSession = server->CreateSession(session);
             }
 
             // Handle request
-            if (rtspSession) {
+            if (RtspSession) {
                 LMRTSP_LOGD("Handling stateful request [%s]: \n%s", request.method_.c_str(), completeRequest.c_str());
-                server->HandleRequest(rtspSession, request);
+                server->HandleRequest(RtspSession, request);
             } else {
                 LMRTSP_LOGE("Failed to create or find RTSP session for method: [%s]. Request:\n%s",
                             request.method_.c_str(), completeRequest.c_str());
@@ -280,7 +280,7 @@ bool RTSPServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
     }
 }
 
-void RTSPServerListener::HandleIncompleteData(std::shared_ptr<lmnet::Session> session, const std::string &data)
+void RtspServerListener::HandleIncompleteData(std::shared_ptr<lmnet::Session> session, const std::string &data)
 {
     // Store incomplete data, wait for more data to arrive
     incompleteRequests_[session->fd] = data;
@@ -288,7 +288,7 @@ void RTSPServerListener::HandleIncompleteData(std::shared_ptr<lmnet::Session> se
                 data.size());
 }
 
-void RTSPServerListener::HandleInterleavedData(std::shared_ptr<lmnet::Session> session, const std::string &data)
+void RtspServerListener::HandleInterleavedData(std::shared_ptr<lmnet::Session> session, const std::string &data)
 {
     // TCP interleaved data format: $<channel><length><data>
     // This data should be ignored as it's from VLC (client to server RTCP feedback)

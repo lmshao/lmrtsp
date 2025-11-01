@@ -97,9 +97,9 @@ bool RtpSinkSession::Initialize(const RtpSinkSessionConfig &config)
     // Create transport adapter based on config
     if (config_.transport.type == TransportConfig::Type::UDP) {
         auto udp_adapter = std::make_unique<UdpRtpTransportAdapter>();
-        transport_listener_ = std::make_shared<TransportListener>(this);
-        udp_adapter->SetOnDataListener(transport_listener_);
-        transport_adapter_ = std::move(udp_adapter);
+        transportListener_ = std::make_shared<TransportListener>(this);
+        udp_adapter->SetOnDataListener(transportListener_);
+        transportAdapter_ = std::move(udp_adapter);
     } else if (config_.transport.type == TransportConfig::Type::TCP_INTERLEAVED) {
         LMRTSP_LOGE("TCP_INTERLEAVED transport type is not supported in RtpSinkSession");
         return false;
@@ -110,12 +110,12 @@ bool RtpSinkSession::Initialize(const RtpSinkSessionConfig &config)
 
     // Create video depacketizer based on media type
     if (config_.video_type == MediaType::H264) {
-        video_depacketizer_ = std::make_unique<RtpDepacketizerH264>();
-        depacketizer_listener_ = std::make_shared<DepacketizerListener>(this);
-        video_depacketizer_->SetListener(depacketizer_listener_);
+        videoDepacketizer_ = std::make_unique<RtpDepacketizerH264>();
+        depacketizerListener_ = std::make_shared<DepacketizerListener>(this);
+        videoDepacketizer_->SetListener(depacketizerListener_);
     } else {
         LMRTSP_LOGE("Unsupported video type: %d", static_cast<int>(config_.video_type));
-        transport_adapter_.reset();
+        transportAdapter_.reset();
         return false;
     }
 
@@ -137,7 +137,7 @@ bool RtpSinkSession::Start()
     }
 
     // Setup and start transport
-    if (!transport_adapter_->Setup(config_.transport)) {
+    if (!transportAdapter_->Setup(config_.transport)) {
         LMRTSP_LOGE("Failed to setup transport adapter");
         return false;
     }
@@ -156,8 +156,8 @@ void RtpSinkSession::Stop()
     running_ = false;
 
     // Close transport
-    if (transport_adapter_) {
-        transport_adapter_->Close();
+    if (transportAdapter_) {
+        transportAdapter_->Close();
     }
 
     LMRTSP_LOGI("RtpSinkSession stopped for session: %s", config_.session_id.c_str());
@@ -171,7 +171,7 @@ void RtpSinkSession::SetListener(std::shared_ptr<RtpSinkSessionListener> listene
 
 void RtpSinkSession::HandleRtpData(std::shared_ptr<lmcore::DataBuffer> buffer)
 {
-    if (!running_ || !buffer || !video_depacketizer_) {
+    if (!running_ || !buffer || !videoDepacketizer_) {
         return;
     }
 
@@ -197,19 +197,19 @@ void RtpSinkSession::HandleRtpData(std::shared_ptr<lmcore::DataBuffer> buffer)
     }
 
     // Check for sequence number gaps (simple detection)
-    if (last_sequence_number_ != 0) {
-        uint16_t expected_seq = last_sequence_number_ + 1;
+    if (lastSequenceNumber_ != 0) {
+        uint16_t expected_seq = lastSequenceNumber_ + 1;
         if (rtp_packet->sequence_number != expected_seq) {
             LMRTSP_LOGW("Sequence number gap detected: got %u, expected %u", rtp_packet->sequence_number, expected_seq);
         }
     }
-    last_sequence_number_ = rtp_packet->sequence_number;
+    lastSequenceNumber_ = rtp_packet->sequence_number;
 
     // Update timestamp tracking
-    last_timestamp_ = rtp_packet->timestamp;
+    lastTimestamp_ = rtp_packet->timestamp;
 
     // Submit packet to depacketizer
-    video_depacketizer_->SubmitPacket(rtp_packet);
+    videoDepacketizer_->SubmitPacket(rtp_packet);
 
     LMRTSP_LOGD("Processed RTP packet: SSRC=%u, seq=%u, ts=%u, pt=%u, size=%u", rtp_packet->ssrc,
                 rtp_packet->sequence_number, rtp_packet->timestamp, rtp_packet->payload_type,

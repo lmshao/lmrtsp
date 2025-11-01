@@ -51,12 +51,12 @@ static std::string Base64Encode(const std::vector<uint8_t> &data)
     return result;
 }
 
-RTSPServer::RTSPServer()
+RtspServer::RtspServer()
 {
-    LMRTSP_LOGD("RTSPServer constructor called");
+    LMRTSP_LOGD("RtspServer constructor called");
 }
 
-bool RTSPServer::Init(const std::string &ip, uint16_t port)
+bool RtspServer::Init(const std::string &ip, uint16_t port)
 {
     LMRTSP_LOGD("Initializing RTSP server on %s:%d", ip.c_str(), port);
 
@@ -71,7 +71,7 @@ bool RTSPServer::Init(const std::string &ip, uint16_t port)
     }
 
     // Set listener
-    serverListener_ = std::make_shared<RTSPServerListener>(shared_from_this());
+    serverListener_ = std::make_shared<RtspServerListener>(shared_from_this());
     tcpServer_->SetListener(serverListener_);
 
     if (!tcpServer_->Init()) {
@@ -83,7 +83,7 @@ bool RTSPServer::Init(const std::string &ip, uint16_t port)
     return true;
 }
 
-bool RTSPServer::Start()
+bool RtspServer::Start()
 {
     LMRTSP_LOGD("Starting RTSP server");
     if (!tcpServer_) {
@@ -101,7 +101,7 @@ bool RTSPServer::Start()
     return true;
 }
 
-bool RTSPServer::Stop()
+bool RtspServer::Stop()
 {
     LMRTSP_LOGD("Stopping RTSP server");
     if (!tcpServer_) {
@@ -126,7 +126,7 @@ bool RTSPServer::Stop()
     return true;
 }
 
-void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPRequest &request)
+void RtspServer::HandleRequest(std::shared_ptr<RtspSession> session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Handling %s request for session %s", request.method_.c_str(), session->GetSessionId().c_str());
 
@@ -134,7 +134,7 @@ void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPR
     std::string client_ip = GetClientIP(session);
 
     // Process request directly through session state machine
-    RTSPResponse response = session->ProcessRequest(request);
+    RtspResponse response = session->ProcessRequest(request);
 
     // Notify callback about the request after processing
     const std::string &method = request.method_;
@@ -146,7 +146,7 @@ void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPR
         }
         LMRTSP_LOGD("invoke OnStreamRequested");
         NotifyCallback(
-            [&](IRTSPServerCallback *callback) { callback->OnSetupReceived(client_ip, transport, request.uri_); });
+            [&](IRtspServerCallback *callback) { callback->OnSetupReceived(client_ip, transport, request.uri_); });
     } else if (method == "PLAY") {
         std::string range = "";
         auto it = request.general_header_.find("Range");
@@ -154,11 +154,11 @@ void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPR
             range = it->second;
         }
         NotifyCallback(
-            [&](IRTSPServerCallback *callback) { callback->OnPlayReceived(client_ip, request.uri_, range); });
+            [&](IRtspServerCallback *callback) { callback->OnPlayReceived(client_ip, request.uri_, range); });
     } else if (method == "PAUSE") {
-        NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnPauseReceived(client_ip, request.uri_); });
+        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnPauseReceived(client_ip, request.uri_); });
     } else if (method == "TEARDOWN") {
-        NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnTeardownReceived(client_ip, request.uri_); });
+        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnTeardownReceived(client_ip, request.uri_); });
     }
 
     // Send response
@@ -169,11 +169,11 @@ void RTSPServer::HandleRequest(std::shared_ptr<RTSPSession> session, const RTSPR
     }
 }
 
-void RTSPServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request)
+void RtspServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RtspRequest &request)
 {
     LMRTSP_LOGD("Handling stateless %s request", request.method_.c_str());
 
-    RTSPResponse response;
+    RtspResponse response;
     int cseq = 0;
 
     // Extract CSeq from request
@@ -182,7 +182,7 @@ void RTSPServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSes
     }
 
     if (request.method_ == METHOD_OPTIONS) {
-        response = RTSPResponseFactory::CreateOptionsOK(cseq).SetServer("RTSP Server/1.0").Build();
+        response = RtspResponseFactory::CreateOptionsOK(cseq).SetServer("RTSP Server/1.0").Build();
     } else if (request.method_ == METHOD_DESCRIBE) {
         // Notify callback for stream request
         std::string client_ip = "";
@@ -190,14 +190,14 @@ void RTSPServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSes
             client_ip = lmnetSession->host;
         }
         LMRTSP_LOGD("invoke OnStreamRequested");
-        NotifyCallback([&](IRTSPServerCallback *callback) { callback->OnStreamRequested(request.uri_, client_ip); });
+        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnStreamRequested(request.uri_, client_ip); });
 
         // Generate SDP for the requested stream
         std::string sdp = GenerateSDP(request.uri_, GetServerIP(), GetServerPort());
-        response = RTSPResponseFactory::CreateDescribeOK(cseq).SetServer("RTSP Server/1.0").SetSdp(sdp).Build();
+        response = RtspResponseFactory::CreateDescribeOK(cseq).SetServer("RTSP Server/1.0").SetSdp(sdp).Build();
     } else {
         // This should not happen as we only call this for OPTIONS and DESCRIBE
-        response = RTSPResponseFactory::CreateMethodNotAllowed(cseq).Build();
+        response = RtspResponseFactory::CreateMethodNotAllowed(cseq).Build();
     }
 
     // Send response
@@ -207,7 +207,7 @@ void RTSPServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSes
     }
 }
 
-void RTSPServer::SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RTSPRequest &request,
+void RtspServer::SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RtspRequest &request,
                                    int statusCode, const std::string &reasonPhrase)
 {
     int cseq = 0;
@@ -217,22 +217,22 @@ void RTSPServer::SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession,
         cseq = std::stoi(request.general_header_.at(CSEQ));
     }
 
-    RTSPResponse response;
+    RtspResponse response;
     switch (statusCode) {
         case 400:
-            response = RTSPResponseFactory::CreateBadRequest(cseq).Build();
+            response = RtspResponseFactory::CreateBadRequest(cseq).Build();
             break;
         case 404:
-            response = RTSPResponseFactory::CreateNotFound(cseq).Build();
+            response = RtspResponseFactory::CreateNotFound(cseq).Build();
             break;
         case 454:
-            response = RTSPResponseFactory::CreateSessionNotFound(cseq).Build();
+            response = RtspResponseFactory::CreateSessionNotFound(cseq).Build();
             break;
         case 500:
-            response = RTSPResponseFactory::CreateInternalServerError(cseq).Build();
+            response = RtspResponseFactory::CreateInternalServerError(cseq).Build();
             break;
         default:
-            response = RTSPResponseFactory::CreateError(static_cast<StatusCode>(statusCode), cseq).Build();
+            response = RtspResponseFactory::CreateError(static_cast<StatusCode>(statusCode), cseq).Build();
             break;
     }
 
@@ -243,9 +243,9 @@ void RTSPServer::SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession,
     }
 }
 
-std::shared_ptr<RTSPSession> RTSPServer::CreateSession(std::shared_ptr<lmnet::Session> lmnetSession)
+std::shared_ptr<RtspSession> RtspServer::CreateSession(std::shared_ptr<lmnet::Session> lmnetSession)
 {
-    auto session = std::make_shared<RTSPSession>(lmnetSession, weak_from_this());
+    auto session = std::make_shared<RtspSession>(lmnetSession, weak_from_this());
     {
         std::lock_guard<std::mutex> lock(sessionsMutex_);
         sessions_[session->GetSessionId()] = session;
@@ -254,7 +254,7 @@ std::shared_ptr<RTSPSession> RTSPServer::CreateSession(std::shared_ptr<lmnet::Se
     return session;
 }
 
-void RTSPServer::RemoveSession(const std::string &sessionId)
+void RtspServer::RemoveSession(const std::string &sessionId)
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     auto it = sessions_.find(sessionId);
@@ -264,7 +264,7 @@ void RTSPServer::RemoveSession(const std::string &sessionId)
     }
 }
 
-std::shared_ptr<RTSPSession> RTSPServer::GetSession(const std::string &sessionId)
+std::shared_ptr<RtspSession> RtspServer::GetSession(const std::string &sessionId)
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     auto it = sessions_.find(sessionId);
@@ -274,28 +274,28 @@ std::shared_ptr<RTSPSession> RTSPServer::GetSession(const std::string &sessionId
     return nullptr;
 }
 
-std::unordered_map<std::string, std::shared_ptr<RTSPSession>> RTSPServer::GetSessions()
+std::unordered_map<std::string, std::shared_ptr<RtspSession>> RtspServer::GetSessions()
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     return sessions_;
 }
 
 // Callback interface implementation
-void RTSPServer::SetCallback(std::shared_ptr<IRTSPServerCallback> callback)
+void RtspServer::SetCallback(std::shared_ptr<IRtspServerCallback> callback)
 {
     std::lock_guard<std::mutex> lock(callbackMutex_);
     callback_ = callback;
     LMRTSP_LOGD("RTSP server callback set");
 }
 
-std::shared_ptr<IRTSPServerCallback> RTSPServer::GetCallback() const
+std::shared_ptr<IRtspServerCallback> RtspServer::GetCallback() const
 {
     std::lock_guard<std::mutex> lock(callbackMutex_);
     return callback_;
 }
 
 // Media stream management implementation
-bool RTSPServer::AddMediaStream(const std::string &stream_path, std::shared_ptr<MediaStreamInfo> stream_info)
+bool RtspServer::AddMediaStream(const std::string &stream_path, std::shared_ptr<MediaStreamInfo> stream_info)
 {
     std::lock_guard<std::mutex> lock(streamsMutex_);
     mediaStreams_[stream_path] = stream_info;
@@ -303,7 +303,7 @@ bool RTSPServer::AddMediaStream(const std::string &stream_path, std::shared_ptr<
     return true;
 }
 
-bool RTSPServer::RemoveMediaStream(const std::string &stream_path)
+bool RtspServer::RemoveMediaStream(const std::string &stream_path)
 {
     std::lock_guard<std::mutex> lock(streamsMutex_);
     auto it = mediaStreams_.find(stream_path);
@@ -315,7 +315,7 @@ bool RTSPServer::RemoveMediaStream(const std::string &stream_path)
     return false;
 }
 
-std::shared_ptr<MediaStreamInfo> RTSPServer::GetMediaStream(const std::string &stream_path)
+std::shared_ptr<MediaStreamInfo> RtspServer::GetMediaStream(const std::string &stream_path)
 {
     std::lock_guard<std::mutex> lock(streamsMutex_);
 
@@ -335,7 +335,7 @@ std::shared_ptr<MediaStreamInfo> RTSPServer::GetMediaStream(const std::string &s
     return nullptr;
 }
 
-std::vector<std::string> RTSPServer::GetMediaStreamPaths() const
+std::vector<std::string> RtspServer::GetMediaStreamPaths() const
 {
     std::lock_guard<std::mutex> lock(streamsMutex_);
     std::vector<std::string> paths;
@@ -346,7 +346,7 @@ std::vector<std::string> RTSPServer::GetMediaStreamPaths() const
 }
 
 // Client management implementation
-std::vector<std::string> RTSPServer::GetConnectedClients() const
+std::vector<std::string> RtspServer::GetConnectedClients() const
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     std::vector<std::string> clients;
@@ -359,7 +359,7 @@ std::vector<std::string> RTSPServer::GetConnectedClients() const
     return clients;
 }
 
-bool RTSPServer::DisconnectClient(const std::string &client_ip)
+bool RtspServer::DisconnectClient(const std::string &client_ip)
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     std::vector<std::string> sessionsToRemove;
@@ -378,30 +378,30 @@ bool RTSPServer::DisconnectClient(const std::string &client_ip)
     return !sessionsToRemove.empty();
 }
 
-size_t RTSPServer::GetClientCount() const
+size_t RtspServer::GetClientCount() const
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     return sessions_.size();
 }
 
 // Server information
-bool RTSPServer::IsRunning() const
+bool RtspServer::IsRunning() const
 {
     return running_.load();
 }
 
-std::string RTSPServer::GetServerIP() const
+std::string RtspServer::GetServerIP() const
 {
     return serverIP_;
 }
 
-uint16_t RTSPServer::GetServerPort() const
+uint16_t RtspServer::GetServerPort() const
 {
     return serverPort_;
 }
 
 // SDP generation implementation
-std::string RTSPServer::GenerateSDP(const std::string &stream_path, const std::string &server_ip, uint16_t server_port)
+std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::string &server_ip, uint16_t server_port)
 {
     // Extract path from full RTSP URL if needed
     std::string path = stream_path;
@@ -478,7 +478,7 @@ std::string RTSPServer::GenerateSDP(const std::string &stream_path, const std::s
 }
 
 // Helper methods
-std::string RTSPServer::GetClientIP(std::shared_ptr<RTSPSession> session) const
+std::string RtspServer::GetClientIP(std::shared_ptr<RtspSession> session) const
 {
     if (session && session->GetNetworkSession()) {
         return session->GetNetworkSession()->host;
@@ -486,7 +486,7 @@ std::string RTSPServer::GetClientIP(std::shared_ptr<RTSPSession> session) const
     return "";
 }
 
-void RTSPServer::NotifyCallback(std::function<void(IRTSPServerCallback *)> func)
+void RtspServer::NotifyCallback(std::function<void(IRtspServerCallback *)> func)
 {
     std::lock_guard<std::mutex> lock(callbackMutex_);
     if (callback_) {

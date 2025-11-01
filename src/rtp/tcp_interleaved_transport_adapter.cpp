@@ -1,3 +1,11 @@
+/**
+ * @author SHAO Liming <lmshao@163.com>
+ * @copyright Copyright (c) 2025 SHAO Liming
+ * @license MIT
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
 #include "tcp_interleaved_transport_adapter.h"
 
 #include <sstream>
@@ -6,8 +14,8 @@
 
 namespace lmshao::lmrtsp {
 
-TcpInterleavedTransportAdapter::TcpInterleavedTransportAdapter(std::weak_ptr<RTSPSession> rtspSession)
-    : rtspSession_(rtspSession), rtpChannel_(0), rtcpChannel_(1), isSetup_(false)
+TcpInterleavedTransportAdapter::TcpInterleavedTransportAdapter(std::weak_ptr<RtspSession> RtspSession)
+    : rtspSession_(RtspSession), rtpChannel_(0), rtcpChannel_(1), isSetup_(false)
 {
 }
 
