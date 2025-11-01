@@ -67,16 +67,16 @@ private:
     bool initialized_ = false;
     bool running_ = false;
 
-    uint32_t last_timestamp_ = 0;
-    uint16_t last_sequence_number_ = 0;
+    uint32_t lastTimestamp_ = 0;
+    uint16_t lastSequenceNumber_ = 0;
 
-    std::unique_ptr<IRtpDepacketizer> video_depacketizer_;
+    std::unique_ptr<IRtpDepacketizer> videoDepacketizer_;
     std::weak_ptr<RtpSinkSessionListener> listener_;
-    std::unique_ptr<IRtpTransportAdapter> transport_adapter_;
+    std::unique_ptr<IRtpTransportAdapter> transportAdapter_;
 
     // Internal listeners
-    std::shared_ptr<DepacketizerListener> depacketizer_listener_;
-    std::shared_ptr<TransportListener> transport_listener_;
+    std::shared_ptr<DepacketizerListener> depacketizerListener_;
+    std::shared_ptr<TransportListener> transportListener_;
 };
 
 } // namespace lmshao::lmrtsp

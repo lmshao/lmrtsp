@@ -8,7 +8,6 @@
 
 #include "rtsp_request.h"
 
-#include <algorithm>
 #include <sstream>
 
 #include "internal_logger.h"
@@ -20,7 +19,7 @@ RequestHeader RequestHeader::FromString(const std::string &header_str)
 {
     RequestHeader header;
 
-    std::vector<std::string> lines = RTSPUtils::split(header_str, CRLF);
+    std::vector<std::string> lines = RtspUtils::split(header_str, CRLF);
 
     for (const std::string &line : lines) {
         if (line.empty()) {
@@ -30,47 +29,47 @@ RequestHeader RequestHeader::FromString(const std::string &header_str)
         size_t colon_pos = line.find(COLON);
         if (colon_pos == std::string::npos) {
             // Invalid header line, add to custom headers
-            header.custom_header_.push_back(line);
+            header.customHeader_.push_back(line);
             continue;
         }
 
-        std::string header_name = RTSPUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RTSPUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
+        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
 
         // Convert header name to lowercase for comparison
-        std::string header_name_lower = RTSPUtils::toLower(header_name);
+        std::string header_name_lower = RtspUtils::toLower(header_name);
 
         // Parse standard request headers
-        if (header_name_lower == RTSPUtils::toLower(ACCEPT)) {
+        if (header_name_lower == RtspUtils::toLower(ACCEPT)) {
             header.accept_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(ACCEPT_ENCODING)) {
-            header.accept_encoding_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(ACCEPT_LANGUAGE)) {
-            header.accept_language_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(AUTHORIZATION)) {
+        } else if (header_name_lower == RtspUtils::toLower(ACCEPT_ENCODING)) {
+            header.acceptEncoding_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(ACCEPT_LANGUAGE)) {
+            header.acceptLanguage_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(AUTHORIZATION)) {
             header.authorization_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(FROM)) {
+        } else if (header_name_lower == RtspUtils::toLower(FROM)) {
             header.from_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(IF_MODIFIED_SINCE)) {
-            header.if_modified_since_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(RANGE)) {
+        } else if (header_name_lower == RtspUtils::toLower(IF_MODIFIED_SINCE)) {
+            header.ifModifiedSince_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(RANGE)) {
             header.range_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(REFERER)) {
+        } else if (header_name_lower == RtspUtils::toLower(REFERER)) {
             header.referer_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(USER_AGENT)) {
-            header.user_agent_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(USER_AGENT)) {
+            header.userAgent_ = header_value;
         } else {
             // Unknown header, add to custom headers
-            header.custom_header_.push_back(header_name + COLON + SP + header_value);
+            header.customHeader_.push_back(header_name + COLON + SP + header_value);
         }
     }
 
     return header;
 }
 
-RTSPRequest RTSPRequest::FromString(const std::string &req_str)
+RtspRequest RtspRequest::FromString(const std::string &req_str)
 {
-    RTSPRequest request;
+    RtspRequest request;
 
     if (req_str.empty()) {
         LMRTSP_LOGD("Empty request string received");
@@ -78,7 +77,7 @@ RTSPRequest RTSPRequest::FromString(const std::string &req_str)
     }
 
     // Split the request into lines
-    std::vector<std::string> lines = RTSPUtils::split(req_str, CRLF);
+    std::vector<std::string> lines = RtspUtils::split(req_str, CRLF);
 
     if (lines.empty()) {
         LMRTSP_LOGD("No lines found in request string");
@@ -89,7 +88,7 @@ RTSPRequest RTSPRequest::FromString(const std::string &req_str)
     std::string request_line = lines[0];
     LMRTSP_LOGD("Request line: [%s]", request_line.c_str());
 
-    std::vector<std::string> request_parts = RTSPUtils::split(request_line, SP);
+    std::vector<std::string> request_parts = RtspUtils::split(request_line, SP);
     LMRTSP_LOGD("Request parts count: %zu", request_parts.size());
 
     if (request_parts.size() >= 3) {
@@ -144,71 +143,71 @@ RTSPRequest RTSPRequest::FromString(const std::string &req_str)
             continue; // Invalid header line
         }
 
-        std::string header_name = RTSPUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RTSPUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
+        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
 
         // Convert header name to lowercase for comparison
-        std::string header_name_lower = RTSPUtils::toLower(header_name);
+        std::string header_name_lower = RtspUtils::toLower(header_name);
 
         // Classify headers into general, request, and entity headers
-        if (header_name_lower == RTSPUtils::toLower(CSEQ) || header_name_lower == RTSPUtils::toLower(DATE) ||
-            header_name_lower == RTSPUtils::toLower(SESSION) || header_name_lower == RTSPUtils::toLower(TRANSPORT) ||
-            header_name_lower == RTSPUtils::toLower(LOCATION) || header_name_lower == RTSPUtils::toLower(REQUIRE) ||
-            header_name_lower == RTSPUtils::toLower(PROXY_REQUIRE)) {
+        if (header_name_lower == RtspUtils::toLower(CSEQ) || header_name_lower == RtspUtils::toLower(DATE) ||
+            header_name_lower == RtspUtils::toLower(SESSION) || header_name_lower == RtspUtils::toLower(TRANSPORT) ||
+            header_name_lower == RtspUtils::toLower(LOCATION) || header_name_lower == RtspUtils::toLower(REQUIRE) ||
+            header_name_lower == RtspUtils::toLower(PROXY_REQUIRE)) {
             // General headers
             request.general_header_[header_name] = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(CONTENT_TYPE) ||
-                   header_name_lower == RTSPUtils::toLower(CONTENT_LENGTH)) {
+        } else if (header_name_lower == RtspUtils::toLower(CONTENT_TYPE) ||
+                   header_name_lower == RtspUtils::toLower(CONTENT_LENGTH)) {
             // Entity headers
             request.entity_header_[header_name] = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(ACCEPT) ||
-                   header_name_lower == RTSPUtils::toLower(ACCEPT_ENCODING) ||
-                   header_name_lower == RTSPUtils::toLower(ACCEPT_LANGUAGE) ||
-                   header_name_lower == RTSPUtils::toLower(AUTHORIZATION) ||
-                   header_name_lower == RTSPUtils::toLower(FROM) ||
-                   header_name_lower == RTSPUtils::toLower(IF_MODIFIED_SINCE) ||
-                   header_name_lower == RTSPUtils::toLower(RANGE) || header_name_lower == RTSPUtils::toLower(REFERER) ||
-                   header_name_lower == RTSPUtils::toLower(USER_AGENT)) {
+        } else if (header_name_lower == RtspUtils::toLower(ACCEPT) ||
+                   header_name_lower == RtspUtils::toLower(ACCEPT_ENCODING) ||
+                   header_name_lower == RtspUtils::toLower(ACCEPT_LANGUAGE) ||
+                   header_name_lower == RtspUtils::toLower(AUTHORIZATION) ||
+                   header_name_lower == RtspUtils::toLower(FROM) ||
+                   header_name_lower == RtspUtils::toLower(IF_MODIFIED_SINCE) ||
+                   header_name_lower == RtspUtils::toLower(RANGE) || header_name_lower == RtspUtils::toLower(REFERER) ||
+                   header_name_lower == RtspUtils::toLower(USER_AGENT)) {
             // Request headers - parse using RequestHeader::FromString
             std::string single_header = header_name + COLON + SP + header_value + CRLF;
             RequestHeader parsed_header = RequestHeader::FromString(single_header);
 
             // Merge the parsed header with the request header
             if (parsed_header.accept_) {
-                request.request_header_.accept_ = parsed_header.accept_;
+                request.requestHeader_.accept_ = parsed_header.accept_;
             }
-            if (parsed_header.accept_encoding_) {
-                request.request_header_.accept_encoding_ = parsed_header.accept_encoding_;
+            if (parsed_header.acceptEncoding_) {
+                request.requestHeader_.acceptEncoding_ = parsed_header.acceptEncoding_;
             }
-            if (parsed_header.accept_language_) {
-                request.request_header_.accept_language_ = parsed_header.accept_language_;
+            if (parsed_header.acceptLanguage_) {
+                request.requestHeader_.acceptLanguage_ = parsed_header.acceptLanguage_;
             }
             if (parsed_header.authorization_) {
-                request.request_header_.authorization_ = parsed_header.authorization_;
+                request.requestHeader_.authorization_ = parsed_header.authorization_;
             }
             if (parsed_header.from_) {
-                request.request_header_.from_ = parsed_header.from_;
+                request.requestHeader_.from_ = parsed_header.from_;
             }
-            if (parsed_header.if_modified_since_) {
-                request.request_header_.if_modified_since_ = parsed_header.if_modified_since_;
+            if (parsed_header.ifModifiedSince_) {
+                request.requestHeader_.ifModifiedSince_ = parsed_header.ifModifiedSince_;
             }
             if (parsed_header.range_) {
-                request.request_header_.range_ = parsed_header.range_;
+                request.requestHeader_.range_ = parsed_header.range_;
             }
             if (parsed_header.referer_) {
-                request.request_header_.referer_ = parsed_header.referer_;
+                request.requestHeader_.referer_ = parsed_header.referer_;
             }
-            if (parsed_header.user_agent_) {
-                request.request_header_.user_agent_ = parsed_header.user_agent_;
+            if (parsed_header.userAgent_) {
+                request.requestHeader_.userAgent_ = parsed_header.userAgent_;
             }
 
             // Add custom headers
-            for (const std::string &custom : parsed_header.custom_header_) {
-                request.request_header_.custom_header_.push_back(custom);
+            for (const std::string &custom : parsed_header.customHeader_) {
+                request.requestHeader_.customHeader_.push_back(custom);
             }
         } else {
             // Unknown header, add to request custom headers
-            request.request_header_.custom_header_.push_back(header_name + COLON + SP + header_value);
+            request.requestHeader_.customHeader_.push_back(header_name + COLON + SP + header_value);
         }
     }
 
@@ -223,7 +222,7 @@ RTSPRequest RTSPRequest::FromString(const std::string &req_str)
         }
         std::string body = body_oss.str();
         if (!body.empty()) {
-            request.message_body_ = body;
+            request.messageBody_ = body;
         }
     }
 
@@ -236,11 +235,11 @@ std::string RequestHeader::ToString() const
     if (accept_) {
         oss << ACCEPT << COLON << SP << *accept_ << CRLF;
     }
-    if (accept_encoding_) {
-        oss << ACCEPT_ENCODING << COLON << SP << *accept_encoding_ << CRLF;
+    if (acceptEncoding_) {
+        oss << ACCEPT_ENCODING << COLON << SP << *acceptEncoding_ << CRLF;
     }
-    if (accept_language_) {
-        oss << ACCEPT_LANGUAGE << COLON << SP << *accept_language_ << CRLF;
+    if (acceptLanguage_) {
+        oss << ACCEPT_LANGUAGE << COLON << SP << *acceptLanguage_ << CRLF;
     }
     if (authorization_) {
         oss << AUTHORIZATION << COLON << SP << *authorization_ << CRLF;
@@ -248,8 +247,8 @@ std::string RequestHeader::ToString() const
     if (from_) {
         oss << FROM << COLON << SP << *from_ << CRLF;
     }
-    if (if_modified_since_) {
-        oss << IF_MODIFIED_SINCE << COLON << SP << *if_modified_since_ << CRLF;
+    if (ifModifiedSince_) {
+        oss << IF_MODIFIED_SINCE << COLON << SP << *ifModifiedSince_ << CRLF;
     }
     if (range_) {
         oss << RANGE << COLON << SP << *range_ << CRLF;
@@ -257,146 +256,146 @@ std::string RequestHeader::ToString() const
     if (referer_) {
         oss << REFERER << COLON << SP << *referer_ << CRLF;
     }
-    if (user_agent_) {
-        oss << USER_AGENT << COLON << SP << *user_agent_ << CRLF;
+    if (userAgent_) {
+        oss << USER_AGENT << COLON << SP << *userAgent_ << CRLF;
     }
-    for (const auto &h : custom_header_) {
+    for (const auto &h : customHeader_) {
         oss << h << CRLF;
     }
     return oss.str();
 }
 
-std::string RTSPRequest::ToString() const
+std::string RtspRequest::ToString() const
 {
     std::ostringstream oss;
     oss << method_ << SP << uri_ << SP << version_ << CRLF;
     for (const auto &[k, v] : general_header_) {
         oss << k << COLON << SP << v << CRLF;
     }
-    oss << request_header_.ToString();
+    oss << requestHeader_.ToString();
     for (const auto &[k, v] : entity_header_) {
         oss << k << COLON << SP << v << CRLF;
     }
     oss << CRLF;
-    if (message_body_) {
-        oss << *message_body_;
+    if (messageBody_) {
+        oss << *messageBody_;
     }
     return oss.str();
 }
 
-// RTSPRequestBuilder implementations
-RTSPRequestBuilder::RTSPRequestBuilder()
+// RtspRequestBuilder implementations
+RtspRequestBuilder::RtspRequestBuilder()
 {
     request_.version_ = RTSP_VERSION;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetMethod(const std::string &method)
+RtspRequestBuilder &RtspRequestBuilder::SetMethod(const std::string &method)
 {
     request_.method_ = method;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetUri(const std::string &uri)
+RtspRequestBuilder &RtspRequestBuilder::SetUri(const std::string &uri)
 {
     request_.uri_ = uri;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetCSeq(int cseq)
+RtspRequestBuilder &RtspRequestBuilder::SetCSeq(int cseq)
 {
     request_.general_header_[CSEQ] = std::to_string(cseq);
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetSession(const std::string &session)
+RtspRequestBuilder &RtspRequestBuilder::SetSession(const std::string &session)
 {
     request_.general_header_[SESSION] = session;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetTransport(const std::string &transport)
+RtspRequestBuilder &RtspRequestBuilder::SetTransport(const std::string &transport)
 {
     request_.general_header_[TRANSPORT] = transport;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetRange(const std::string &range)
+RtspRequestBuilder &RtspRequestBuilder::SetRange(const std::string &range)
 {
     request_.general_header_[RANGE] = range;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetLocation(const std::string &location)
+RtspRequestBuilder &RtspRequestBuilder::SetLocation(const std::string &location)
 {
     request_.general_header_[LOCATION] = location;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetRequire(const std::string &require)
+RtspRequestBuilder &RtspRequestBuilder::SetRequire(const std::string &require)
 {
     request_.general_header_[REQUIRE] = require;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetProxyRequire(const std::string &proxy_require)
+RtspRequestBuilder &RtspRequestBuilder::SetProxyRequire(const std::string &proxy_require)
 {
     request_.general_header_[PROXY_REQUIRE] = proxy_require;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetAccept(const std::string &accept)
+RtspRequestBuilder &RtspRequestBuilder::SetAccept(const std::string &accept)
 {
-    request_.request_header_.accept_ = accept;
+    request_.requestHeader_.accept_ = accept;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetUserAgent(const std::string &user_agent)
+RtspRequestBuilder &RtspRequestBuilder::SetUserAgent(const std::string &user_agent)
 {
-    request_.request_header_.user_agent_ = user_agent;
+    request_.requestHeader_.userAgent_ = user_agent;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetAuthorization(const std::string &authorization)
+RtspRequestBuilder &RtspRequestBuilder::SetAuthorization(const std::string &authorization)
 {
-    request_.request_header_.authorization_ = authorization;
+    request_.requestHeader_.authorization_ = authorization;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::AddCustomHeader(const std::string &header)
+RtspRequestBuilder &RtspRequestBuilder::AddCustomHeader(const std::string &header)
 {
-    request_.request_header_.custom_header_.push_back(header);
+    request_.requestHeader_.customHeader_.push_back(header);
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetContentType(const std::string &content_type)
+RtspRequestBuilder &RtspRequestBuilder::SetContentType(const std::string &content_type)
 {
     request_.entity_header_[CONTENT_TYPE] = content_type;
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetContentLength(size_t length)
+RtspRequestBuilder &RtspRequestBuilder::SetContentLength(size_t length)
 {
     request_.entity_header_[CONTENT_LENGTH] = std::to_string(length);
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetMessageBody(const std::string &body)
+RtspRequestBuilder &RtspRequestBuilder::SetMessageBody(const std::string &body)
 {
-    request_.message_body_ = body;
+    request_.messageBody_ = body;
     if (request_.entity_header_.find(CONTENT_LENGTH) == request_.entity_header_.end()) {
         SetContentLength(body.size());
     }
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetSdp(const std::string &sdp)
+RtspRequestBuilder &RtspRequestBuilder::SetSdp(const std::string &sdp)
 {
     SetContentType(MIME_SDP);
     SetMessageBody(sdp);
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetParameters(const std::vector<std::string> &params)
+RtspRequestBuilder &RtspRequestBuilder::SetParameters(const std::vector<std::string> &params)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < params.size(); ++i) {
@@ -410,7 +409,7 @@ RTSPRequestBuilder &RTSPRequestBuilder::SetParameters(const std::vector<std::str
     return *this;
 }
 
-RTSPRequestBuilder &RTSPRequestBuilder::SetParameters(const std::vector<std::pair<std::string, std::string>> &params)
+RtspRequestBuilder &RtspRequestBuilder::SetParameters(const std::vector<std::pair<std::string, std::string>> &params)
 {
     std::ostringstream oss;
     for (size_t i = 0; i < params.size(); ++i) {
@@ -424,65 +423,65 @@ RTSPRequestBuilder &RTSPRequestBuilder::SetParameters(const std::vector<std::pai
     return *this;
 }
 
-RTSPRequest RTSPRequestBuilder::Build() const
+RtspRequest RtspRequestBuilder::Build() const
 {
     return request_;
 }
 
-// RTSPRequestFactory implementations
-RTSPRequestBuilder RTSPRequestFactory::CreateOptions(int cseq, const std::string &uri)
+// RtspRequestFactory implementations
+RtspRequestBuilder RtspRequestFactory::CreateOptions(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_OPTIONS).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_OPTIONS).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateDescribe(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateDescribe(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_DESCRIBE).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_DESCRIBE).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateAnnounce(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateAnnounce(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_ANNOUNCE).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_ANNOUNCE).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateSetup(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateSetup(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_SETUP).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_SETUP).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreatePlay(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreatePlay(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_PLAY).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_PLAY).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreatePause(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreatePause(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_PAUSE).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_PAUSE).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateTeardown(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateTeardown(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_TEARDOWN).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_TEARDOWN).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateGetParameter(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateGetParameter(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_GET_PARAMETER).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_GET_PARAMETER).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateSetParameter(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateSetParameter(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_SET_PARAMETER).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_SET_PARAMETER).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateRedirect(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateRedirect(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_REDIRECT).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_REDIRECT).SetUri(uri).SetCSeq(cseq);
 }
 
-RTSPRequestBuilder RTSPRequestFactory::CreateRecord(int cseq, const std::string &uri)
+RtspRequestBuilder RtspRequestFactory::CreateRecord(int cseq, const std::string &uri)
 {
-    return RTSPRequestBuilder().SetMethod(METHOD_RECORD).SetUri(uri).SetCSeq(cseq);
+    return RtspRequestBuilder().SetMethod(METHOD_RECORD).SetUri(uri).SetCSeq(cseq);
 }
 
 } // namespace lmshao::lmrtsp

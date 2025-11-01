@@ -22,8 +22,8 @@ public:
     RtpPacketizerH264() = default;
     explicit RtpPacketizerH264(uint32_t ssrc, uint16_t initial_seq = 0, uint8_t payload_type = 96,
                                uint32_t clock_rate = 90000, uint32_t mtu_size = 1400)
-        : ssrc_(ssrc), sequence_number_(initial_seq), payload_type_(payload_type), clock_rate_(clock_rate),
-          mtu_size_(mtu_size)
+        : ssrc_(ssrc), sequenceNumber_(initial_seq), payloadType_(payload_type), clockRate_(clock_rate),
+          mtuSize_(mtu_size)
     {
     }
 
@@ -41,10 +41,10 @@ private:
 
 private:
     uint32_t ssrc_ = 0;
-    uint16_t sequence_number_ = 0;
-    uint8_t payload_type_ = 96;   // dynamic for H264
-    uint32_t clock_rate_ = 90000; // H264 clock
-    uint32_t mtu_size_ = 1400;    // default MTU
+    uint16_t sequenceNumber_ = 0;
+    uint8_t payloadType_ = 96;   // dynamic for H264
+    uint32_t clockRate_ = 90000; // H264 clock
+    uint32_t mtuSize_ = 1400;    // default MTU
 };
 
 } // namespace lmshao::lmrtsp

@@ -65,14 +65,14 @@ public:
         config.transport.server_rtcp_port = listen_port_ + 1;
 
         // Initialize RTP session
-        rtp_session_ = std::make_unique<RtpSinkSession>();
-        if (!rtp_session_->Initialize(config)) {
+        rtpSession_ = std::make_unique<RtpSinkSession>();
+        if (!rtpSession_->Initialize(config)) {
             std::cerr << "Failed to initialize RTP sink session" << std::endl;
             return false;
         }
 
         // Set frame listener
-        rtp_session_->SetListener(std::static_pointer_cast<RtpSinkSessionListener>(shared_from_this()));
+        rtpSession_->SetListener(std::static_pointer_cast<RtpSinkSessionListener>(shared_from_this()));
 
         std::cout << "RTP receiver initialized successfully" << std::endl;
         std::cout << "Listening on port: " << listen_port_ << std::endl;
@@ -83,7 +83,7 @@ public:
 
     bool Start()
     {
-        if (!rtp_session_->Start()) {
+        if (!rtpSession_->Start()) {
             std::cerr << "Failed to start RTP session" << std::endl;
             return false;
         }
@@ -112,8 +112,8 @@ public:
 
     void Stop()
     {
-        if (rtp_session_) {
-            rtp_session_->Stop();
+        if (rtpSession_) {
+            rtpSession_->Stop();
         }
         if (output_file_stream_.is_open()) {
             output_file_stream_.close();
@@ -262,7 +262,7 @@ private:
     std::string output_file_;
     uint16_t listen_port_;
     std::ofstream output_file_stream_;
-    std::unique_ptr<RtpSinkSession> rtp_session_;
+    std::unique_ptr<RtpSinkSession> rtpSession_;
     std::atomic<size_t> frames_received_;
     std::atomic<size_t> total_bytes_received_;
 };

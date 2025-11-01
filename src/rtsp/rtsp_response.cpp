@@ -31,9 +31,9 @@ StatusCode parseStatusCode(const std::string &status_str)
 std::vector<std::string> splitCommaSeparated(const std::string &str)
 {
     std::vector<std::string> result;
-    std::vector<std::string> parts = RTSPUtils::split(str, COMMA);
+    std::vector<std::string> parts = RtspUtils::split(str, COMMA);
     for (const std::string &part : parts) {
-        std::string trimmed = RTSPUtils::trim(part);
+        std::string trimmed = RtspUtils::trim(part);
         if (!trimmed.empty()) {
             result.push_back(trimmed);
         }
@@ -47,7 +47,7 @@ ResponseHeader ResponseHeader::FromString(const std::string &header_str)
 {
     ResponseHeader header;
 
-    std::vector<std::string> lines = RTSPUtils::split(header_str, CRLF);
+    std::vector<std::string> lines = RtspUtils::split(header_str, CRLF);
 
     for (const std::string &line : lines) {
         if (line.empty()) {
@@ -57,53 +57,53 @@ ResponseHeader ResponseHeader::FromString(const std::string &header_str)
         size_t colon_pos = line.find(COLON);
         if (colon_pos == std::string::npos) {
             // Invalid header line, add to custom headers
-            header.custom_header_.push_back(line);
+            header.customHeader_.push_back(line);
             continue;
         }
 
-        std::string header_name = RTSPUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RTSPUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
+        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
 
         // Convert header name to lowercase for comparison
-        std::string header_name_lower = RTSPUtils::toLower(header_name);
+        std::string header_name_lower = RtspUtils::toLower(header_name);
 
         // Parse standard response headers
-        if (header_name_lower == RTSPUtils::toLower(LOCATION)) {
+        if (header_name_lower == RtspUtils::toLower(LOCATION)) {
             header.location_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(PROXY_AUTHENTICATE)) {
-            header.proxy_authenticate_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(PUBLIC)) {
+        } else if (header_name_lower == RtspUtils::toLower(PROXY_AUTHENTICATE)) {
+            header.proxyAuthenticate_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(PUBLIC)) {
             // Parse comma-separated public methods
-            header.public_methods_ = splitCommaSeparated(header_value);
-        } else if (header_name_lower == RTSPUtils::toLower(RETRY_AFTER)) {
-            header.retry_after_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(SERVER)) {
+            header.publicMethods_ = splitCommaSeparated(header_value);
+        } else if (header_name_lower == RtspUtils::toLower(RETRY_AFTER)) {
+            header.retryAfter_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(SERVER)) {
             header.server_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(VARY)) {
+        } else if (header_name_lower == RtspUtils::toLower(VARY)) {
             header.vary_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(WWW_AUTHENTICATE)) {
-            header.www_authenticate_ = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(RTP_INFO)) {
-            header.rtp_info_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(WWW_AUTHENTICATE)) {
+            header.wwwAuthenticate_ = header_value;
+        } else if (header_name_lower == RtspUtils::toLower(RTP_INFO)) {
+            header.rtpInfo_ = header_value;
         } else {
             // Unknown header, add to custom headers
-            header.custom_header_.push_back(header_name + COLON + SP + header_value);
+            header.customHeader_.push_back(header_name + COLON + SP + header_value);
         }
     }
 
     return header;
 }
 
-RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
+RtspResponse RtspResponse::FromString(const std::string &resp_str)
 {
-    RTSPResponse response;
+    RtspResponse response;
 
     if (resp_str.empty()) {
         return response;
     }
 
     // Split the response into lines
-    std::vector<std::string> lines = RTSPUtils::split(resp_str, CRLF);
+    std::vector<std::string> lines = RtspUtils::split(resp_str, CRLF);
 
     if (lines.empty()) {
         return response;
@@ -111,7 +111,7 @@ RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
 
     // Parse the status line (first line)
     std::string status_line = lines[0];
-    std::vector<std::string> status_parts = RTSPUtils::split(status_line, SP);
+    std::vector<std::string> status_parts = RtspUtils::split(status_line, SP);
 
     if (status_parts.size() >= 3) {
         response.version_ = status_parts[0];
@@ -153,67 +153,67 @@ RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
             continue; // Invalid header line
         }
 
-        std::string header_name = RTSPUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RTSPUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
+        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
 
         // Convert header name to lowercase for comparison
-        std::string header_name_lower = RTSPUtils::toLower(header_name);
+        std::string header_name_lower = RtspUtils::toLower(header_name);
 
         // Classify headers into general, response, and entity headers
-        if (header_name_lower == RTSPUtils::toLower(CSEQ) || header_name_lower == RTSPUtils::toLower(DATE) ||
-            header_name_lower == RTSPUtils::toLower(SESSION) || header_name_lower == RTSPUtils::toLower(TRANSPORT) ||
-            header_name_lower == RTSPUtils::toLower(RANGE) || header_name_lower == RTSPUtils::toLower(REQUIRE) ||
-            header_name_lower == RTSPUtils::toLower(PROXY_REQUIRE)) {
+        if (header_name_lower == RtspUtils::toLower(CSEQ) || header_name_lower == RtspUtils::toLower(DATE) ||
+            header_name_lower == RtspUtils::toLower(SESSION) || header_name_lower == RtspUtils::toLower(TRANSPORT) ||
+            header_name_lower == RtspUtils::toLower(RANGE) || header_name_lower == RtspUtils::toLower(REQUIRE) ||
+            header_name_lower == RtspUtils::toLower(PROXY_REQUIRE)) {
             // General headers
             response.general_header_[header_name] = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(CONTENT_TYPE) ||
-                   header_name_lower == RTSPUtils::toLower(CONTENT_LENGTH)) {
+        } else if (header_name_lower == RtspUtils::toLower(CONTENT_TYPE) ||
+                   header_name_lower == RtspUtils::toLower(CONTENT_LENGTH)) {
             // Entity headers
             response.entity_header_[header_name] = header_value;
-        } else if (header_name_lower == RTSPUtils::toLower(LOCATION) ||
-                   header_name_lower == RTSPUtils::toLower(PROXY_AUTHENTICATE) ||
-                   header_name_lower == RTSPUtils::toLower(PUBLIC) ||
-                   header_name_lower == RTSPUtils::toLower(RETRY_AFTER) ||
-                   header_name_lower == RTSPUtils::toLower(SERVER) || header_name_lower == RTSPUtils::toLower(VARY) ||
-                   header_name_lower == RTSPUtils::toLower(WWW_AUTHENTICATE) ||
-                   header_name_lower == RTSPUtils::toLower(RTP_INFO)) {
+        } else if (header_name_lower == RtspUtils::toLower(LOCATION) ||
+                   header_name_lower == RtspUtils::toLower(PROXY_AUTHENTICATE) ||
+                   header_name_lower == RtspUtils::toLower(PUBLIC) ||
+                   header_name_lower == RtspUtils::toLower(RETRY_AFTER) ||
+                   header_name_lower == RtspUtils::toLower(SERVER) || header_name_lower == RtspUtils::toLower(VARY) ||
+                   header_name_lower == RtspUtils::toLower(WWW_AUTHENTICATE) ||
+                   header_name_lower == RtspUtils::toLower(RTP_INFO)) {
             // Response headers - parse using ResponseHeader::FromString
             std::string single_header = header_name + COLON + SP + header_value + CRLF;
             ResponseHeader parsed_header = ResponseHeader::FromString(single_header);
 
             // Merge the parsed header with the response header
             if (parsed_header.location_) {
-                response.response_header_.location_ = parsed_header.location_;
+                response.responseHeader_.location_ = parsed_header.location_;
             }
-            if (parsed_header.proxy_authenticate_) {
-                response.response_header_.proxy_authenticate_ = parsed_header.proxy_authenticate_;
+            if (parsed_header.proxyAuthenticate_) {
+                response.responseHeader_.proxyAuthenticate_ = parsed_header.proxyAuthenticate_;
             }
-            if (!parsed_header.public_methods_.empty()) {
-                response.response_header_.public_methods_ = parsed_header.public_methods_;
+            if (!parsed_header.publicMethods_.empty()) {
+                response.responseHeader_.publicMethods_ = parsed_header.publicMethods_;
             }
-            if (parsed_header.retry_after_) {
-                response.response_header_.retry_after_ = parsed_header.retry_after_;
+            if (parsed_header.retryAfter_) {
+                response.responseHeader_.retryAfter_ = parsed_header.retryAfter_;
             }
             if (parsed_header.server_) {
-                response.response_header_.server_ = parsed_header.server_;
+                response.responseHeader_.server_ = parsed_header.server_;
             }
             if (parsed_header.vary_) {
-                response.response_header_.vary_ = parsed_header.vary_;
+                response.responseHeader_.vary_ = parsed_header.vary_;
             }
-            if (parsed_header.www_authenticate_) {
-                response.response_header_.www_authenticate_ = parsed_header.www_authenticate_;
+            if (parsed_header.wwwAuthenticate_) {
+                response.responseHeader_.wwwAuthenticate_ = parsed_header.wwwAuthenticate_;
             }
-            if (parsed_header.rtp_info_) {
-                response.response_header_.rtp_info_ = parsed_header.rtp_info_;
+            if (parsed_header.rtpInfo_) {
+                response.responseHeader_.rtpInfo_ = parsed_header.rtpInfo_;
             }
 
             // Add custom headers
-            for (const std::string &custom : parsed_header.custom_header_) {
-                response.response_header_.custom_header_.push_back(custom);
+            for (const std::string &custom : parsed_header.customHeader_) {
+                response.responseHeader_.customHeader_.push_back(custom);
             }
         } else {
             // Unknown header, add to response custom headers
-            response.response_header_.custom_header_.push_back(header_name + COLON + SP + header_value);
+            response.responseHeader_.customHeader_.push_back(header_name + COLON + SP + header_value);
         }
     }
 
@@ -228,7 +228,7 @@ RTSPResponse RTSPResponse::FromString(const std::string &resp_str)
         }
         std::string body = body_oss.str();
         if (!body.empty()) {
-            response.message_body_ = body;
+            response.messageBody_ = body;
         }
     }
 
@@ -322,7 +322,7 @@ std::string GetReasonPhrase(StatusCode code)
             return REASON_SERVICE_UNAVAILABLE;
         case StatusCode::GatewayTimeout:
             return REASON_GATEWAY_TIMEOUT;
-        case StatusCode::RTSPVersionNotSupported:
+        case StatusCode::RtspVersionNotSupported:
             return REASON_RTSP_VERSION_NOT_SUPPORTED;
         case StatusCode::OptionNotSupported:
             return REASON_OPTION_NOT_SUPPORTED;
@@ -337,21 +337,21 @@ std::string ResponseHeader::ToString() const
     if (location_) {
         oss << LOCATION << COLON << SP << *location_ << CRLF;
     }
-    if (proxy_authenticate_) {
-        oss << PROXY_AUTHENTICATE << COLON << SP << *proxy_authenticate_ << CRLF;
+    if (proxyAuthenticate_) {
+        oss << PROXY_AUTHENTICATE << COLON << SP << *proxyAuthenticate_ << CRLF;
     }
-    if (!public_methods_.empty()) {
+    if (!publicMethods_.empty()) {
         oss << PUBLIC << COLON << SP;
-        for (size_t i = 0; i < public_methods_.size(); ++i) {
-            oss << public_methods_[i];
-            if (i + 1 < public_methods_.size()) {
+        for (size_t i = 0; i < publicMethods_.size(); ++i) {
+            oss << publicMethods_[i];
+            if (i + 1 < publicMethods_.size()) {
                 oss << COMMA << SP;
             }
         }
         oss << CRLF;
     }
-    if (retry_after_) {
-        oss << RETRY_AFTER << COLON << SP << *retry_after_ << CRLF;
+    if (retryAfter_) {
+        oss << RETRY_AFTER << COLON << SP << *retryAfter_ << CRLF;
     }
     if (server_) {
         oss << SERVER << COLON << SP << *server_ << CRLF;
@@ -359,98 +359,98 @@ std::string ResponseHeader::ToString() const
     if (vary_) {
         oss << VARY << COLON << SP << *vary_ << CRLF;
     }
-    if (www_authenticate_) {
-        oss << WWW_AUTHENTICATE << COLON << SP << *www_authenticate_ << CRLF;
+    if (wwwAuthenticate_) {
+        oss << WWW_AUTHENTICATE << COLON << SP << *wwwAuthenticate_ << CRLF;
     }
-    if (rtp_info_) {
-        oss << RTP_INFO << COLON << SP << *rtp_info_ << CRLF;
+    if (rtpInfo_) {
+        oss << RTP_INFO << COLON << SP << *rtpInfo_ << CRLF;
     }
-    for (const auto &h : custom_header_) {
+    for (const auto &h : customHeader_) {
         oss << h << CRLF;
     }
     return oss.str();
 }
 
-std::string RTSPResponse::ToString() const
+std::string RtspResponse::ToString() const
 {
     std::ostringstream oss;
     oss << version_ << SP << static_cast<uint16_t>(status_) << SP << GetReasonPhrase(status_) << CRLF;
     for (const auto &[k, v] : general_header_) {
         oss << k << COLON << SP << v << CRLF;
     }
-    oss << response_header_.ToString();
+    oss << responseHeader_.ToString();
     for (const auto &[k, v] : entity_header_) {
         oss << k << COLON << SP << v << CRLF;
     }
     oss << CRLF;
-    if (message_body_) {
-        oss << *message_body_;
+    if (messageBody_) {
+        oss << *messageBody_;
     }
     return oss.str();
 }
 
-// RTSPResponseBuilder implementations
-RTSPResponseBuilder::RTSPResponseBuilder()
+// RtspResponseBuilder implementations
+RtspResponseBuilder::RtspResponseBuilder()
 {
     response_.version_ = RTSP_VERSION;
     response_.status_ = StatusCode::OK;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetStatus(StatusCode status)
+RtspResponseBuilder &RtspResponseBuilder::SetStatus(StatusCode status)
 {
     response_.status_ = status;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetCSeq(int cseq)
+RtspResponseBuilder &RtspResponseBuilder::SetCSeq(int cseq)
 {
     response_.general_header_[CSEQ] = std::to_string(cseq);
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetSession(const std::string &session)
+RtspResponseBuilder &RtspResponseBuilder::SetSession(const std::string &session)
 {
     response_.general_header_[SESSION] = session;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetTransport(const std::string &transport)
+RtspResponseBuilder &RtspResponseBuilder::SetTransport(const std::string &transport)
 {
     response_.general_header_[TRANSPORT] = transport;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetRange(const std::string &range)
+RtspResponseBuilder &RtspResponseBuilder::SetRange(const std::string &range)
 {
     response_.general_header_[RANGE] = range;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetDate(const std::string &date)
+RtspResponseBuilder &RtspResponseBuilder::SetDate(const std::string &date)
 {
     response_.general_header_[DATE] = date;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetLocation(const std::string &location)
+RtspResponseBuilder &RtspResponseBuilder::SetLocation(const std::string &location)
 {
-    response_.response_header_.location_ = location;
+    response_.responseHeader_.location_ = location;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetServer(const std::string &server)
+RtspResponseBuilder &RtspResponseBuilder::SetServer(const std::string &server)
 {
-    response_.response_header_.server_ = server;
+    response_.responseHeader_.server_ = server;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetPublic(const std::vector<std::string> &methods)
+RtspResponseBuilder &RtspResponseBuilder::SetPublic(const std::vector<std::string> &methods)
 {
-    response_.response_header_.public_methods_ = methods;
+    response_.responseHeader_.publicMethods_ = methods;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetPublic(const std::string &methods_str)
+RtspResponseBuilder &RtspResponseBuilder::SetPublic(const std::string &methods_str)
 {
     // Split comma-separated string into method list
     std::vector<std::string> methods;
@@ -458,147 +458,147 @@ RTSPResponseBuilder &RTSPResponseBuilder::SetPublic(const std::string &methods_s
     size_t end = methods_str.find(COMMA);
 
     while (end != std::string::npos) {
-        methods.push_back(RTSPUtils::trim(methods_str.substr(start, end - start)));
+        methods.push_back(RtspUtils::trim(methods_str.substr(start, end - start)));
         start = end + 1;
         end = methods_str.find(COMMA, start);
     }
 
     // Add the last method
     if (start < methods_str.length()) {
-        methods.push_back(RTSPUtils::trim(methods_str.substr(start)));
+        methods.push_back(RtspUtils::trim(methods_str.substr(start)));
     }
 
-    response_.response_header_.public_methods_ = methods;
+    response_.responseHeader_.publicMethods_ = methods;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetWWWAuthenticate(const std::string &auth)
+RtspResponseBuilder &RtspResponseBuilder::SetWWWAuthenticate(const std::string &auth)
 {
-    response_.response_header_.www_authenticate_ = auth;
+    response_.responseHeader_.wwwAuthenticate_ = auth;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetRTPInfo(const std::string &rtp_info)
+RtspResponseBuilder &RtspResponseBuilder::SetRTPInfo(const std::string &rtp_info)
 {
-    response_.response_header_.rtp_info_ = rtp_info;
+    response_.responseHeader_.rtpInfo_ = rtp_info;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::AddCustomHeader(const std::string &header)
+RtspResponseBuilder &RtspResponseBuilder::AddCustomHeader(const std::string &header)
 {
-    response_.response_header_.custom_header_.push_back(header);
+    response_.responseHeader_.customHeader_.push_back(header);
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetContentType(const std::string &content_type)
+RtspResponseBuilder &RtspResponseBuilder::SetContentType(const std::string &content_type)
 {
     response_.entity_header_[CONTENT_TYPE] = content_type;
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetContentLength(size_t length)
+RtspResponseBuilder &RtspResponseBuilder::SetContentLength(size_t length)
 {
     response_.entity_header_[CONTENT_LENGTH] = std::to_string(length);
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetMessageBody(const std::string &body)
+RtspResponseBuilder &RtspResponseBuilder::SetMessageBody(const std::string &body)
 {
-    response_.message_body_ = body;
+    response_.messageBody_ = body;
     if (response_.entity_header_.find(CONTENT_LENGTH) == response_.entity_header_.end()) {
         SetContentLength(body.size());
     }
     return *this;
 }
 
-RTSPResponseBuilder &RTSPResponseBuilder::SetSdp(const std::string &sdp)
+RtspResponseBuilder &RtspResponseBuilder::SetSdp(const std::string &sdp)
 {
     SetContentType(MIME_SDP);
     SetMessageBody(sdp);
     return *this;
 }
 
-RTSPResponse RTSPResponseBuilder::Build() const
+RtspResponse RtspResponseBuilder::Build() const
 {
     return response_;
 }
 
-// RTSPResponseFactory implementations
-RTSPResponseBuilder RTSPResponseFactory::CreateOK(int cseq)
+// RtspResponseFactory implementations
+RtspResponseBuilder RtspResponseFactory::CreateOK(int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateOptionsOK(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateOptionsOK(int cseq)
 {
-    return RTSPResponseBuilder()
+    return RtspResponseBuilder()
         .SetStatus(StatusCode::OK)
         .SetCSeq(cseq)
         .SetPublic({METHOD_OPTIONS, METHOD_DESCRIBE, METHOD_SETUP, METHOD_TEARDOWN, METHOD_PLAY, METHOD_PAUSE,
                     METHOD_ANNOUNCE, METHOD_RECORD, METHOD_GET_PARAMETER, METHOD_SET_PARAMETER});
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateDescribeOK(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateDescribeOK(int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateSetupOK(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateSetupOK(int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreatePlayOK(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreatePlayOK(int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreatePauseOK(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreatePauseOK(int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateTeardownOK(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateTeardownOK(int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateError(StatusCode status, int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateError(StatusCode status, int cseq)
 {
-    return RTSPResponseBuilder().SetStatus(status).SetCSeq(cseq);
+    return RtspResponseBuilder().SetStatus(status).SetCSeq(cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateBadRequest(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateBadRequest(int cseq)
 {
     return CreateError(StatusCode::BadRequest, cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateUnauthorized(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateUnauthorized(int cseq)
 {
     return CreateError(StatusCode::Unauthorized, cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateNotFound(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateNotFound(int cseq)
 {
     return CreateError(StatusCode::NotFound, cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateMethodNotAllowed(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateMethodNotAllowed(int cseq)
 {
     return CreateError(StatusCode::MethodNotAllowed, cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateSessionNotFound(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateSessionNotFound(int cseq)
 {
     return CreateError(StatusCode::SessionNotFound, cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateInternalServerError(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateInternalServerError(int cseq)
 {
     return CreateError(StatusCode::InternalServerError, cseq);
 }
 
-RTSPResponseBuilder RTSPResponseFactory::CreateNotImplemented(int cseq)
+RtspResponseBuilder RtspResponseFactory::CreateNotImplemented(int cseq)
 {
     return CreateError(StatusCode::NotImplemented, cseq);
 }

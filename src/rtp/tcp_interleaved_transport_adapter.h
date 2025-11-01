@@ -16,11 +16,11 @@
 
 namespace lmshao::lmrtsp {
 
-class RTSPSession;
+class RtspSession;
 
 class TcpInterleavedTransportAdapter : public IRtpTransportAdapter {
 public:
-    explicit TcpInterleavedTransportAdapter(std::weak_ptr<RTSPSession> session);
+    explicit TcpInterleavedTransportAdapter(std::weak_ptr<RtspSession> session);
     ~TcpInterleavedTransportAdapter() override;
 
     bool Setup(const TransportConfig &config) override;
@@ -33,7 +33,7 @@ public:
 private:
     bool ValidateChannels(uint8_t rtpChannel, uint8_t rtcpChannel) const;
 
-    std::weak_ptr<RTSPSession> rtspSession_;
+    std::weak_ptr<RtspSession> rtspSession_;
     uint8_t rtpChannel_{0};
     uint8_t rtcpChannel_{1};
     bool isSetup_{false};

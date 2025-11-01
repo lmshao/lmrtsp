@@ -28,7 +28,7 @@
 
 namespace lmshao {
 namespace lmrtsp {
-class RTSPSession;
+class RtspSession;
 class RtpSourceSession;
 
 // Dummy media frame for build-only mode
@@ -51,11 +51,11 @@ enum class StreamState {
 
 /**
  * Media stream manager for RTSP sessions
- * Replaces the functionality of RTPStream with better separation of concerns
+ * Replaces the functionality of RtpStream with better separation of concerns
  */
 class RtspMediaStreamManager {
 public:
-    explicit RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RTSPSession> rtsp_session);
+    explicit RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RtspSession> rtsp_session);
     ~RtspMediaStreamManager();
 
     /**
@@ -125,26 +125,26 @@ private:
      */
     void ProcessFrame(const lmrtsp::MediaFrame &frame);
 
-    std::weak_ptr<lmshao::lmrtsp::RTSPSession> rtsp_session_;
-    std::unique_ptr<RtpSourceSession> rtp_session_;
+    std::weak_ptr<lmshao::lmrtsp::RtspSession> rtspSession_;
+    std::unique_ptr<RtpSourceSession> rtpSession_;
 
     // Persist the transport config to build proper Transport header
     lmshao::lmrtsp::TransportConfig transport_config_{};
 
     StreamState state_;
     std::atomic<bool> active_;
-    std::atomic<bool> send_thread_running_;
+    std::atomic<bool> sendThreadRunning_;
 
     // Media frame queue
-    std::queue<lmrtsp::MediaFrame> frame_queue_;
-    std::mutex queue_mutex_;
-    std::condition_variable queue_condition_;
+    std::queue<lmrtsp::MediaFrame> frameQueue_;
+    std::mutex queueMutex_;
+    std::condition_variable queueCondition_;
 
     // Send thread
-    std::thread send_thread_;
+    std::thread sendThread_;
 
     // RTP parameters
-    uint16_t sequence_number_;
+    uint16_t sequenceNumber_;
     uint32_t timestamp_;
     uint32_t ssrc_;
 };

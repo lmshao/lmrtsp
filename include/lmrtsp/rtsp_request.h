@@ -27,90 +27,90 @@ public:
 
 public:
     std::optional<std::string> accept_;
-    std::optional<std::string> accept_encoding_;
-    std::optional<std::string> accept_language_;
+    std::optional<std::string> acceptEncoding_;
+    std::optional<std::string> acceptLanguage_;
     std::optional<std::string> authorization_;
     std::optional<std::string> from_;
-    std::optional<std::string> if_modified_since_;
+    std::optional<std::string> ifModifiedSince_;
     std::optional<std::string> range_;
     std::optional<std::string> referer_;
-    std::optional<std::string> user_agent_;
-    std::vector<std::string> custom_header_;
+    std::optional<std::string> userAgent_;
+    std::vector<std::string> customHeader_;
 };
 
 // RTSP Request class
-class RTSPRequest {
+class RtspRequest {
 public:
-    RTSPRequest() : version_(RTSP_VERSION) {}
+    RtspRequest() : version_(RTSP_VERSION) {}
     std::string ToString() const;
-    static RTSPRequest FromString(const std::string &req_str);
+    static RtspRequest FromString(const std::string &req_str);
 
     std::map<std::string, std::string> entity_header_;
-    std::optional<std::string> message_body_;
+    std::optional<std::string> messageBody_;
 
 public:
     std::string method_;
     std::string uri_;
     std::string version_;
     std::map<std::string, std::string> general_header_;
-    RequestHeader request_header_;
+    RequestHeader requestHeader_;
 };
 
 // Builder class for constructing RTSP requests
-class RTSPRequestBuilder {
+class RtspRequestBuilder {
 public:
-    RTSPRequestBuilder();
+    RtspRequestBuilder();
 
     // Method setting
-    RTSPRequestBuilder &SetMethod(const std::string &method);
-    RTSPRequestBuilder &SetUri(const std::string &uri);
-    RTSPRequestBuilder &SetCSeq(int cseq);
+    RtspRequestBuilder &SetMethod(const std::string &method);
+    RtspRequestBuilder &SetUri(const std::string &uri);
+    RtspRequestBuilder &SetCSeq(int cseq);
 
     // General headers
-    RTSPRequestBuilder &SetSession(const std::string &session);
-    RTSPRequestBuilder &SetTransport(const std::string &transport);
-    RTSPRequestBuilder &SetRange(const std::string &range);
-    RTSPRequestBuilder &SetLocation(const std::string &location);
-    RTSPRequestBuilder &SetRequire(const std::string &require);
-    RTSPRequestBuilder &SetProxyRequire(const std::string &proxy_require);
+    RtspRequestBuilder &SetSession(const std::string &session);
+    RtspRequestBuilder &SetTransport(const std::string &transport);
+    RtspRequestBuilder &SetRange(const std::string &range);
+    RtspRequestBuilder &SetLocation(const std::string &location);
+    RtspRequestBuilder &SetRequire(const std::string &require);
+    RtspRequestBuilder &SetProxyRequire(const std::string &proxy_require);
 
     // Request headers
-    RTSPRequestBuilder &SetAccept(const std::string &accept);
-    RTSPRequestBuilder &SetUserAgent(const std::string &user_agent);
-    RTSPRequestBuilder &SetAuthorization(const std::string &authorization);
-    RTSPRequestBuilder &AddCustomHeader(const std::string &header);
+    RtspRequestBuilder &SetAccept(const std::string &accept);
+    RtspRequestBuilder &SetUserAgent(const std::string &user_agent);
+    RtspRequestBuilder &SetAuthorization(const std::string &authorization);
+    RtspRequestBuilder &AddCustomHeader(const std::string &header);
 
     // Entity headers
-    RTSPRequestBuilder &SetContentType(const std::string &content_type);
-    RTSPRequestBuilder &SetContentLength(size_t length);
+    RtspRequestBuilder &SetContentType(const std::string &content_type);
+    RtspRequestBuilder &SetContentLength(size_t length);
 
     // Message body
-    RTSPRequestBuilder &SetMessageBody(const std::string &body);
-    RTSPRequestBuilder &SetSdp(const std::string &sdp);
-    RTSPRequestBuilder &SetParameters(const std::vector<std::string> &params);
-    RTSPRequestBuilder &SetParameters(const std::vector<std::pair<std::string, std::string>> &params);
+    RtspRequestBuilder &SetMessageBody(const std::string &body);
+    RtspRequestBuilder &SetSdp(const std::string &sdp);
+    RtspRequestBuilder &SetParameters(const std::vector<std::string> &params);
+    RtspRequestBuilder &SetParameters(const std::vector<std::pair<std::string, std::string>> &params);
 
     // Build the final request
-    RTSPRequest Build() const;
+    RtspRequest Build() const;
 
 private:
-    RTSPRequest request_;
+    RtspRequest request_;
 };
 
 // Factory methods for common request types
-class RTSPRequestFactory {
+class RtspRequestFactory {
 public:
-    static RTSPRequestBuilder CreateOptions(int cseq, const std::string &uri = "*");
-    static RTSPRequestBuilder CreateDescribe(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateAnnounce(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateSetup(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreatePlay(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreatePause(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateTeardown(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateGetParameter(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateSetParameter(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateRedirect(int cseq, const std::string &uri);
-    static RTSPRequestBuilder CreateRecord(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateOptions(int cseq, const std::string &uri = "*");
+    static RtspRequestBuilder CreateDescribe(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateAnnounce(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateSetup(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreatePlay(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreatePause(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateTeardown(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateGetParameter(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateSetParameter(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateRedirect(int cseq, const std::string &uri);
+    static RtspRequestBuilder CreateRecord(int cseq, const std::string &uri);
 };
 
 } // namespace lmshao::lmrtsp

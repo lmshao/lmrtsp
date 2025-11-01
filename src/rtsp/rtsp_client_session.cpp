@@ -13,13 +13,13 @@
 #include <regex>
 #include <sstream>
 
-#include "../internal_logger.h"
+#include "internal_logger.h"
 #include "lmrtsp/media_stream_info.h"
 #include "lmrtsp/rtsp_client.h"
 
 namespace lmshao::lmrtsp {
 
-RTSPClientSession::RTSPClientSession(const std::string &url, std::weak_ptr<RTSPClient> client)
+RtspClientSession::RtspClientSession(const std::string &url, std::weak_ptr<RtspClient> client)
     : url_(url), client_(client)
 {
 
@@ -37,12 +37,12 @@ RTSPClientSession::RTSPClientSession(const std::string &url, std::weak_ptr<RTSPC
     AllocateClientPorts();
 }
 
-RTSPClientSession::~RTSPClientSession()
+RtspClientSession::~RtspClientSession()
 {
     Cleanup();
 }
 
-bool RTSPClientSession::Initialize()
+bool RtspClientSession::Initialize()
 {
     try {
         LMRTSP_LOGI("Initializing RTSP client session: %s for URL: %s", sessionId_.c_str(), url_.c_str());
@@ -56,7 +56,7 @@ bool RTSPClientSession::Initialize()
             mediaPath_ = "/";
         }
 
-        SetState(RTSPClientSessionState::INIT);
+        SetState(RtspClientSessionState::INIT);
         return true;
     } catch (const std::exception &e) {
         LMRTSP_LOGE("Exception initializing session: {}", e.what());
@@ -64,19 +64,19 @@ bool RTSPClientSession::Initialize()
     }
 }
 
-void RTSPClientSession::Cleanup()
+void RtspClientSession::Cleanup()
 {
     try {
         LMRTSP_LOGI("Cleaning up RTSP client session: {}", sessionId_);
 
         StopRtpSession();
-        SetState(RTSPClientSessionState::TEARDOWN);
+        SetState(RtspClientSessionState::TEARDOWN);
     } catch (const std::exception &e) {
         LMRTSP_LOGE("Exception during cleanup: {}", e.what());
     }
 }
 
-bool RTSPClientSession::HandleDescribeResponse(const std::string &sdp)
+bool RtspClientSession::HandleDescribeResponse(const std::string &sdp)
 {
     try {
         LMRTSP_LOGD("Handling DESCRIBE response for session: {}", sessionId_);
@@ -88,7 +88,7 @@ bool RTSPClientSession::HandleDescribeResponse(const std::string &sdp)
             return false;
         }
 
-        SetState(RTSPClientSessionState::READY);
+        SetState(RtspClientSessionState::READY);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -105,7 +105,7 @@ bool RTSPClientSession::HandleDescribeResponse(const std::string &sdp)
     }
 }
 
-bool RTSPClientSession::HandleSetupResponse(const std::string &session_id, const std::string &transport)
+bool RtspClientSession::HandleSetupResponse(const std::string &session_id, const std::string &transport)
 {
     try {
         LMRTSP_LOGD("Handling SETUP response for session: {}", sessionId_);
@@ -135,7 +135,7 @@ bool RTSPClientSession::HandleSetupResponse(const std::string &session_id, const
             return false;
         }
 
-        SetState(RTSPClientSessionState::READY);
+        SetState(RtspClientSessionState::READY);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -152,7 +152,7 @@ bool RTSPClientSession::HandleSetupResponse(const std::string &session_id, const
     }
 }
 
-bool RTSPClientSession::HandlePlayResponse(const std::string &rtp_info)
+bool RtspClientSession::HandlePlayResponse(const std::string &rtp_info)
 {
     try {
         LMRTSP_LOGD("Handling PLAY response for session: {}", sessionId_);
@@ -162,7 +162,7 @@ bool RTSPClientSession::HandlePlayResponse(const std::string &rtp_info)
             return false;
         }
 
-        SetState(RTSPClientSessionState::PLAYING);
+        SetState(RtspClientSessionState::PLAYING);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -180,13 +180,13 @@ bool RTSPClientSession::HandlePlayResponse(const std::string &rtp_info)
     }
 }
 
-bool RTSPClientSession::HandlePauseResponse()
+bool RtspClientSession::HandlePauseResponse()
 {
     try {
         LMRTSP_LOGD("Handling PAUSE response for session: {}", sessionId_);
 
         StopRtpSession();
-        SetState(RTSPClientSessionState::PAUSED);
+        SetState(RtspClientSessionState::PAUSED);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -204,13 +204,13 @@ bool RTSPClientSession::HandlePauseResponse()
     }
 }
 
-bool RTSPClientSession::HandleTeardownResponse()
+bool RtspClientSession::HandleTeardownResponse()
 {
     try {
         LMRTSP_LOGD("Handling TEARDOWN response for session: {}", sessionId_);
 
         StopRtpSession();
-        SetState(RTSPClientSessionState::TEARDOWN);
+        SetState(RtspClientSessionState::TEARDOWN);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -228,10 +228,10 @@ bool RTSPClientSession::HandleTeardownResponse()
     }
 }
 
-void RTSPClientSession::SetState(RTSPClientSessionState new_state)
+void RtspClientSession::SetState(RtspClientSessionState new_state)
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
-    RTSPClientSessionState old_state = state_.load();
+    RtspClientSessionState old_state = state_.load();
     state_.store(new_state);
 
     LMRTSP_LOGD("Session {} state changed: {} -> {}", sessionId_, GetStateString(old_state), GetStateString(new_state));
@@ -245,47 +245,47 @@ void RTSPClientSession::SetState(RTSPClientSessionState new_state)
     }
 }
 
-RTSPClientSessionState RTSPClientSession::GetState() const
+RtspClientSessionState RtspClientSession::GetState() const
 {
     return state_.load();
 }
 
-std::string RTSPClientSession::GetStateString() const
+std::string RtspClientSession::GetStateString() const
 {
     return GetStateString(state_.load());
 }
 
-std::string RTSPClientSession::GetStateString(RTSPClientSessionState state)
+std::string RtspClientSession::GetStateString(RtspClientSessionState state)
 {
     switch (state) {
-        case RTSPClientSessionState::INIT:
+        case RtspClientSessionState::INIT:
             return "INIT";
-        case RTSPClientSessionState::READY:
+        case RtspClientSessionState::READY:
             return "READY";
-        case RTSPClientSessionState::PLAYING:
+        case RtspClientSessionState::PLAYING:
             return "PLAYING";
-        case RTSPClientSessionState::PAUSED:
+        case RtspClientSessionState::PAUSED:
             return "PAUSED";
-        case RTSPClientSessionState::TEARDOWN:
+        case RtspClientSessionState::TEARDOWN:
             return "TEARDOWN";
         default:
             return "UNKNOWN";
     }
 }
 
-std::shared_ptr<MediaStreamInfo> RTSPClientSession::GetMediaStreamInfo() const
+std::shared_ptr<MediaStreamInfo> RtspClientSession::GetMediaStreamInfo() const
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     return mediaStreamInfo_;
 }
 
-std::string RTSPClientSession::GetMediaPath() const
+std::string RtspClientSession::GetMediaPath() const
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     return mediaPath_;
 }
 
-bool RTSPClientSession::StartRtpSession()
+bool RtspClientSession::StartRtpSession()
 {
     try {
         std::lock_guard<std::mutex> lock(sessionMutex_);
@@ -308,7 +308,7 @@ bool RTSPClientSession::StartRtpSession()
     }
 }
 
-void RTSPClientSession::StopRtpSession()
+void RtspClientSession::StopRtpSession()
 {
     try {
         std::lock_guard<std::mutex> lock(sessionMutex_);
@@ -323,19 +323,19 @@ void RTSPClientSession::StopRtpSession()
     }
 }
 
-void RTSPClientSession::SetTransportConfig(const TransportConfig &config)
+void RtspClientSession::SetTransportConfig(const TransportConfig &config)
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     transportConfig_ = config;
 }
 
-TransportConfig RTSPClientSession::GetTransportConfig() const
+TransportConfig RtspClientSession::GetTransportConfig() const
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     return transportConfig_;
 }
 
-void RTSPClientSession::OnFrame(const std::shared_ptr<MediaFrame> &frame)
+void RtspClientSession::OnFrame(const std::shared_ptr<MediaFrame> &frame)
 {
     try {
         if (!frame) {
@@ -366,7 +366,7 @@ void RTSPClientSession::OnFrame(const std::shared_ptr<MediaFrame> &frame)
     }
 }
 
-void RTSPClientSession::OnError(int code, const std::string &message)
+void RtspClientSession::OnError(int code, const std::string &message)
 {
     LMRTSP_LOGE("RTP session error: {} - {}", code, message);
 
@@ -380,7 +380,7 @@ void RTSPClientSession::OnError(int code, const std::string &message)
 }
 
 // Private methods
-bool RTSPClientSession::ParseSDP(const std::string &sdp)
+bool RtspClientSession::ParseSDP(const std::string &sdp)
 {
     try {
         LMRTSP_LOGD("Parsing SDP:\n{}", sdp);
@@ -454,7 +454,7 @@ bool RTSPClientSession::ParseSDP(const std::string &sdp)
     }
 }
 
-bool RTSPClientSession::SetupRtpSession()
+bool RtspClientSession::SetupRtpSession()
 {
     try {
         if (rtpSession_) {
@@ -488,7 +488,7 @@ bool RTSPClientSession::SetupRtpSession()
     }
 }
 
-std::string RTSPClientSession::AllocateClientPorts()
+std::string RtspClientSession::AllocateClientPorts()
 {
     try {
         // Allocate client ports (simplified - in real implementation should check for port availability)
@@ -511,7 +511,7 @@ std::string RTSPClientSession::AllocateClientPorts()
     }
 }
 
-std::string RTSPClientSession::GenerateTransportHeader()
+std::string RtspClientSession::GenerateTransportHeader()
 {
     std::ostringstream transport;
     transport << "RTP/AVP;unicast;client_port=" << clientRtpPort_ << "-" << clientRtcpPort_;

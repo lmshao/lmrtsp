@@ -28,8 +28,8 @@ public:
 private:
     void FlushFrame();
     std::vector<uint8_t> pending_;
-    uint32_t current_timestamp_ = 0;
-    bool have_frame_data_ = false;
+    uint32_t currentTimestamp_ = 0;
+    bool haveFrameData_ = false;
 };
 
 } // namespace lmshao::lmrtsp

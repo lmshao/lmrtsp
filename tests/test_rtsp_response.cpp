@@ -16,7 +16,7 @@ using namespace lmshao::lmrtsp;
 
 void test_rtsp_response_basic_construction()
 {
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(1).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(1).Build();
 
     std::string response_str = response.ToString();
 
@@ -26,7 +26,7 @@ void test_rtsp_response_basic_construction()
 
 void test_rtsp_response_factory_ok()
 {
-    auto ok_response = RTSPResponseFactory::CreateOK(1).SetServer("TestServer/1.0").Build();
+    auto ok_response = RtspResponseFactory::CreateOK(1).SetServer("TestServer/1.0").Build();
 
     std::string response_str = ok_response.ToString();
 
@@ -37,7 +37,7 @@ void test_rtsp_response_factory_ok()
 
 void test_rtsp_response_factory_options_ok()
 {
-    auto options_response = RTSPResponseFactory::CreateOptionsOK(1).SetServer("TestServer/1.0").Build();
+    auto options_response = RtspResponseFactory::CreateOptionsOK(1).SetServer("TestServer/1.0").Build();
 
     std::string response_str = options_response.ToString();
 
@@ -51,7 +51,7 @@ void test_rtsp_response_factory_describe_ok()
 {
     std::string test_sdp = "v=0\r\no=- 123 456 IN IP4 192.168.1.1\r\ns=Test Session\r\n";
     auto describe_response =
-        RTSPResponseFactory::CreateDescribeOK(2).SetServer("TestServer/1.0").SetSdp(test_sdp).Build();
+        RtspResponseFactory::CreateDescribeOK(2).SetServer("TestServer/1.0").SetSdp(test_sdp).Build();
 
     std::string response_str = describe_response.ToString();
 
@@ -64,7 +64,7 @@ void test_rtsp_response_factory_describe_ok()
 
 void test_rtsp_response_factory_setup_ok()
 {
-    auto setup_response = RTSPResponseFactory::CreateSetupOK(3)
+    auto setup_response = RtspResponseFactory::CreateSetupOK(3)
                               .SetSession("ABCD1234")
                               .SetTransport("RTP/AVP/UDP;unicast;client_port=4588-4589;server_port=6256-6257")
                               .Build();
@@ -79,7 +79,7 @@ void test_rtsp_response_factory_setup_ok()
 
 void test_rtsp_response_factory_play_ok()
 {
-    auto play_response = RTSPResponseFactory::CreatePlayOK(4)
+    auto play_response = RtspResponseFactory::CreatePlayOK(4)
                              .SetSession("ABCD1234")
                              .SetRange("npt=0-")
                              .SetRTPInfo("url=rtsp://example.com/stream/track1;seq=45102;rtptime=2890844526")
@@ -99,20 +99,20 @@ void test_rtsp_response_error_codes()
     struct ErrorTest {
         StatusCode code;
         std::string expected_line;
-        std::function<RTSPResponseBuilder()> factory_func;
+        std::function<RtspResponseBuilder()> factory_func;
     };
 
     std::vector<ErrorTest> error_tests = {
-        {StatusCode::BadRequest, "RTSP/1.0 400 Bad Request", []() { return RTSPResponseFactory::CreateBadRequest(1); }},
+        {StatusCode::BadRequest, "RTSP/1.0 400 Bad Request", []() { return RtspResponseFactory::CreateBadRequest(1); }},
         {StatusCode::Unauthorized, "RTSP/1.0 401 Unauthorized",
-         []() { return RTSPResponseFactory::CreateUnauthorized(2); }},
-        {StatusCode::NotFound, "RTSP/1.0 404 Not Found", []() { return RTSPResponseFactory::CreateNotFound(3); }},
+         []() { return RtspResponseFactory::CreateUnauthorized(2); }},
+        {StatusCode::NotFound, "RTSP/1.0 404 Not Found", []() { return RtspResponseFactory::CreateNotFound(3); }},
         {StatusCode::MethodNotAllowed, "RTSP/1.0 405 Method Not Allowed",
-         []() { return RTSPResponseFactory::CreateMethodNotAllowed(4); }},
+         []() { return RtspResponseFactory::CreateMethodNotAllowed(4); }},
         {StatusCode::SessionNotFound, "RTSP/1.0 454 Session Not Found",
-         []() { return RTSPResponseFactory::CreateSessionNotFound(5); }},
+         []() { return RtspResponseFactory::CreateSessionNotFound(5); }},
         {StatusCode::InternalServerError, "RTSP/1.0 500 Internal Server Error",
-         []() { return RTSPResponseFactory::CreateInternalServerError(6); }}};
+         []() { return RtspResponseFactory::CreateInternalServerError(6); }}};
 
     for (const auto &test : error_tests) {
         auto response = test.factory_func().Build();
@@ -123,7 +123,7 @@ void test_rtsp_response_error_codes()
 
 void test_rtsp_response_custom_headers()
 {
-    auto response = RTSPResponseBuilder()
+    auto response = RtspResponseBuilder()
                         .SetStatus(StatusCode::Created)
                         .SetCSeq(7)
                         .SetServer("TestServer/1.0")
@@ -141,7 +141,7 @@ void test_rtsp_response_custom_headers()
 void test_rtsp_response_with_body()
 {
     std::string body_content = "packets_received: 1000\r\njitter: 0.01\r\npacket_loss: 0";
-    auto response = RTSPResponseBuilder()
+    auto response = RtspResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(8)
                         .SetContentType("text/parameters")
@@ -157,7 +157,7 @@ void test_rtsp_response_with_body()
 
 void test_rtsp_response_unauthorized_with_auth()
 {
-    auto auth_response = RTSPResponseFactory::CreateUnauthorized(9)
+    auto auth_response = RtspResponseFactory::CreateUnauthorized(9)
                              .SetWWWAuthenticate("Digest realm=\"MyRTSPServer\", nonce=\"b64token\", algorithm=\"MD5\"")
                              .Build();
 
@@ -192,11 +192,11 @@ void test_rtsp_response_status_code_coverage()
         {StatusCode::NotImplemented, "501 Not Implemented"},
         {StatusCode::BadGateway, "502 Bad Gateway"},
         {StatusCode::ServiceUnavailable, "503 Service Unavailable"},
-        {StatusCode::RTSPVersionNotSupported, "505 RTSP Version not supported"},
+        {StatusCode::RtspVersionNotSupported, "505 RTSP Version not supported"},
         {StatusCode::OptionNotSupported, "551 Option not supported"}};
 
     for (const auto &test : status_tests) {
-        auto response = RTSPResponseBuilder().SetStatus(test.code).SetCSeq(1).Build();
+        auto response = RtspResponseBuilder().SetStatus(test.code).SetCSeq(1).Build();
 
         std::string response_str = response.ToString();
         ASSERT_STR_CONTAINS(response_str, test.expected_line);
@@ -220,21 +220,21 @@ void test_rtsp_response_header_parsing()
     ASSERT_TRUE(header.location_.has_value());
     ASSERT_STR_EQ(*header.location_, "rtsp://example.com/newpath");
 
-    ASSERT_TRUE(header.rtp_info_.has_value());
-    ASSERT_STR_EQ(*header.rtp_info_, "url=rtsp://example.com/video;seq=12345;rtptime=2000");
+    ASSERT_TRUE(header.rtpInfo_.has_value());
+    ASSERT_STR_EQ(*header.rtpInfo_, "url=rtsp://example.com/video;seq=12345;rtptime=2000");
 
-    ASSERT_EQ(header.public_methods_.size(), 6);
-    ASSERT_STR_EQ(header.public_methods_[0], "OPTIONS");
-    ASSERT_STR_EQ(header.public_methods_[1], "DESCRIBE");
-    ASSERT_STR_EQ(header.public_methods_[5], "PAUSE");
+    ASSERT_EQ(header.publicMethods_.size(), 6);
+    ASSERT_STR_EQ(header.publicMethods_[0], "OPTIONS");
+    ASSERT_STR_EQ(header.publicMethods_[1], "DESCRIBE");
+    ASSERT_STR_EQ(header.publicMethods_[5], "PAUSE");
 
-    ASSERT_EQ(header.custom_header_.size(), 1);
-    ASSERT_STR_EQ(header.custom_header_[0], "Custom-Response-Header: custom-value");
+    ASSERT_EQ(header.customHeader_.size(), 1);
+    ASSERT_STR_EQ(header.customHeader_[0], "Custom-Response-Header: custom-value");
 }
 
 void test_rtsp_response_full_parsing()
 {
-    // Test RTSPResponse::FromString with complete response
+    // Test RtspResponse::FromString with complete response
     std::string response_str = "RTSP/1.0 200 OK\r\n"
                                "CSeq: 2\r\n"
                                "Server: MyRTSPServer/1.0\r\n"
@@ -245,7 +245,7 @@ void test_rtsp_response_full_parsing()
                                "\r\n"
                                "v=0\r\no=- 123456 654321";
 
-    RTSPResponse response = RTSPResponse::FromString(response_str);
+    RtspResponse response = RtspResponse::FromString(response_str);
 
     // Check status line
     ASSERT_STR_EQ(response.version_, "RTSP/1.0");
@@ -258,29 +258,29 @@ void test_rtsp_response_full_parsing()
                   "RTP/AVP;unicast;client_port=8000-8001;server_port=9000-9001");
 
     // Check response headers
-    ASSERT_TRUE(response.response_header_.server_.has_value());
-    ASSERT_STR_EQ(*response.response_header_.server_, "MyRTSPServer/1.0");
+    ASSERT_TRUE(response.responseHeader_.server_.has_value());
+    ASSERT_STR_EQ(*response.responseHeader_.server_, "MyRTSPServer/1.0");
 
     // Check entity headers
     ASSERT_STR_EQ(response.entity_header_.at("Content-Type"), "application/sdp");
     ASSERT_STR_EQ(response.entity_header_.at("Content-Length"), "25");
 
     // Check message body
-    ASSERT_TRUE(response.message_body_.has_value());
-    ASSERT_STR_EQ(*response.message_body_, "v=0\r\no=- 123456 654321");
+    ASSERT_TRUE(response.messageBody_.has_value());
+    ASSERT_STR_EQ(*response.messageBody_, "v=0\r\no=- 123456 654321");
 }
 
 void test_rtsp_response_roundtrip()
 {
     // Test round-trip: build -> toString -> parse -> toString
-    auto original_response = RTSPResponseFactory::CreateDescribeOK(123)
+    auto original_response = RtspResponseFactory::CreateDescribeOK(123)
                                  .SetServer("TestServer/1.0")
                                  .SetSession("abcdef123456")
                                  .SetSdp("v=0\r\no=- 123 456 IN IP4 127.0.0.1")
                                  .Build();
 
     std::string response_str = original_response.ToString();
-    RTSPResponse parsed_response = RTSPResponse::FromString(response_str);
+    RtspResponse parsed_response = RtspResponse::FromString(response_str);
     std::string reparsed_str = parsed_response.ToString();
 
     // Check that key components are preserved
@@ -288,13 +288,13 @@ void test_rtsp_response_roundtrip()
     ASSERT_EQ(static_cast<int>(parsed_response.status_), 200);
     ASSERT_STR_EQ(parsed_response.general_header_.at("CSeq"), "123");
 
-    ASSERT_TRUE(parsed_response.response_header_.server_.has_value());
-    ASSERT_STR_EQ(*parsed_response.response_header_.server_, "TestServer/1.0");
+    ASSERT_TRUE(parsed_response.responseHeader_.server_.has_value());
+    ASSERT_STR_EQ(*parsed_response.responseHeader_.server_, "TestServer/1.0");
 
     ASSERT_STR_EQ(parsed_response.general_header_.at("Session"), "abcdef123456");
 
-    ASSERT_TRUE(parsed_response.message_body_.has_value());
-    ASSERT_STR_EQ(*parsed_response.message_body_, "v=0\r\no=- 123 456 IN IP4 127.0.0.1");
+    ASSERT_TRUE(parsed_response.messageBody_.has_value());
+    ASSERT_STR_EQ(*parsed_response.messageBody_, "v=0\r\no=- 123 456 IN IP4 127.0.0.1");
 }
 
 void test_rtsp_response_error_parsing()
@@ -307,16 +307,16 @@ void test_rtsp_response_error_parsing()
                                 "Server: MyRTSPServer/1.0\r\n"
                                 "\r\n";
 
-    RTSPResponse not_found = RTSPResponse::FromString(not_found_str);
+    RtspResponse not_found = RtspResponse::FromString(not_found_str);
     ASSERT_STR_EQ(not_found.version_, "RTSP/1.0");
     ASSERT_EQ(static_cast<int>(not_found.status_), 404);
     ASSERT_STR_EQ(not_found.general_header_.at("CSeq"), "5");
-    ASSERT_TRUE(not_found.response_header_.server_.has_value());
-    ASSERT_STR_EQ(*not_found.response_header_.server_, "MyRTSPServer/1.0");
+    ASSERT_TRUE(not_found.responseHeader_.server_.has_value());
+    ASSERT_STR_EQ(*not_found.responseHeader_.server_, "MyRTSPServer/1.0");
 
     // Test 500 Internal Server Error
     std::string server_error_str = "RTSP/1.0 500 Internal Server Error\r\n\r\n";
-    RTSPResponse server_error = RTSPResponse::FromString(server_error_str);
+    RtspResponse server_error = RtspResponse::FromString(server_error_str);
     ASSERT_STR_EQ(server_error.version_, "RTSP/1.0");
     ASSERT_EQ(static_cast<int>(server_error.status_), 500);
 }
@@ -326,16 +326,16 @@ void test_rtsp_response_malformed_parsing()
     // Test parsing of malformed responses
 
     // Empty string
-    RTSPResponse empty_response = RTSPResponse::FromString("");
+    RtspResponse empty_response = RtspResponse::FromString("");
     ASSERT_STR_EQ(empty_response.version_, "RTSP/1.0");       // Default value
     ASSERT_EQ(static_cast<int>(empty_response.status_), 200); // Default value
 
     // Invalid status line
-    RTSPResponse invalid_response = RTSPResponse::FromString("INVALID STATUS LINE\r\n");
+    RtspResponse invalid_response = RtspResponse::FromString("INVALID STATUS LINE\r\n");
     ASSERT_EQ(static_cast<int>(invalid_response.status_), 500); // Error default
 
     // Missing headers but valid status line
-    RTSPResponse minimal_response = RTSPResponse::FromString("RTSP/1.0 200 OK\r\n\r\n");
+    RtspResponse minimal_response = RtspResponse::FromString("RTSP/1.0 200 OK\r\n\r\n");
     ASSERT_STR_EQ(minimal_response.version_, "RTSP/1.0");
     ASSERT_EQ(static_cast<int>(minimal_response.status_), 200);
 }

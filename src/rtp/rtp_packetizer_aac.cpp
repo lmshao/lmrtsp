@@ -31,7 +31,7 @@ void RtpPacketizerAac::SubmitFrame(const std::shared_ptr<MediaFrame> &frame)
 
     // Simple fragmentation without RFC3640 AU headers (basic payloading).
     // If needed later, AU headers can be added.
-    size_t max_payload = mtu_size_ - RtpHeaderSize();
+    size_t max_payload = mtuSize_ - RtpHeaderSize();
     if (max_payload <= 0)
         return;
 
@@ -42,8 +42,8 @@ void RtpPacketizerAac::SubmitFrame(const std::shared_ptr<MediaFrame> &frame)
 
         auto packet = std::make_shared<RtpPacket>();
         packet->version = 2;
-        packet->payload_type = payload_type_;
-        packet->sequence_number = sequence_number_++;
+        packet->payload_type = payloadType_;
+        packet->sequence_number = sequenceNumber_++;
         packet->timestamp = timestamp;
         packet->ssrc = ssrc_;
         packet->marker = is_last ? 1 : 0;

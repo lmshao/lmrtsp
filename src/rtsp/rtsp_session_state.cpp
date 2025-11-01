@@ -15,14 +15,13 @@
 
 namespace lmshao::lmrtsp {
 
-// Common RTSP method handling functions
 namespace {
 
-RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
+RtspResponse HandleOptions(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing OPTIONS request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder()
+    auto response = RtspResponseBuilder()
                         .SetStatus(StatusCode::OK)
                         .SetCSeq(cseq)
                         .SetPublic("OPTIONS, DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE")
@@ -30,11 +29,11 @@ RTSPResponse HandleOptions(RTSPSession *session, const RTSPRequest &request)
     return response;
 }
 
-RTSPResponse HandleDescribe(RTSPSession *session, const RTSPRequest &request)
+RtspResponse HandleDescribe(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing DESCRIBE request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    RTSPResponseBuilder builder;
+    RtspResponseBuilder builder;
 
     // Get server reference from session
     auto server = session->GetRTSPServer();
@@ -65,79 +64,79 @@ RTSPResponse HandleDescribe(RTSPSession *session, const RTSPRequest &request)
     }
 }
 
-RTSPResponse HandleGetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse HandleGetParameter(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing GET_PARAMETER request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse HandleSetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse HandleSetParameter(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing SET_PARAMETER request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse HandleAnnounce(RTSPSession *session, const RTSPRequest &request)
+RtspResponse HandleAnnounce(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing ANNOUNCE request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse HandleRecord(RTSPSession *session, const RTSPRequest &request)
+RtspResponse HandleRecord(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing RECORD request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::NotImplemented).SetCSeq(cseq).Build();
     return response;
 }
 
 } // namespace
 
 // InitialState implementations
-RTSPResponse InitialState::OnOptions(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnOptions(RtspSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RTSPResponse InitialState::OnDescribe(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnDescribe(RtspSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RTSPResponse InitialState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnAnnounce(RtspSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RTSPResponse InitialState::OnRecord(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnRecord(RtspSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse InitialState::OnGetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnGetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RTSPResponse InitialState::OnSetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnSetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RTSPResponse InitialState::OnSetup(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnSetup(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing SETUP request in InitialState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     if (session->SetupMedia(request.uri_, request.general_header_.at("Transport"))) {
         session->ChangeState(ReadyState::GetInstance());
-        auto response = RTSPResponseBuilder()
+        auto response = RtspResponseBuilder()
                             .SetStatus(StatusCode::OK)
                             .SetCSeq(cseq)
                             .SetSession(session->GetSessionId())
@@ -145,83 +144,83 @@ RTSPResponse InitialState::OnSetup(RTSPSession *session, const RTSPRequest &requ
                             .Build();
         return response;
     } else {
-        auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
+        auto response = RtspResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
         return response;
     }
 }
 
-RTSPResponse InitialState::OnPlay(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnPlay(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse InitialState::OnPause(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnPause(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse InitialState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
+RtspResponse InitialState::OnTeardown(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
 // ReadyState implementations
-RTSPResponse ReadyState::OnOptions(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnOptions(RtspSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RTSPResponse ReadyState::OnDescribe(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnDescribe(RtspSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RTSPResponse ReadyState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnAnnounce(RtspSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RTSPResponse ReadyState::OnRecord(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnRecord(RtspSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse ReadyState::OnGetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnGetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RTSPResponse ReadyState::OnSetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnSetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RTSPResponse ReadyState::OnSetup(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnSetup(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse ReadyState::OnPlay(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnPlay(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing PLAY request in ReadyState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     std::string range = "";
-    if (request.request_header_.range_) {
-        range = *request.request_header_.range_;
+    if (request.requestHeader_.range_) {
+        range = *request.requestHeader_.range_;
     }
 
     if (session->PlayMedia(request.uri_, range)) {
         session->ChangeState(PlayingState::GetInstance());
-        auto response = RTSPResponseBuilder()
+        auto response = RtspResponseBuilder()
                             .SetStatus(StatusCode::OK)
                             .SetCSeq(cseq)
                             .SetSession(session->GetSessionId())
@@ -230,19 +229,19 @@ RTSPResponse ReadyState::OnPlay(RTSPSession *session, const RTSPRequest &request
                             .Build();
         return response;
     } else {
-        auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
+        auto response = RtspResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
         return response;
     }
 }
 
-RTSPResponse ReadyState::OnPause(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnPause(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse ReadyState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
+RtspResponse ReadyState::OnTeardown(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing TEARDOWN request in ReadyState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -250,71 +249,71 @@ RTSPResponse ReadyState::OnTeardown(RTSPSession *session, const RTSPRequest &req
     session->TeardownMedia(request.uri_);
     session->ChangeState(InitialState::GetInstance());
 
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
 // PlayingState implementations
-RTSPResponse PlayingState::OnOptions(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnOptions(RtspSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RTSPResponse PlayingState::OnDescribe(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnDescribe(RtspSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RTSPResponse PlayingState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnAnnounce(RtspSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RTSPResponse PlayingState::OnRecord(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnRecord(RtspSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse PlayingState::OnGetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnGetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RTSPResponse PlayingState::OnSetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnSetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RTSPResponse PlayingState::OnSetup(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnSetup(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse PlayingState::OnPlay(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnPlay(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse PlayingState::OnPause(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnPause(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing PAUSE request in PlayingState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     if (session->PauseMedia(request.uri_)) {
         session->ChangeState(PausedState::GetInstance());
-        auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+        auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
         return response;
     } else {
-        auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
+        auto response = RtspResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
         return response;
     }
 }
 
-RTSPResponse PlayingState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PlayingState::OnTeardown(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing TEARDOWN request in PlayingState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -322,61 +321,61 @@ RTSPResponse PlayingState::OnTeardown(RTSPSession *session, const RTSPRequest &r
     session->TeardownMedia(request.uri_);
     session->ChangeState(InitialState::GetInstance());
 
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
 // PausedState implementations
-RTSPResponse PausedState::OnOptions(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnOptions(RtspSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RTSPResponse PausedState::OnDescribe(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnDescribe(RtspSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RTSPResponse PausedState::OnAnnounce(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnAnnounce(RtspSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RTSPResponse PausedState::OnRecord(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnRecord(RtspSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RTSPResponse PausedState::OnGetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnGetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RTSPResponse PausedState::OnSetParameter(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnSetParameter(RtspSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RTSPResponse PausedState::OnSetup(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnSetup(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse PausedState::OnPlay(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnPlay(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing PLAY request in PausedState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
 
     std::string range = "";
-    if (request.request_header_.range_) {
-        range = *request.request_header_.range_;
+    if (request.requestHeader_.range_) {
+        range = *request.requestHeader_.range_;
     }
 
     if (session->PlayMedia(request.uri_, range)) {
         session->ChangeState(PlayingState::GetInstance());
-        auto response = RTSPResponseBuilder()
+        auto response = RtspResponseBuilder()
                             .SetStatus(StatusCode::OK)
                             .SetCSeq(cseq)
                             .SetSession(session->GetSessionId())
@@ -385,19 +384,19 @@ RTSPResponse PausedState::OnPlay(RTSPSession *session, const RTSPRequest &reques
                             .Build();
         return response;
     } else {
-        auto response = RTSPResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
+        auto response = RtspResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
         return response;
     }
 }
 
-RTSPResponse PausedState::OnPause(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnPause(RtspSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-RTSPResponse PausedState::OnTeardown(RTSPSession *session, const RTSPRequest &request)
+RtspResponse PausedState::OnTeardown(RtspSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing TEARDOWN request in PausedState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -405,11 +404,11 @@ RTSPResponse PausedState::OnTeardown(RTSPSession *session, const RTSPRequest &re
     session->TeardownMedia(request.uri_);
     session->ChangeState(InitialState::GetInstance());
 
-    auto response = RTSPResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
+    auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-// RTSPSessionState is an abstract base class - no default implementations needed
+// RtspSessionState is an abstract base class - no default implementations needed
 
 // GetName functions are implemented inline in the header file
 

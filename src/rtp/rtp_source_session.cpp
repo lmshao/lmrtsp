@@ -59,12 +59,12 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
     }
 
     // Initialize sequence number and timestamp
-    sequence_number_ = GenerateRandomSequenceNumber();
+    sequenceNumber_ = GenerateRandomSequenceNumber();
     timestamp_ = 0;
 
     // Create transport adapter based on config
     if (config_.transport.type == TransportConfig::Type::UDP) {
-        transport_adapter_ = std::make_unique<UdpRtpTransportAdapter>();
+        transportAdapter_ = std::make_unique<UdpRtpTransportAdapter>();
     } else if (config_.transport.type == TransportConfig::Type::TCP_INTERLEAVED) {
         // For TCP interleaved, we need RTSP session - simplified implementation
         // In real implementation, this would need proper RTSP session reference
@@ -75,29 +75,29 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
     }
 
     // Setup transport immediately (needed for port allocation)
-    if (transport_adapter_) {
-        if (!transport_adapter_->Setup(config_.transport)) {
+    if (transportAdapter_) {
+        if (!transportAdapter_->Setup(config_.transport)) {
             LMRTSP_LOGE("Failed to setup transport in Initialize");
-            transport_adapter_.reset();
+            transportAdapter_.reset();
             return false;
         }
     }
 
     // Create video packetizer
     if (config_.video_type == MediaType::H264) {
-        video_packetizer_ =
-            std::make_unique<RtpPacketizerH264>(config_.ssrc, sequence_number_, config_.video_payload_type,
+        videoPacketizer_ =
+            std::make_unique<RtpPacketizerH264>(config_.ssrc, sequenceNumber_, config_.video_payload_type,
                                                 90000, // H264 clock rate
                                                 config_.mtu_size);
         // Set up listener for video packetizer
-        video_listener_ = std::static_pointer_cast<IRtpPacketizerListener>(
-            std::make_shared<PacketizerListener>(transport_adapter_.get()));
-        video_packetizer_->SetListener(video_listener_);
+        videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
+            std::make_shared<PacketizerListener>(transportAdapter_.get()));
+        videoPacketizer_->SetListener(videoListener_);
     }
 
     // Check if video packetizer was created
-    if (!video_packetizer_) {
-        transport_adapter_.reset();
+    if (!videoPacketizer_) {
+        transportAdapter_.reset();
         return false;
     }
 
@@ -118,7 +118,7 @@ bool RtpSourceSession::Start()
     }
 
     // Transport is already setup in Initialize(), just mark as running
-    if (!transport_adapter_ || !transport_adapter_->IsActive()) {
+    if (!transportAdapter_ || !transportAdapter_->IsActive()) {
         LMRTSP_LOGE("Transport not ready");
         return false;
     }
@@ -137,19 +137,19 @@ void RtpSourceSession::Stop()
     running_ = false;
 
     // Clean up packetizers
-    video_packetizer_.reset();
+    videoPacketizer_.reset();
 
     // Clean up transport
-    if (transport_adapter_) {
-        transport_adapter_->Close();
-        transport_adapter_.reset();
+    if (transportAdapter_) {
+        transportAdapter_->Close();
+        transportAdapter_.reset();
     }
 }
 
 std::string RtpSourceSession::GetTransportInfo() const
 {
-    if (transport_adapter_) {
-        return transport_adapter_->GetTransportInfo();
+    if (transportAdapter_) {
+        return transportAdapter_->GetTransportInfo();
     }
     return "";
 }
@@ -164,9 +164,9 @@ bool RtpSourceSession::SendFrame(const std::shared_ptr<MediaFrame> &frame)
     }
 
     // Only support H264 video frames
-    if (frame->media_type != MediaType::H264 || !video_packetizer_) {
+    if (frame->media_type != MediaType::H264 || !videoPacketizer_) {
         LMRTSP_LOGE("SendFrame failed - media_type: %d, video_packetizer: %s", static_cast<int>(frame->media_type),
-                    video_packetizer_ ? "valid" : "null");
+                    videoPacketizer_ ? "valid" : "null");
         return false; // Unsupported media type or no video packetizer
     }
 
@@ -175,7 +175,7 @@ bool RtpSourceSession::SendFrame(const std::shared_ptr<MediaFrame> &frame)
     // Submit frame for packetization
     // The listener is already set up during initialization
     try {
-        video_packetizer_->SubmitFrame(frame);
+        videoPacketizer_->SubmitFrame(frame);
         LMRTSP_LOGI("Frame submitted to packetizer successfully");
     } catch (const std::exception &e) {
         LMRTSP_LOGE("Exception in SubmitFrame: %s", e.what());

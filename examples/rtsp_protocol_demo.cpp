@@ -20,10 +20,10 @@
 using namespace lmshao::lmrtsp;
 
 // Global server instance for signal handling
-std::shared_ptr<RTSPServer> g_server;
+std::shared_ptr<RtspServer> g_server;
 
 // RTSP Server Callback Implementation
-class RTSPProtocolCallback : public IRTSPServerCallback {
+class RtspProtocolCallback : public IRtspServerCallback {
 public:
     void OnClientConnected(const std::string &client_ip, const std::string &user_agent) override
     {
@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
     signal(SIGINT, signalHandler);
 
     // Get RTSP server instance
-    g_server = RTSPServer::GetInstance();
+    g_server = RtspServer::GetInstance();
 
     // Configure server parameters
     std::string ip = "0.0.0.0";
@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
     }
 
     // Create and set callback
-    auto callback = std::make_shared<RTSPProtocolCallback>();
+    auto callback = std::make_shared<RtspProtocolCallback>();
     g_server->SetCallback(callback);
     std::cout << "[INFO] RTSP callback handler registered" << std::endl;
 

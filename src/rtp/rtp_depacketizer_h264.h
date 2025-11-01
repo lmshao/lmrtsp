@@ -30,11 +30,11 @@ private:
     void ResetState(); // Reset depacketizer state on error
 
     std::vector<uint8_t> pending_;
-    uint32_t current_timestamp_ = 0;
-    uint16_t last_sequence_number_ = 0; // Track sequence numbers
-    bool sequence_initialized_ = false;
-    bool have_frame_data_ = false;
-    bool fua_active_ = false;
+    uint32_t currentTimestamp_ = 0;
+    uint16_t lastSequenceNumber_ = 0; // Track sequence numbers
+    bool sequenceInitialized_ = false;
+    bool haveFrameData_ = false;
+    bool fuaActive_ = false;
 };
 
 } // namespace lmshao::lmrtsp

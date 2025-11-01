@@ -12,7 +12,7 @@
 
 namespace lmshao::lmrtsp {
 
-std::string RTSPUtils::trim(const std::string &str)
+std::string RtspUtils::trim(const std::string &str)
 {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) {
@@ -22,14 +22,14 @@ std::string RTSPUtils::trim(const std::string &str)
     return str.substr(start, end - start + 1);
 }
 
-std::string RTSPUtils::toLower(const std::string &str)
+std::string RtspUtils::toLower(const std::string &str)
 {
     std::string lower = str;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     return lower;
 }
 
-std::vector<std::string> RTSPUtils::split(const std::string &str, const std::string &delimiter)
+std::vector<std::string> RtspUtils::split(const std::string &str, const std::string &delimiter)
 {
     std::vector<std::string> tokens;
     size_t start = 0;

@@ -6,16 +6,16 @@
 
 #include <sstream>
 
-#include "../rtp/udp_rtp_transport_adapter.h"
 #include "internal_logger.h"
 #include "lmrtsp/media_types.h"
 #include "lmrtsp/rtp_source_session.h"
+#include "rtp/udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
 
-RtspMediaStreamManager::RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RTSPSession> rtsp_session)
-    : rtsp_session_(rtsp_session), state_(StreamState::IDLE), active_(false), send_thread_running_(false),
-      sequence_number_(0), timestamp_(0), ssrc_(0)
+RtspMediaStreamManager::RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RtspSession> rtsp_session)
+    : rtspSession_(rtsp_session), state_(StreamState::IDLE), active_(false), sendThreadRunning_(false),
+      sequenceNumber_(0), timestamp_(0), ssrc_(0)
 {
 }
 
@@ -30,7 +30,7 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
     transport_config_ = config;
 
     // Create RTP source session
-    rtp_session_ = std::make_unique<RtpSourceSession>();
+    rtpSession_ = std::make_unique<RtpSourceSession>();
 
     // Prepare config for RTP session
     RtpSourceSessionConfig rtp_config;
@@ -41,15 +41,15 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
     rtp_config.enable_rtcp = false;
 
     // Initialize RTP session (this will create and setup transport)
-    if (!rtp_session_->Initialize(rtp_config)) {
+    if (!rtpSession_->Initialize(rtp_config)) {
         LMRTSP_LOGE("Failed to initialize RTP source session");
-        rtp_session_.reset();
+        rtpSession_.reset();
         return false;
     }
 
     // Get transport adapter and update config with allocated ports
     if (config.type == TransportConfig::Type::UDP) {
-        auto *transport = rtp_session_->GetTransportAdapter();
+        auto *transport = rtpSession_->GetTransportAdapter();
         if (transport) {
             auto *udp_adapter = dynamic_cast<UdpRtpTransportAdapter *>(transport);
             if (udp_adapter) {
@@ -73,8 +73,8 @@ bool RtspMediaStreamManager::Play()
     }
 
     // Start RTP session
-    if (rtp_session_) {
-        rtp_session_->Start();
+    if (rtpSession_) {
+        rtpSession_->Start();
     }
 
     active_ = true;
@@ -91,8 +91,8 @@ bool RtspMediaStreamManager::Pause()
     }
 
     // Stop RTP session
-    if (rtp_session_) {
-        rtp_session_->Stop();
+    if (rtpSession_) {
+        rtpSession_->Stop();
     }
 
     active_ = false;
@@ -105,12 +105,12 @@ bool RtspMediaStreamManager::Pause()
 void RtspMediaStreamManager::Teardown()
 {
     active_ = false;
-    send_thread_running_ = false;
+    sendThreadRunning_ = false;
 
     // Stop and cleanup RTP session (it will handle transport cleanup)
-    if (rtp_session_) {
-        rtp_session_->Stop();
-        rtp_session_.reset();
+    if (rtpSession_) {
+        rtpSession_->Stop();
+        rtpSession_.reset();
     }
 
     state_ = StreamState::IDLE;
@@ -119,7 +119,7 @@ void RtspMediaStreamManager::Teardown()
 
 bool RtspMediaStreamManager::PushFrame(const lmrtsp::MediaFrame &frame)
 {
-    if (!active_ || !rtp_session_) {
+    if (!active_ || !rtpSession_) {
         return false;
     }
 
@@ -127,25 +127,25 @@ bool RtspMediaStreamManager::PushFrame(const lmrtsp::MediaFrame &frame)
     ProcessFrame(frame);
 
     timestamp_ = frame.timestamp;
-    sequence_number_++;
+    sequenceNumber_++;
     return true;
 }
 
 void RtspMediaStreamManager::ProcessFrame(const lmrtsp::MediaFrame &frame)
 {
-    if (!rtp_session_) {
+    if (!rtpSession_) {
         return;
     }
 
     // Create a MediaFrame shared pointer for RTP session
     auto frame_ptr = std::make_shared<lmrtsp::MediaFrame>(frame);
-    rtp_session_->SendFrame(frame_ptr);
+    rtpSession_->SendFrame(frame_ptr);
 }
 
 std::string RtspMediaStreamManager::GetRtpInfo() const
 {
     std::ostringstream oss;
-    oss << "seq=" << sequence_number_ << ";rtptime=" << timestamp_;
+    oss << "seq=" << sequenceNumber_ << ";rtptime=" << timestamp_;
     return oss.str();
 }
 

@@ -52,8 +52,8 @@ public:
         config.transport.client_rtp_port = dest_port_;
 
         // Initialize RTP session
-        rtp_session_ = std::make_unique<RtpSourceSession>();
-        if (!rtp_session_->Initialize(config)) {
+        rtpSession_ = std::make_unique<RtpSourceSession>();
+        if (!rtpSession_->Initialize(config)) {
             std::cerr << "Failed to initialize RTP source session" << std::endl;
             return false;
         }
@@ -67,7 +67,7 @@ public:
 
     bool Start()
     {
-        if (!rtp_session_->Start()) {
+        if (!rtpSession_->Start()) {
             std::cerr << "Failed to start RTP session" << std::endl;
             return false;
         }
@@ -78,8 +78,8 @@ public:
 
     void Stop()
     {
-        if (rtp_session_) {
-            rtp_session_->Stop();
+        if (rtpSession_) {
+            rtpSession_->Stop();
         }
         if (file_.is_open()) {
             file_.close();
@@ -158,7 +158,7 @@ private:
                 media_frame->video_param.is_key_frame = (nalu_type == 5);
 
                 // Send frame via RTP
-                if (!rtp_session_->SendFrame(media_frame)) {
+                if (!rtpSession_->SendFrame(media_frame)) {
                     std::cerr << "Failed to send frame " << frames_sent << std::endl;
                     break;
                 }
@@ -240,7 +240,7 @@ private:
     uint16_t dest_port_;
     uint32_t frame_rate_;
     std::ifstream file_;
-    std::unique_ptr<RtpSourceSession> rtp_session_;
+    std::unique_ptr<RtpSourceSession> rtpSession_;
 };
 
 void PrintUsage(const char *program_name)

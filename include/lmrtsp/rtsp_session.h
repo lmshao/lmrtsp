@@ -27,34 +27,34 @@
 
 namespace lmshao::lmrtsp {
 
-class RTSPSessionState;
+class RtspSessionState;
 class MediaStream;
-class RTSPServer;
+class RtspServer;
 
 namespace rtsp {
 class RtspMediaStreamManager;
 struct MediaFrame;
 } // namespace rtsp
 
-class RTSPSession : public std::enable_shared_from_this<RTSPSession> {
+class RtspSession : public std::enable_shared_from_this<RtspSession> {
 public:
-    explicit RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession);
-    explicit RTSPSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RTSPServer> server);
-    ~RTSPSession();
+    explicit RtspSession(std::shared_ptr<lmnet::Session> lmnetSession);
+    explicit RtspSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RtspServer> server);
+    ~RtspSession();
 
     // Process RTSP request
-    RTSPResponse ProcessRequest(const RTSPRequest &request);
+    RtspResponse ProcessRequest(const RtspRequest &request);
 
     // State management
-    void ChangeState(std::shared_ptr<RTSPSessionState> newState);
-    std::shared_ptr<RTSPSessionState> GetCurrentState() const;
+    void ChangeState(std::shared_ptr<RtspSessionState> newState);
+    std::shared_ptr<RtspSessionState> GetCurrentState() const;
 
     // Session information
     std::string GetSessionId() const;
     std::string GetClientIP() const;
     uint16_t GetClientPort() const;
     std::shared_ptr<lmnet::Session> GetNetworkSession() const;
-    std::weak_ptr<RTSPServer> GetRTSPServer() const;
+    std::weak_ptr<RtspServer> GetRTSPServer() const;
 
     // Media control
     bool SetupMedia(const std::string &uri, const std::string &transport);
@@ -74,8 +74,8 @@ public:
     // bool HasRTPSender() const;
 
     // Transport parameters (removed by request)
-    // void SetRTPTransportParams(const RTPTransportParams &params);
-    // RTPTransportParams GetRTPTransportParams() const;
+    // void SetRtpTransportParams(const RtpTransportParams &params);
+    // RtpTransportParams GetRtpTransportParams() const;
     // bool HasValidTransport() const;
 
     // SDP management
@@ -92,7 +92,7 @@ public:
     bool IsSetup() const;
 
     // Statistics (removed by request)
-    // RTPStatistics GetRTPStatistics() const;
+    // RtpStatistics GetRtpStatistics() const;
 
     // Session timeout management
     void UpdateLastActiveTime();
@@ -112,12 +112,12 @@ private:
     static std::string GenerateSessionId();
 
     // Transport parsing (removed by request)
-    // RTPTransportParams ParseTransportHeader(const std::string &transport) const;
+    // RtpTransportParams ParseTransportHeader(const std::string &transport) const;
 
     std::string sessionId_;
-    std::shared_ptr<RTSPSessionState> currentState_;
+    std::shared_ptr<RtspSessionState> currentState_;
     std::shared_ptr<lmnet::Session> lmnetSession_;
-    std::weak_ptr<RTSPServer> rtspServer_;
+    std::weak_ptr<RtspServer> rtspServer_;
 
     // New media stream manager (replaces MediaStream)
     std::unique_ptr<lmshao::lmrtsp::RtspMediaStreamManager> mediaStreamManager_;
@@ -133,7 +133,7 @@ private:
     mutable std::mutex mediaInfoMutex_;
     std::shared_ptr<MediaStreamInfo> mediaStreamInfo_;
     // std::shared_ptr<IRTPSender> rtpSender_;
-    // RTPTransportParams rtpTransportParams_;
+    // RtpTransportParams rtpTransportParams_;
 
     // State flags
     std::atomic<bool> isPlaying_{false};
