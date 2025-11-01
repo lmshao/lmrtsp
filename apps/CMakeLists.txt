@@ -20,6 +20,7 @@ if(BUILD_APPS)
 
     # RTSP applications
     add_lmrtsp_app(rtsp_server rtsp/rtsp_server.cpp rtsp/h264_file_reader.cpp)
+    add_lmrtsp_app(rtsp_vod_server rtsp/rtsp_vod_server.cpp rtsp/h264_file_reader.cpp)
     add_lmrtsp_app(rtsp_client rtsp/rtsp_client.cpp)
 
     # RTP applications
