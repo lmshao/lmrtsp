@@ -97,7 +97,7 @@ public:
     // Session timeout management
     void UpdateLastActiveTime();
     bool IsExpired(uint32_t timeout_seconds) const;
-    time_t GetLastActiveTime() const;
+    int64_t GetLastActiveTime() const;
 
     // New media frame interface for RtspMediaStreamManager
     bool PushFrame(const lmrtsp::MediaFrame &frame);
@@ -141,8 +141,8 @@ private:
     std::atomic<bool> isSetup_{false};
 
     // Session timeout
-    uint32_t timeout_;                   // Session timeout (seconds)
-    std::atomic<time_t> lastActiveTime_; // Last active time
+    uint32_t timeout_;                    // Session timeout (seconds)
+    std::atomic<int64_t> lastActiveTime_; // Last active time (milliseconds)
 
     // Stream URI for RTP-Info in PLAY response
     std::string streamUri_;

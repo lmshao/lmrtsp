@@ -8,6 +8,8 @@
 
 #include "lmrtsp/rtsp_server.h"
 
+#include <lmcore/base64.h>
+#include <lmcore/hex.h>
 #include <lmnet/tcp_server.h>
 
 #include "internal_logger.h"
@@ -17,39 +19,6 @@
 #include "rtsp_server_listener.h"
 
 namespace lmshao::lmrtsp {
-
-// Base64 encoding table
-static const char kBase64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-// Helper function to encode SPS/PPS to Base64
-static std::string Base64Encode(const std::vector<uint8_t> &data)
-{
-    std::string result;
-    result.reserve((data.size() + 2) / 3 * 4);
-
-    size_t i = 0;
-    while (i + 2 < data.size()) {
-        result += kBase64Table[(data[i] >> 2) & 0x3F];
-        result += kBase64Table[((data[i] & 0x03) << 4) | ((data[i + 1] & 0xF0) >> 4)];
-        result += kBase64Table[((data[i + 1] & 0x0F) << 2) | ((data[i + 2] & 0xC0) >> 6)];
-        result += kBase64Table[data[i + 2] & 0x3F];
-        i += 3;
-    }
-
-    if (i < data.size()) {
-        result += kBase64Table[(data[i] >> 2) & 0x3F];
-        if (i + 1 < data.size()) {
-            result += kBase64Table[((data[i] & 0x03) << 4) | ((data[i + 1] & 0xF0) >> 4)];
-            result += kBase64Table[((data[i + 1] & 0x0F) << 2)];
-        } else {
-            result += kBase64Table[(data[i] & 0x03) << 4];
-            result += '=';
-        }
-        result += '=';
-    }
-
-    return result;
-}
 
 RtspServer::RtspServer()
 {
@@ -446,15 +415,13 @@ std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::s
             // Extract profile-level-id from SPS (bytes 1-3)
             std::string profileLevelId = "42001f"; // Default: Baseline Profile Level 3.1
             if (stream_info->sps.size() >= 4) {
-                char buf[7];
-                snprintf(buf, sizeof(buf), "%02x%02x%02x", stream_info->sps[1], stream_info->sps[2],
-                         stream_info->sps[3]);
-                profileLevelId = buf;
+                std::vector<uint8_t> profile_bytes = {stream_info->sps[1], stream_info->sps[2], stream_info->sps[3]};
+                profileLevelId = lmcore::Hex::Encode(profile_bytes);
             }
 
             // Base64 encode SPS and PPS
-            std::string spsBase64 = Base64Encode(stream_info->sps);
-            std::string ppsBase64 = Base64Encode(stream_info->pps);
+            std::string spsBase64 = lmcore::Base64::Encode(stream_info->sps);
+            std::string ppsBase64 = lmcore::Base64::Encode(stream_info->pps);
 
             sdp += "a=fmtp:" + std::to_string(stream_info->payload_type) +
                    " packetization-mode=1;profile-level-id=" + profileLevelId + ";sprop-parameter-sets=" + spsBase64 +

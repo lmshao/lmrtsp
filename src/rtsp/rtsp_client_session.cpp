@@ -8,6 +8,9 @@
 
 #include "lmrtsp/rtsp_client_session.h"
 
+#include <lmcore/url.h>
+#include <lmcore/uuid.h>
+
 #include <iostream>
 #include <random>
 #include <regex>
@@ -24,10 +27,7 @@ RtspClientSession::RtspClientSession(const std::string &url, std::weak_ptr<RtspC
 {
 
     // Generate session ID
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(100000, 999999);
-    sessionId_ = std::to_string(dis(gen));
+    sessionId_ = lmcore::UUID::GenerateShort();
 
     // Initialize transport config for UDP
     transportConfig_.type = TransportConfig::Type::UDP;
@@ -48,10 +48,12 @@ bool RtspClientSession::Initialize()
         LMRTSP_LOGI("Initializing RTSP client session: %s for URL: %s", sessionId_.c_str(), url_.c_str());
 
         // Extract media path from URL
-        std::regex path_regex(R"(rtsp://[^/]+(/.*))");
-        std::smatch matches;
-        if (std::regex_match(url_, matches, path_regex)) {
-            mediaPath_ = matches[1].str();
+        auto parsed_url = lmcore::URL::Parse(url_);
+        if (parsed_url && parsed_url->IsRTSP()) {
+            mediaPath_ = parsed_url->Path();
+            if (mediaPath_.empty()) {
+                mediaPath_ = "/";
+            }
         } else {
             mediaPath_ = "/";
         }
