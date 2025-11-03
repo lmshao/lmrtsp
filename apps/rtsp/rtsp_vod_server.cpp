@@ -11,6 +11,10 @@
  */
 
 #include <lmnet/lmnet_logger.h>
+#include <lmrtsp/lmrtsp_logger.h>
+#include <lmrtsp/media_stream_info.h>
+#include <lmrtsp/rtsp_server.h>
+#include <lmrtsp/rtsp_session.h>
 #include <signal.h>
 
 #include <chrono>
@@ -21,23 +25,17 @@
 #include <thread>
 
 #include "h264_file_reader.h"
-#include "lmnet/lmnet_logger.h"
-#include "lmrtsp/lmrtsp_logger.h"
-#include "lmrtsp/media_stream_info.h"
-#include "lmrtsp/rtsp_server.h"
-#include "lmrtsp/rtsp_session.h"
 
 using namespace lmshao::lmrtsp;
 using namespace lmshao::lmnet;
 using namespace lmshao::lmcore;
-namespace fs = std::filesystem;
 
 // Global server components
 std::shared_ptr<RtspServer> g_server;
 std::atomic<bool> g_running{true};
 std::string g_media_directory;
 
-// Media file管理
+// Media file manager
 struct MediaFile {
     std::string filename;
     std::string stream_path; // RTSP URL path
@@ -65,7 +63,7 @@ void signalHandler(int signum)
 // Determine codec from file extension
 std::string GetCodecFromExtension(const std::string &filename)
 {
-    std::string ext = fs::path(filename).extension().string();
+    std::string ext = std::filesystem::path(filename).extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
     if (ext == ".h264" || ext == ".264") {
@@ -82,7 +80,7 @@ std::string GetCodecFromExtension(const std::string &filename)
 // Scan media directory and register streams
 bool ScanMediaDirectory(const std::string &directory)
 {
-    if (!fs::exists(directory) || !fs::is_directory(directory)) {
+    if (!std::filesystem::exists(directory) || !std::filesystem::is_directory(directory)) {
         std::cerr << "Error: Media directory does not exist or is not a directory: " << directory << std::endl;
         return false;
     }
@@ -92,7 +90,7 @@ bool ScanMediaDirectory(const std::string &directory)
     int fileCount = 0;
 
     try {
-        for (const auto &entry : fs::directory_iterator(directory)) {
+        for (const auto &entry : std::filesystem::directory_iterator(directory)) {
             if (!entry.is_regular_file()) {
                 continue;
             }
@@ -163,7 +161,7 @@ bool ScanMediaDirectory(const std::string &directory)
             std::lock_guard<std::mutex> lock(g_media_mutex);
             g_media_files[streamPath] = media;
         }
-    } catch (const fs::filesystem_error &e) {
+    } catch (const std::filesystem::filesystem_error &e) {
         std::cerr << "Filesystem error: " << e.what() << std::endl;
         return false;
     }
@@ -293,31 +291,31 @@ int main(int argc, char *argv[])
     // Main loop - push media data to playing clients
     while (g_running) {
         auto sessions = g_server->GetSessions();
-        
+
         std::lock_guard<std::mutex> lock(g_media_mutex);
-        
+
         for (auto &sessionPair : sessions) {
             auto session = sessionPair.second;
-            
+
             if (!session->IsPlaying()) {
                 continue;
             }
-            
+
             // Get stream path for this session
             auto streamInfo = session->GetMediaStreamInfo();
             if (!streamInfo) {
                 continue;
             }
-            
+
             std::string streamPath = streamInfo->stream_path;
-            
+
             auto it = g_media_files.find(streamPath);
             if (it == g_media_files.end()) {
                 continue;
             }
-            
+
             MediaFile &media = it->second;
-            
+
             // Push frame based on codec
             if (media.codec == "H264" && media.reader) {
                 std::vector<uint8_t> frameData;
@@ -334,7 +332,7 @@ int main(int argc, char *argv[])
             }
             // Add handlers for other codecs here
         }
-        
+
         std::this_thread::sleep_for(std::chrono::milliseconds(40)); // ~25fps
     }
 

@@ -150,10 +150,8 @@ endif()
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
-# Collect RTSP source files
-file(GLOB_RECURSE RTSP_SOURCES "src/rtsp/*.cpp")
-file(GLOB_RECURSE RTP_SOURCES "src/rtp/*.cpp")
-set(SOURCES ${RTSP_SOURCES} ${RTP_SOURCES})
+# Collect all source files from src directory
+file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 # Validate build options
 if(NOT BUILD_STATIC_LIBS AND NOT BUILD_SHARED_LIBS)
@@ -182,10 +180,8 @@ message(STATUS "C++ flags for ${CMAKE_BUILD_TYPE}: ${CMAKE_CXX_FLAGS_${CMAKE_BUI
 find_package(Threads REQUIRED)
 
 # Print source file summary
-list(LENGTH RTSP_SOURCES RTSP_COUNT)
-list(LENGTH RTP_SOURCES RTP_COUNT)
-message(STATUS "Found ${RTSP_COUNT} RTSP source files")
-message(STATUS "Found ${RTP_COUNT} RTP source files")
+list(LENGTH SOURCES SOURCE_COUNT)
+message(STATUS "Found ${SOURCE_COUNT} source files in src/")
 
 # Static library
 if(BUILD_STATIC_LIBS)
