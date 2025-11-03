@@ -108,6 +108,30 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspSession> session, const RtspR
     // Notify callback about the request after processing
     const std::string &method = request.method_;
     if (method == "SETUP") {
+        // Extract stream path from URI (remove /track0, /track1, etc and rtsp:// prefix)
+        std::string stream_path = request.uri_;
+
+        // Remove rtsp:// prefix if present
+        size_t rtsp_pos = stream_path.find("rtsp://");
+        if (rtsp_pos != std::string::npos) {
+            size_t slash_pos = stream_path.find('/', rtsp_pos + 7);
+            if (slash_pos != std::string::npos) {
+                stream_path = stream_path.substr(slash_pos);
+            }
+        }
+
+        // Remove /track0, /track1 suffix
+        size_t track_pos = stream_path.find("/track");
+        if (track_pos != std::string::npos) {
+            stream_path = stream_path.substr(0, track_pos);
+        }
+
+        // Set media stream info on session for later use
+        auto stream_info = GetMediaStream(stream_path);
+        if (stream_info) {
+            session->SetMediaStreamInfo(stream_info);
+        }
+
         std::string transport = "";
         auto it = request.general_header_.find("Transport");
         if (it != request.general_header_.end()) {

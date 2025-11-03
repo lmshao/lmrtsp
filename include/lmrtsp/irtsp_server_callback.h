@@ -9,9 +9,13 @@
 #ifndef LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
 #define LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
 
+#include <memory>
 #include <string>
 
 namespace lmshao::lmrtsp {
+
+// Forward declaration
+class RtspSession;
 
 /**
  * @brief RTSP server callback interface
@@ -95,6 +99,42 @@ public:
      * @param error_message Error message
      */
     virtual void OnError(const std::string &client_ip, int error_code, const std::string &error_message)
+    {
+        // Default empty implementation
+    }
+
+    /**
+     * @brief Session created event
+     * @param session Shared pointer to the created session
+     */
+    virtual void OnSessionCreated(std::shared_ptr<RtspSession> session)
+    {
+        // Default empty implementation
+    }
+
+    /**
+     * @brief Session destroyed event
+     * @param session_id Session ID that was destroyed
+     */
+    virtual void OnSessionDestroyed(const std::string &session_id)
+    {
+        // Default empty implementation
+    }
+
+    /**
+     * @brief Session start play event
+     * @param session Shared pointer to the session that started playing
+     */
+    virtual void OnSessionStartPlay(std::shared_ptr<RtspSession> session)
+    {
+        // Default empty implementation
+    }
+
+    /**
+     * @brief Session stop play event
+     * @param session_id Session ID that stopped playing
+     */
+    virtual void OnSessionStopPlay(const std::string &session_id)
     {
         // Default empty implementation
     }
