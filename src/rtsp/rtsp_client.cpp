@@ -8,7 +8,7 @@
 
 #include "lmrtsp/rtsp_client.h"
 
-#include <regex>
+#include <lmcore/url.h>
 
 #include "internal_logger.h"
 #include "lmnet/iclient_listener.h"
@@ -468,24 +468,16 @@ void RtspClient::HandleResponse(const RtspResponse &response)
 
 void RtspClient::ParseUrl(const std::string &url, std::string &host, uint16_t &port, std::string &path)
 {
-    std::regex rtsp_regex(R"(rtsp://([^:]+)(?::(\d+))?(.*))");
-    std::smatch matches;
-
-    if (std::regex_match(url, matches, rtsp_regex)) {
-        host = matches[1].str();
-
-        if (matches[2].matched) {
-            port = static_cast<uint16_t>(std::stoi(matches[2].str()));
-        } else {
-            port = 554; // Default RTSP port
-        }
-
-        path = matches[3].str();
-        if (path.empty()) {
-            path = "/";
-        }
-    } else {
+    auto parsed_url = lmcore::URL::Parse(url);
+    if (!parsed_url || !parsed_url->IsRTSP()) {
         throw std::invalid_argument("Invalid RTSP URL: " + url);
+    }
+
+    host = parsed_url->Host();
+    port = parsed_url->Port();
+    path = parsed_url->Path();
+    if (path.empty()) {
+        path = "/";
     }
 }
 

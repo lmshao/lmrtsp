@@ -8,11 +8,13 @@
 
 #include "rtsp_response.h"
 
+#include <lmcore/string_utils.h>
+
 #include <sstream>
 
-#include "rtsp_utils.h"
-
 namespace lmshao::lmrtsp {
+
+using lmcore::StringUtils;
 
 namespace {
 
@@ -31,9 +33,9 @@ StatusCode parseStatusCode(const std::string &status_str)
 std::vector<std::string> splitCommaSeparated(const std::string &str)
 {
     std::vector<std::string> result;
-    std::vector<std::string> parts = RtspUtils::split(str, COMMA);
+    std::vector<std::string> parts = StringUtils::Split(str, COMMA);
     for (const std::string &part : parts) {
-        std::string trimmed = RtspUtils::trim(part);
+        std::string trimmed = StringUtils::Trim(part);
         if (!trimmed.empty()) {
             result.push_back(trimmed);
         }
@@ -47,7 +49,7 @@ ResponseHeader ResponseHeader::FromString(const std::string &header_str)
 {
     ResponseHeader header;
 
-    std::vector<std::string> lines = RtspUtils::split(header_str, CRLF);
+    std::vector<std::string> lines = StringUtils::Split(header_str, CRLF);
 
     for (const std::string &line : lines) {
         if (line.empty()) {
@@ -61,29 +63,26 @@ ResponseHeader ResponseHeader::FromString(const std::string &header_str)
             continue;
         }
 
-        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = StringUtils::Trim(line.substr(0, colon_pos));
+        std::string header_value = StringUtils::Trim(line.substr(colon_pos + 1));
 
-        // Convert header name to lowercase for comparison
-        std::string header_name_lower = RtspUtils::toLower(header_name);
-
-        // Parse standard response headers
-        if (header_name_lower == RtspUtils::toLower(LOCATION)) {
+        // Parse standard response headers (case-insensitive)
+        if (StringUtils::EqualsIgnoreCase(header_name, LOCATION)) {
             header.location_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(PROXY_AUTHENTICATE)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, PROXY_AUTHENTICATE)) {
             header.proxyAuthenticate_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(PUBLIC)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, PUBLIC)) {
             // Parse comma-separated public methods
             header.publicMethods_ = splitCommaSeparated(header_value);
-        } else if (header_name_lower == RtspUtils::toLower(RETRY_AFTER)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, RETRY_AFTER)) {
             header.retryAfter_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(SERVER)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, SERVER)) {
             header.server_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(VARY)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, VARY)) {
             header.vary_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(WWW_AUTHENTICATE)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, WWW_AUTHENTICATE)) {
             header.wwwAuthenticate_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(RTP_INFO)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, RTP_INFO)) {
             header.rtpInfo_ = header_value;
         } else {
             // Unknown header, add to custom headers
@@ -103,7 +102,7 @@ RtspResponse RtspResponse::FromString(const std::string &resp_str)
     }
 
     // Split the response into lines
-    std::vector<std::string> lines = RtspUtils::split(resp_str, CRLF);
+    std::vector<std::string> lines = StringUtils::Split(resp_str, CRLF);
 
     if (lines.empty()) {
         return response;
@@ -111,7 +110,7 @@ RtspResponse RtspResponse::FromString(const std::string &resp_str)
 
     // Parse the status line (first line)
     std::string status_line = lines[0];
-    std::vector<std::string> status_parts = RtspUtils::split(status_line, SP);
+    std::vector<std::string> status_parts = StringUtils::Split(status_line, SP);
 
     if (status_parts.size() >= 3) {
         response.version_ = status_parts[0];
@@ -153,30 +152,29 @@ RtspResponse RtspResponse::FromString(const std::string &resp_str)
             continue; // Invalid header line
         }
 
-        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = StringUtils::Trim(line.substr(0, colon_pos));
+        std::string header_value = StringUtils::Trim(line.substr(colon_pos + 1));
 
-        // Convert header name to lowercase for comparison
-        std::string header_name_lower = RtspUtils::toLower(header_name);
-
-        // Classify headers into general, response, and entity headers
-        if (header_name_lower == RtspUtils::toLower(CSEQ) || header_name_lower == RtspUtils::toLower(DATE) ||
-            header_name_lower == RtspUtils::toLower(SESSION) || header_name_lower == RtspUtils::toLower(TRANSPORT) ||
-            header_name_lower == RtspUtils::toLower(RANGE) || header_name_lower == RtspUtils::toLower(REQUIRE) ||
-            header_name_lower == RtspUtils::toLower(PROXY_REQUIRE)) {
+        // Classify headers into general, response, and entity headers (case-insensitive)
+        if (StringUtils::EqualsIgnoreCase(header_name, CSEQ) || StringUtils::EqualsIgnoreCase(header_name, DATE) ||
+            StringUtils::EqualsIgnoreCase(header_name, SESSION) ||
+            StringUtils::EqualsIgnoreCase(header_name, TRANSPORT) ||
+            StringUtils::EqualsIgnoreCase(header_name, RANGE) || StringUtils::EqualsIgnoreCase(header_name, REQUIRE) ||
+            StringUtils::EqualsIgnoreCase(header_name, PROXY_REQUIRE)) {
             // General headers
             response.general_header_[header_name] = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(CONTENT_TYPE) ||
-                   header_name_lower == RtspUtils::toLower(CONTENT_LENGTH)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, CONTENT_TYPE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, CONTENT_LENGTH)) {
             // Entity headers
             response.entity_header_[header_name] = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(LOCATION) ||
-                   header_name_lower == RtspUtils::toLower(PROXY_AUTHENTICATE) ||
-                   header_name_lower == RtspUtils::toLower(PUBLIC) ||
-                   header_name_lower == RtspUtils::toLower(RETRY_AFTER) ||
-                   header_name_lower == RtspUtils::toLower(SERVER) || header_name_lower == RtspUtils::toLower(VARY) ||
-                   header_name_lower == RtspUtils::toLower(WWW_AUTHENTICATE) ||
-                   header_name_lower == RtspUtils::toLower(RTP_INFO)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, LOCATION) ||
+                   StringUtils::EqualsIgnoreCase(header_name, PROXY_AUTHENTICATE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, PUBLIC) ||
+                   StringUtils::EqualsIgnoreCase(header_name, RETRY_AFTER) ||
+                   StringUtils::EqualsIgnoreCase(header_name, SERVER) ||
+                   StringUtils::EqualsIgnoreCase(header_name, VARY) ||
+                   StringUtils::EqualsIgnoreCase(header_name, WWW_AUTHENTICATE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, RTP_INFO)) {
             // Response headers - parse using ResponseHeader::FromString
             std::string single_header = header_name + COLON + SP + header_value + CRLF;
             ResponseHeader parsed_header = ResponseHeader::FromString(single_header);
@@ -458,14 +456,14 @@ RtspResponseBuilder &RtspResponseBuilder::SetPublic(const std::string &methods_s
     size_t end = methods_str.find(COMMA);
 
     while (end != std::string::npos) {
-        methods.push_back(RtspUtils::trim(methods_str.substr(start, end - start)));
+        methods.push_back(StringUtils::Trim(methods_str.substr(start, end - start)));
         start = end + 1;
         end = methods_str.find(COMMA, start);
     }
 
     // Add the last method
     if (start < methods_str.length()) {
-        methods.push_back(RtspUtils::trim(methods_str.substr(start)));
+        methods.push_back(StringUtils::Trim(methods_str.substr(start)));
     }
 
     response_.responseHeader_.publicMethods_ = methods;

@@ -8,18 +8,21 @@
 
 #include "rtsp_request.h"
 
+#include <lmcore/string_utils.h>
+
 #include <sstream>
 
 #include "internal_logger.h"
-#include "rtsp_utils.h"
 
 namespace lmshao::lmrtsp {
+
+using lmcore::StringUtils;
 
 RequestHeader RequestHeader::FromString(const std::string &header_str)
 {
     RequestHeader header;
 
-    std::vector<std::string> lines = RtspUtils::split(header_str, CRLF);
+    std::vector<std::string> lines = StringUtils::Split(header_str, CRLF);
 
     for (const std::string &line : lines) {
         if (line.empty()) {
@@ -33,30 +36,27 @@ RequestHeader RequestHeader::FromString(const std::string &header_str)
             continue;
         }
 
-        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = StringUtils::Trim(line.substr(0, colon_pos));
+        std::string header_value = StringUtils::Trim(line.substr(colon_pos + 1));
 
-        // Convert header name to lowercase for comparison
-        std::string header_name_lower = RtspUtils::toLower(header_name);
-
-        // Parse standard request headers
-        if (header_name_lower == RtspUtils::toLower(ACCEPT)) {
+        // Parse standard request headers (case-insensitive)
+        if (StringUtils::EqualsIgnoreCase(header_name, ACCEPT)) {
             header.accept_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(ACCEPT_ENCODING)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, ACCEPT_ENCODING)) {
             header.acceptEncoding_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(ACCEPT_LANGUAGE)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, ACCEPT_LANGUAGE)) {
             header.acceptLanguage_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(AUTHORIZATION)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, AUTHORIZATION)) {
             header.authorization_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(FROM)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, FROM)) {
             header.from_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(IF_MODIFIED_SINCE)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, IF_MODIFIED_SINCE)) {
             header.ifModifiedSince_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(RANGE)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, RANGE)) {
             header.range_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(REFERER)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, REFERER)) {
             header.referer_ = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(USER_AGENT)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, USER_AGENT)) {
             header.userAgent_ = header_value;
         } else {
             // Unknown header, add to custom headers
@@ -77,7 +77,7 @@ RtspRequest RtspRequest::FromString(const std::string &req_str)
     }
 
     // Split the request into lines
-    std::vector<std::string> lines = RtspUtils::split(req_str, CRLF);
+    std::vector<std::string> lines = StringUtils::Split(req_str, CRLF);
 
     if (lines.empty()) {
         LMRTSP_LOGD("No lines found in request string");
@@ -88,7 +88,7 @@ RtspRequest RtspRequest::FromString(const std::string &req_str)
     std::string request_line = lines[0];
     LMRTSP_LOGD("Request line: [%s]", request_line.c_str());
 
-    std::vector<std::string> request_parts = RtspUtils::split(request_line, SP);
+    std::vector<std::string> request_parts = StringUtils::Split(request_line, SP);
     LMRTSP_LOGD("Request parts count: %zu", request_parts.size());
 
     if (request_parts.size() >= 3) {
@@ -143,31 +143,31 @@ RtspRequest RtspRequest::FromString(const std::string &req_str)
             continue; // Invalid header line
         }
 
-        std::string header_name = RtspUtils::trim(line.substr(0, colon_pos));
-        std::string header_value = RtspUtils::trim(line.substr(colon_pos + 1));
+        std::string header_name = StringUtils::Trim(line.substr(0, colon_pos));
+        std::string header_value = StringUtils::Trim(line.substr(colon_pos + 1));
 
-        // Convert header name to lowercase for comparison
-        std::string header_name_lower = RtspUtils::toLower(header_name);
-
-        // Classify headers into general, request, and entity headers
-        if (header_name_lower == RtspUtils::toLower(CSEQ) || header_name_lower == RtspUtils::toLower(DATE) ||
-            header_name_lower == RtspUtils::toLower(SESSION) || header_name_lower == RtspUtils::toLower(TRANSPORT) ||
-            header_name_lower == RtspUtils::toLower(LOCATION) || header_name_lower == RtspUtils::toLower(REQUIRE) ||
-            header_name_lower == RtspUtils::toLower(PROXY_REQUIRE)) {
+        // Classify headers into general, request, and entity headers (case-insensitive)
+        if (StringUtils::EqualsIgnoreCase(header_name, CSEQ) || StringUtils::EqualsIgnoreCase(header_name, DATE) ||
+            StringUtils::EqualsIgnoreCase(header_name, SESSION) ||
+            StringUtils::EqualsIgnoreCase(header_name, TRANSPORT) ||
+            StringUtils::EqualsIgnoreCase(header_name, LOCATION) ||
+            StringUtils::EqualsIgnoreCase(header_name, REQUIRE) ||
+            StringUtils::EqualsIgnoreCase(header_name, PROXY_REQUIRE)) {
             // General headers
             request.general_header_[header_name] = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(CONTENT_TYPE) ||
-                   header_name_lower == RtspUtils::toLower(CONTENT_LENGTH)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, CONTENT_TYPE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, CONTENT_LENGTH)) {
             // Entity headers
             request.entity_header_[header_name] = header_value;
-        } else if (header_name_lower == RtspUtils::toLower(ACCEPT) ||
-                   header_name_lower == RtspUtils::toLower(ACCEPT_ENCODING) ||
-                   header_name_lower == RtspUtils::toLower(ACCEPT_LANGUAGE) ||
-                   header_name_lower == RtspUtils::toLower(AUTHORIZATION) ||
-                   header_name_lower == RtspUtils::toLower(FROM) ||
-                   header_name_lower == RtspUtils::toLower(IF_MODIFIED_SINCE) ||
-                   header_name_lower == RtspUtils::toLower(RANGE) || header_name_lower == RtspUtils::toLower(REFERER) ||
-                   header_name_lower == RtspUtils::toLower(USER_AGENT)) {
+        } else if (StringUtils::EqualsIgnoreCase(header_name, ACCEPT) ||
+                   StringUtils::EqualsIgnoreCase(header_name, ACCEPT_ENCODING) ||
+                   StringUtils::EqualsIgnoreCase(header_name, ACCEPT_LANGUAGE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, AUTHORIZATION) ||
+                   StringUtils::EqualsIgnoreCase(header_name, FROM) ||
+                   StringUtils::EqualsIgnoreCase(header_name, IF_MODIFIED_SINCE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, RANGE) ||
+                   StringUtils::EqualsIgnoreCase(header_name, REFERER) ||
+                   StringUtils::EqualsIgnoreCase(header_name, USER_AGENT)) {
             // Request headers - parse using RequestHeader::FromString
             std::string single_header = header_name + COLON + SP + header_value + CRLF;
             RequestHeader parsed_header = RequestHeader::FromString(single_header);

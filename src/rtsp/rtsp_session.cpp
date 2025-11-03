@@ -8,8 +8,9 @@
 
 #include "lmrtsp/rtsp_session.h"
 
-#include <ctime>
-#include <random>
+#include <lmcore/time_utils.h>
+#include <lmcore/uuid.h>
+
 #include <string>
 
 #include "internal_logger.h"
@@ -29,7 +30,7 @@ RtspSession::RtspSession(std::shared_ptr<lmnet::Session> lmnetSession)
     sessionId_ = GenerateSessionId();
 
     // Initialize last active time
-    lastActiveTime_ = std::time(nullptr);
+    lastActiveTime_ = lmcore::TimeUtils::GetCurrentTimeMs();
 
     // Initialize state machine to Initial state
     currentState_ = InitialState::GetInstance();
@@ -45,7 +46,7 @@ RtspSession::RtspSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak
     sessionId_ = GenerateSessionId();
 
     // Initialize last active time
-    lastActiveTime_ = std::time(nullptr);
+    lastActiveTime_ = lmcore::TimeUtils::GetCurrentTimeMs();
 
     // Initialize state machine to Initial state
     currentState_ = InitialState::GetInstance();
@@ -360,27 +361,23 @@ bool RtspSession::IsSetup() const
 
 void RtspSession::UpdateLastActiveTime()
 {
-    lastActiveTime_ = std::time(nullptr);
+    lastActiveTime_ = lmcore::TimeUtils::GetCurrentTimeMs();
 }
 
 bool RtspSession::IsExpired(uint32_t timeout_seconds) const
 {
-    time_t current_time = std::time(nullptr);
-    return (current_time - lastActiveTime_) > timeout_seconds;
+    int64_t current_time = lmcore::TimeUtils::GetCurrentTimeMs();
+    return (current_time - lastActiveTime_) > static_cast<int64_t>(timeout_seconds) * 1000;
 }
 
-time_t RtspSession::GetLastActiveTime() const
+int64_t RtspSession::GetLastActiveTime() const
 {
     return lastActiveTime_;
 }
 
 std::string RtspSession::GenerateSessionId()
 {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(100000, 999999);
-
-    return std::to_string(dis(gen));
+    return lmcore::UUID::GenerateShort();
 }
 
 // RtpTransportParams RtspSession::ParseTransportHeader(const std::string &transport) const
