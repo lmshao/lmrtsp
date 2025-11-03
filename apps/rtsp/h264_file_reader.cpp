@@ -10,6 +10,8 @@
 
 #include <iostream>
 
+#include "lmrtsp/h264_parser.h"
+
 H264FileReader::H264FileReader(const std::string &filename)
     : filename_(filename), frame_rate_(25) // Default 25 fps
       ,
@@ -172,17 +174,24 @@ size_t H264FileReader::GetFrameCount() const
 
 bool H264FileReader::GetResolution(uint32_t &width, uint32_t &height) const
 {
-    // For now, return default resolution. In a real implementation,
-    // this would parse SPS to extract actual resolution
-    if (!sps_.empty() && sps_.size() >= 4) {
-        // Simple SPS parsing for resolution (very basic)
-        // This is a simplified implementation
-        width = 1280; // Default width
-        height = 720; // Default height
+    if (sps_.empty()) {
+        width = 1280;
+        height = 720;
+        return false;
+    }
+
+    // Use H264Parser to extract resolution from SPS
+    auto sps_buffer = lmshao::lmcore::DataBuffer::Create(sps_.size());
+    sps_buffer->Assign(sps_.data(), sps_.size());
+
+    int32_t w = 0, h = 0;
+    if (lmshao::lmrtsp::H264Parser::GetResolution(sps_buffer, w, h)) {
+        width = static_cast<uint32_t>(w);
+        height = static_cast<uint32_t>(h);
         return true;
     }
 
-    // Return default values
+    // Return default values if parsing fails
     width = 1280;
     height = 720;
     return false;
@@ -241,62 +250,16 @@ void H264FileReader::ExtractParameterSets()
     file_.read(reinterpret_cast<char *>(temp_buffer.data()), BUFFER_SIZE);
     size_t bytes_read = file_.gcount();
 
-    // Look for SPS and PPS
-    for (size_t i = 0; i < bytes_read - 4; ++i) {
-        // Check for 4-byte start code (0x00000001)
-        if (temp_buffer[i] == 0x00 && temp_buffer[i + 1] == 0x00 && temp_buffer[i + 2] == 0x00 &&
-            temp_buffer[i + 3] == 0x01) {
+    // Use H264Parser to extract SPS and PPS with DataBuffer
+    auto data_buffer = lmshao::lmcore::DataBuffer::Create(bytes_read);
+    data_buffer->Assign(temp_buffer.data(), bytes_read);
 
-            uint8_t nalu_type = temp_buffer[i + 4] & 0x1F;
-
-            // Only process SPS and PPS
-            if (nalu_type != 7 && nalu_type != 8) {
-                continue;
-            }
-
-            // Find end of this NALU by searching for next start code
-            size_t nalu_start = i + 4;
-            size_t nalu_end = nalu_start; // Start searching from nalu_start
-            bool found_end = false;
-
-            // Search for next 4-byte start code
-            for (size_t j = nalu_start + 1; j < bytes_read - 3; ++j) {
-                if (temp_buffer[j] == 0x00 && temp_buffer[j + 1] == 0x00 &&
-                    (temp_buffer[j + 2] == 0x00 && temp_buffer[j + 3] == 0x01)) {
-                    nalu_end = j;
-                    found_end = true;
-                    break;
-                }
-                // Also check for 3-byte start code (0x000001)
-                if (temp_buffer[j] == 0x00 && temp_buffer[j + 1] == 0x00 && temp_buffer[j + 2] == 0x01) {
-                    nalu_end = j;
-                    found_end = true;
-                    break;
-                }
-            }
-
-            // If no end found, limit to reasonable size (SPS/PPS are typically small)
-            if (!found_end) {
-                nalu_end = std::min(nalu_start + 256, bytes_read);
-            }
-
-            // Sanity check: SPS/PPS should be relatively small
-            size_t nalu_size = nalu_end - nalu_start;
-            if (nalu_size > 0 && nalu_size < 512) {
-                if (nalu_type == 7) { // SPS
-                    sps_.assign(temp_buffer.begin() + nalu_start, temp_buffer.begin() + nalu_end);
-                    std::cout << "Found SPS, size: " << sps_.size() << " bytes" << std::endl;
-                } else if (nalu_type == 8) { // PPS
-                    pps_.assign(temp_buffer.begin() + nalu_start, temp_buffer.begin() + nalu_end);
-                    std::cout << "Found PPS, size: " << pps_.size() << " bytes" << std::endl;
-                }
-            }
-
-            // If we found both, we're done
-            if (!sps_.empty() && !pps_.empty()) {
-                break;
-            }
-        }
+    std::shared_ptr<lmshao::lmcore::DataBuffer> sps_buffer, pps_buffer;
+    if (lmshao::lmrtsp::H264Parser::ExtractSPSPPS(data_buffer, sps_buffer, pps_buffer)) {
+        sps_.assign(sps_buffer->Data(), sps_buffer->Data() + sps_buffer->Size());
+        pps_.assign(pps_buffer->Data(), pps_buffer->Data() + pps_buffer->Size());
+        std::cout << "Found SPS, size: " << sps_.size() << " bytes" << std::endl;
+        std::cout << "Found PPS, size: " << pps_.size() << " bytes" << std::endl;
     }
 
     // Restore position
@@ -318,7 +281,7 @@ void H264FileReader::AnalyzeFile()
     size_t file_size = file_.tellg();
     file_.seekg(0, std::ios::beg);
 
-    // Simple frame counting by looking for I-frames and P-frames
+    // Simple frame counting using H264Parser
     std::vector<uint8_t> temp_buffer(BUFFER_SIZE);
     size_t total_frames = 0;
 
@@ -329,14 +292,22 @@ void H264FileReader::AnalyzeFile()
         if (bytes_read == 0)
             break;
 
+        // Create DataBuffer for parsing
+        auto data_buffer = lmshao::lmcore::DataBuffer::Create(bytes_read);
+        data_buffer->Assign(temp_buffer.data(), bytes_read);
+
         for (size_t i = 0; i < bytes_read - 4; ++i) {
             if (temp_buffer[i] == 0x00 && temp_buffer[i + 1] == 0x00 && temp_buffer[i + 2] == 0x00 &&
                 temp_buffer[i + 3] == 0x01) {
 
-                uint8_t nalu_type = temp_buffer[i + 4] & 0x1F;
+                // Create a sub-buffer for this NALU
+                auto nalu_buffer = lmshao::lmcore::DataBuffer::Create(bytes_read - i);
+                nalu_buffer->Assign(temp_buffer.data() + i, bytes_read - i);
 
-                // Count I-frames and P-frames
-                if (nalu_type == 1 || nalu_type == 5) { // P-frame or I-frame
+                int32_t nalu_type = lmshao::lmrtsp::H264Parser::GetNaluType(nalu_buffer);
+
+                // Count I-frames and P-frames (NALU type 1 and 5)
+                if (nalu_type == 1 || nalu_type == 5) {
                     total_frames++;
                 }
             }
