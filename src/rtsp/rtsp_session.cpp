@@ -257,6 +257,14 @@ bool RtspSession::PlayMedia(const std::string &uri, const std::string &range)
     isPaused_ = false;
 
     LMRTSP_LOGD("Media playback started for session: %s", sessionId_.c_str());
+
+    // Notify callback that session started playing
+    if (auto server = rtspServer_.lock()) {
+        if (auto callback = server->GetCallback()) {
+            callback->OnSessionStartPlay(shared_from_this());
+        }
+    }
+
     return true;
 }
 
@@ -286,6 +294,14 @@ bool RtspSession::PauseMedia(const std::string &uri)
     isPlaying_ = false;
 
     LMRTSP_LOGD("Media playback paused for session: %s", sessionId_.c_str());
+
+    // Notify callback that session stopped playing
+    if (auto server = rtspServer_.lock()) {
+        if (auto callback = server->GetCallback()) {
+            callback->OnSessionStopPlay(sessionId_);
+        }
+    }
+
     return true;
 }
 
@@ -308,6 +324,14 @@ bool RtspSession::TeardownMedia(const std::string &uri)
     isSetup_ = false;
 
     LMRTSP_LOGD("Media teardown completed for session: %s", sessionId_.c_str());
+
+    // Notify callback that session stopped playing
+    if (auto server = rtspServer_.lock()) {
+        if (auto callback = server->GetCallback()) {
+            callback->OnSessionStopPlay(sessionId_);
+        }
+    }
+
     return true;
 }
 

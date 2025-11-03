@@ -10,7 +10,6 @@
  * and serves media files from a specified directory.
  */
 
-#include <lmnet/lmnet_logger.h>
 #include <lmrtsp/lmrtsp_logger.h>
 #include <lmrtsp/media_stream_info.h>
 #include <lmrtsp/rtsp_server.h>
@@ -24,16 +23,14 @@
 #include <memory>
 #include <thread>
 
+#include "file_manager.h"
 #include "h264_file_reader.h"
+#include "session_manager.h"
+#include "session_worker_thread.h"
 
 using namespace lmshao::lmrtsp;
 using namespace lmshao::lmnet;
 using namespace lmshao::lmcore;
-
-// Global server components
-std::shared_ptr<RtspServer> g_server;
-std::atomic<bool> g_running{true};
-std::string g_media_directory;
 
 // Media file manager
 struct MediaFile {
@@ -41,14 +38,110 @@ struct MediaFile {
     std::string stream_path; // RTSP URL path
     std::string file_path;   // Full file path
     std::string codec;       // H264, AAC, MP2T
-    std::shared_ptr<H264FileReader> reader;
+    // Note: No longer storing H264FileReader, using MappedFile through FileManager
 };
 
+// Global server components
+std::shared_ptr<RtspServer> g_server;
+std::atomic<bool> g_running{true};
+std::string g_media_directory;
 std::map<std::string, MediaFile> g_media_files;
 std::mutex g_media_mutex;
 
+// Session event callback for managing worker threads
+class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
+public:
+    void OnSessionCreated(std::shared_ptr<RtspSession> session) override
+    {
+        std::cout << "Session created: " << session->GetSessionId() << std::endl;
+    }
+
+    void OnSessionDestroyed(const std::string &session_id) override
+    {
+        std::cout << "Session destroyed: " << session_id << std::endl;
+        // Stop the worker thread for this session
+        SessionManager::GetInstance().StopSession(session_id);
+    }
+
+    void OnSessionStartPlay(std::shared_ptr<RtspSession> session) override
+    {
+        std::string session_id = session->GetSessionId();
+        std::cout << "Session start play: " << session_id << std::endl;
+
+        // Get media stream info to determine file path
+        auto stream_info = session->GetMediaStreamInfo();
+        if (!stream_info) {
+            std::cout << "No media stream info for session: " << session_id << std::endl;
+            return;
+        }
+
+        std::string stream_path = stream_info->stream_path;
+
+        // Find corresponding file path
+        std::lock_guard<std::mutex> lock(g_media_mutex);
+        auto it = g_media_files.find(stream_path);
+        if (it == g_media_files.end()) {
+            std::cout << "Media file not found for stream: " << stream_path << std::endl;
+            return;
+        }
+
+        const MediaFile &media = it->second;
+        uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
+
+        // Start worker thread for this session
+        if (!SessionManager::GetInstance().StartSession(session, media.file_path, frame_rate)) {
+            std::cout << "Failed to start worker thread for session: " << session_id << std::endl;
+        }
+    }
+
+    void OnSessionStopPlay(const std::string &session_id) override
+    {
+        std::cout << "Session stop play: " << session_id << std::endl;
+        // Stop the worker thread for this session
+        SessionManager::GetInstance().StopSession(session_id);
+    }
+
+    void OnPlayReceived(const std::string &client_ip, const std::string &stream_path,
+                        const std::string &range = "") override
+    {
+        std::cout << "PLAY received from " << client_ip << " for " << stream_path << std::endl;
+    }
+
+    void OnPauseReceived(const std::string &client_ip, const std::string &stream_path) override
+    {
+        std::cout << "PAUSE received from " << client_ip << " for " << stream_path << std::endl;
+    }
+
+    void OnTeardownReceived(const std::string &client_ip, const std::string &stream_path) override
+    {
+        std::cout << "TEARDOWN received from " << client_ip << " for " << stream_path << std::endl;
+    }
+
+    void OnClientConnected(const std::string &client_ip, const std::string &user_agent) override
+    {
+        std::cout << "Client connected: " << client_ip << " (" << user_agent << ")" << std::endl;
+    }
+
+    void OnClientDisconnected(const std::string &client_ip) override
+    {
+        std::cout << "Client disconnected: " << client_ip << std::endl;
+    }
+
+    void OnStreamRequested(const std::string &stream_path, const std::string &client_ip) override
+    {
+        std::cout << "Stream requested: " << stream_path << " from " << client_ip << std::endl;
+    }
+
+    void OnSetupReceived(const std::string &client_ip, const std::string &transport,
+                         const std::string &stream_path) override
+    {
+        std::cout << "SETUP received from " << client_ip << " for " << stream_path << " (transport: " << transport
+                  << ")" << std::endl;
+    }
+};
+
 // Signal handler
-void signalHandler(int signum)
+void SignalHandler(int signum)
 {
     std::cout << "\nReceived interrupt signal (" << signum << "), stopping server..." << std::endl;
     g_running = false;
@@ -113,13 +206,17 @@ bool ScanMediaDirectory(const std::string &directory)
             media.file_path = filepath;
             media.codec = codec;
 
-            // For H.264 files, load parameters
+            // For H.264 files, load parameters using MappedFile
             if (codec == "H264") {
-                media.reader = std::make_shared<H264FileReader>(filepath);
-                if (!media.reader->Open()) {
-                    std::cerr << "Warning: Failed to open H.264 file: " << filepath << std::endl;
+                // Use FileManager to get shared MappedFile
+                auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
+                if (!mapped_file) {
+                    std::cerr << "Warning: Failed to map H.264 file: " << filepath << std::endl;
                     continue;
                 }
+
+                // Create temporary SessionH264Reader to extract parameters
+                SessionH264Reader temp_reader(mapped_file);
 
                 // Create and register media stream
                 auto streamInfo = std::make_shared<MediaStreamInfo>();
@@ -129,32 +226,33 @@ bool ScanMediaDirectory(const std::string &directory)
                 streamInfo->payload_type = 96;
                 streamInfo->clock_rate = 90000;
 
-                // Get video parameters
-                uint32_t width, height;
-                if (media.reader->GetResolution(width, height)) {
-                    streamInfo->width = width;
-                    streamInfo->height = height;
-                } else {
-                    streamInfo->width = 1920;
-                    streamInfo->height = 1080;
-                }
-
-                streamInfo->frame_rate = media.reader->GetFrameRate();
-                streamInfo->sps = media.reader->GetSPS();
-                streamInfo->pps = media.reader->GetPPS();
+                // Set default resolution (will be updated from SPS if available)
+                streamInfo->width = 1920;
+                streamInfo->height = 1080;
+                streamInfo->frame_rate = temp_reader.GetFrameRate();
+                streamInfo->sps = temp_reader.GetSPS();
+                streamInfo->pps = temp_reader.GetPPS();
 
                 if (!g_server->AddMediaStream(streamPath, streamInfo)) {
                     std::cerr << "Warning: Failed to register stream: " << streamPath << std::endl;
-                    media.reader->Close();
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
                     continue;
                 }
+
+                // Calculate duration from frame index
+                auto playback_info = temp_reader.GetPlaybackInfo();
+                double duration = playback_info.total_duration_;
 
                 std::cout << "  [" << ++fileCount << "] " << filename << std::endl;
                 std::cout << "      Stream:     rtsp://localhost:8554" << streamPath << std::endl;
                 std::cout << "      Codec:      " << codec << std::endl;
                 std::cout << "      Resolution: " << streamInfo->width << "x" << streamInfo->height << std::endl;
                 std::cout << "      Frame rate: " << streamInfo->frame_rate << " fps" << std::endl;
-                std::cout << "      Duration:   " << media.reader->GetDuration() << " seconds" << std::endl;
+                std::cout << "      Duration:   " << duration << " seconds" << std::endl;
+                std::cout << "      Frames:     " << playback_info.total_frames_ << std::endl;
+
+                // Release temporary reference
+                FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
             // Add support for other codecs here (AAC, TS)
 
@@ -170,7 +268,7 @@ bool ScanMediaDirectory(const std::string &directory)
     return fileCount > 0;
 }
 
-void printUsage(const char *programName)
+void PrintUsage(const char *programName)
 {
     std::cout << "\nRTSP VOD Server - Video On Demand Service\n" << std::endl;
     std::cout << "Usage: " << programName << " [options] <media_directory>\n" << std::endl;
@@ -210,14 +308,14 @@ int main(int argc, char *argv[])
     // Parse arguments
     if (argc < 2) {
         std::cerr << "Error: Missing media directory\n" << std::endl;
-        printUsage(argv[0]);
+        PrintUsage(argv[0]);
         return 1;
     }
 
     // Check for help
     std::string firstArg = argv[1];
     if (firstArg == "-h" || firstArg == "--help") {
-        printUsage(argv[0]);
+        PrintUsage(argv[0]);
         return 0;
     }
 
@@ -241,7 +339,7 @@ int main(int argc, char *argv[])
             break;
         } else {
             std::cerr << "Error: Unknown option: " << arg << std::endl;
-            printUsage(argv[0]);
+            PrintUsage(argv[0]);
             return 1;
         }
 
@@ -250,16 +348,12 @@ int main(int argc, char *argv[])
 
     if (g_media_directory.empty()) {
         std::cerr << "Error: Media directory not specified\n" << std::endl;
-        printUsage(argv[0]);
+        PrintUsage(argv[0]);
         return 1;
     }
 
     // Register signal handler
-    signal(SIGINT, signalHandler);
-
-    // Initialize loggers
-    InitLmnetLogger(LogLevel::kInfo);
-    InitLmrtspLogger(LogLevel::kInfo);
+    signal(SIGINT, SignalHandler);
 
     std::cout << "=== RTSP VOD Server ===" << std::endl;
     std::cout << "Listening on: " << ip << ":" << port << std::endl;
@@ -268,84 +362,77 @@ int main(int argc, char *argv[])
     // Get server instance
     g_server = RtspServer::GetInstance();
 
+    // Set session event callback
+    auto callback = std::make_shared<SessionEventCallback>();
+    g_server->SetCallback(callback);
+
     // Initialize server
     if (!g_server->Init(ip, port)) {
         std::cerr << "Failed to initialize RTSP server" << std::endl;
+        if (g_server) {
+            g_server->Stop();
+        }
         return 1;
     }
 
     // Scan and register media files
     if (!ScanMediaDirectory(g_media_directory)) {
         std::cerr << "No media files found or failed to register streams" << std::endl;
+        if (g_server) {
+            g_server->Stop();
+        }
         return 1;
     }
 
     // Start server
     if (!g_server->Start()) {
         std::cerr << "Failed to start RTSP server" << std::endl;
+        if (g_server) {
+            g_server->Stop();
+        }
         return 1;
     }
 
     std::cout << "\n=== Server is running, press Ctrl+C to stop ===" << std::endl;
 
-    // Main loop - push media data to playing clients
+    // Main loop - monitor sessions and cleanup
     while (g_running) {
-        auto sessions = g_server->GetSessions();
-
-        std::lock_guard<std::mutex> lock(g_media_mutex);
-
-        for (auto &sessionPair : sessions) {
-            auto session = sessionPair.second;
-
-            if (!session->IsPlaying()) {
-                continue;
-            }
-
-            // Get stream path for this session
-            auto streamInfo = session->GetMediaStreamInfo();
-            if (!streamInfo) {
-                continue;
-            }
-
-            std::string streamPath = streamInfo->stream_path;
-
-            auto it = g_media_files.find(streamPath);
-            if (it == g_media_files.end()) {
-                continue;
-            }
-
-            MediaFile &media = it->second;
-
-            // Push frame based on codec
-            if (media.codec == "H264" && media.reader) {
-                std::vector<uint8_t> frameData;
-                if (media.reader->GetNextFrame(frameData)) {
-                    MediaFrame frame;
-                    frame.data = DataBuffer::Create(frameData.size());
-                    frame.data->Assign(frameData.data(), frameData.size());
-                    frame.timestamp = 0; // Will be set by session
-                    session->PushFrame(std::move(frame));
-                } else {
-                    // End of file, loop back
-                    media.reader->Reset();
-                }
-            }
-            // Add handlers for other codecs here
+        // Cleanup finished sessions periodically
+        size_t cleaned = SessionManager::GetInstance().CleanupFinishedSessions();
+        if (cleaned > 0) {
+            std::cout << "Cleaned up " << cleaned << " finished sessions" << std::endl;
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(40)); // ~25fps
+        // Print session statistics every 30 seconds
+        static auto last_stats_time = std::chrono::steady_clock::now();
+        auto current_time = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - last_stats_time);
+
+        if (elapsed.count() >= 30) {
+            size_t active_count = SessionManager::GetInstance().GetActiveSessionCount();
+            size_t cached_files = FileManager::GetInstance().GetCachedFileCount();
+
+            std::cout << "Server stats - Active sessions: " << active_count << ", Cached files: " << cached_files
+                      << std::endl;
+
+            last_stats_time = current_time;
+        }
+
+        // Sleep for a short time
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     // Cleanup
     std::cout << "\nShutting down..." << std::endl;
 
+    // Stop all session worker threads
+    SessionManager::GetInstance().StopAllSessions();
+
+    // Clear file cache
+    FileManager::GetInstance().ClearCache();
+
     {
         std::lock_guard<std::mutex> lock(g_media_mutex);
-        for (auto &pair : g_media_files) {
-            if (pair.second.reader) {
-                pair.second.reader->Close();
-            }
-        }
         g_media_files.clear();
     }
 
