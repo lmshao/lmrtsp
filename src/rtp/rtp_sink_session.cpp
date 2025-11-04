@@ -10,13 +10,29 @@
 
 #include <lmcore/data_buffer.h>
 
+#include <random>
+
 #include "i_rtp_depacketizer.h"
 #include "i_rtp_transport_adapter.h"
 #include "internal_logger.h"
+#include "lmcore/time_utils.h"
+#include "lmrtsp/rtcp_context.h"
+#include "lmrtsp/rtp_packet.h"
 #include "rtp_depacketizer_h264.h"
 #include "udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
+
+namespace {
+// Generate random SSRC
+uint32_t GenerateRandomSSRC()
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<uint32_t> dis(1, 0xFFFFFFFF);
+    return dis(gen);
+}
+} // namespace
 
 // Internal listener class to handle transport data reception
 class RtpSinkSession::TransportListener : public UdpRtpTransportAdapterListener {
@@ -33,8 +49,10 @@ public:
 
     void OnRtcpDataReceived(std::shared_ptr<lmcore::DataBuffer> buffer) override
     {
-        // RTCP not implemented yet - ignore for now
-        (void)buffer;
+        if (!session_ || !buffer) {
+            return;
+        }
+        session_->HandleRtcpData(buffer);
     }
 
 private:
@@ -119,6 +137,18 @@ bool RtpSinkSession::Initialize(const RtpSinkSessionConfig &config)
         return false;
     }
 
+    // Initialize RTCP if enabled
+    if (config_.enable_rtcp) {
+        rtcpSsrc_ = GenerateRandomSSRC();
+        rtcpContext_ = RtcpReceiverContext::Create();
+        if (rtcpContext_) {
+            // RTCP context will be fully initialized when first RTP packet arrives (to get sender SSRC)
+            LMRTSP_LOGI("RTCP receiver context created: SSRC=0x%08x (pending sender SSRC)", rtcpSsrc_);
+        } else {
+            LMRTSP_LOGW("Failed to create RTCP receiver context");
+        }
+    }
+
     initialized_ = true;
     LMRTSP_LOGI("RtpSinkSession initialized successfully for session: %s", config_.session_id.c_str());
     return true;
@@ -154,6 +184,11 @@ void RtpSinkSession::Stop()
     }
 
     running_ = false;
+
+    // Stop RTCP timer
+    if (config_.enable_rtcp) {
+        StopRtcpTimer();
+    }
 
     // Close transport
     if (transportAdapter_) {
@@ -196,6 +231,20 @@ void RtpSinkSession::HandleRtpData(std::shared_ptr<lmcore::DataBuffer> buffer)
         return;
     }
 
+    // Initialize RTCP context with sender SSRC on first RTP packet
+    if (config_.enable_rtcp && rtcpContext_ && !rtcpContext_->GetExpectedPackets()) {
+        rtcpContext_->Initialize(rtcpSsrc_, rtp_packet->ssrc);
+        StartRtcpTimer();
+        LMRTSP_LOGI("RTCP initialized: receiver SSRC=0x%08x, sender SSRC=0x%08x", rtcpSsrc_, rtp_packet->ssrc);
+    }
+
+    // Update RTCP statistics
+    if (rtcpContext_) {
+        rtcpContext_->OnRtp(rtp_packet->sequence_number, rtp_packet->timestamp, lmcore::TimeUtils::GetCurrentTimeMs(),
+                            90000, // 90kHz for video
+                            buffer->Size());
+    }
+
     // Check for sequence number gaps (simple detection)
     if (lastSequenceNumber_ != 0) {
         uint16_t expected_seq = lastSequenceNumber_ + 1;
@@ -218,8 +267,13 @@ void RtpSinkSession::HandleRtpData(std::shared_ptr<lmcore::DataBuffer> buffer)
 
 void RtpSinkSession::HandleRtcpData(std::shared_ptr<lmcore::DataBuffer> buffer)
 {
-    // RTCP not implemented yet - ignore for now
-    (void)buffer;
+    if (!rtcpContext_ || !buffer) {
+        return;
+    }
+
+    // Process RTCP packet (SR, BYE, etc.)
+    rtcpContext_->OnRtcp(buffer->Data(), buffer->Size());
+    LMRTSP_LOGD("Processed RTCP packet: size=%zu", buffer->Size());
 }
 
 void RtpSinkSession::HandleFrame(const std::shared_ptr<MediaFrame> &frame)
@@ -244,6 +298,55 @@ void RtpSinkSession::HandleDepacketizerError(int code, const std::string &messag
     // Forward error to listener (check if still alive)
     if (auto listener = listener_.lock()) {
         listener->OnError(code, message);
+    }
+}
+
+void RtpSinkSession::StartRtcpTimer()
+{
+    if (!rtcpTimer_) {
+        rtcpTimer_ = std::make_unique<lmcore::AsyncTimer>(1);
+        rtcpTimer_->Start();
+    }
+
+    // Schedule repeating RTCP report
+    rtcpTimerId_ = rtcpTimer_->ScheduleRepeating([this]() { SendRtcpReport(); }, config_.rtcp_interval_ms);
+
+    LMRTSP_LOGI("RTCP timer started: interval=%ums", config_.rtcp_interval_ms);
+}
+
+void RtpSinkSession::StopRtcpTimer()
+{
+    if (rtcpTimer_ && rtcpTimerId_ != 0) {
+        rtcpTimer_->Cancel(rtcpTimerId_);
+        rtcpTimer_->Stop();
+        rtcpTimerId_ = 0;
+        LMRTSP_LOGI("RTCP timer stopped");
+    }
+}
+
+void RtpSinkSession::SendRtcpReport()
+{
+    if (!rtcpContext_ || !transportAdapter_) {
+        return;
+    }
+
+    // Create compound packet (RR + SDES) if CNAME is provided, otherwise just RR
+    std::shared_ptr<lmcore::DataBuffer> rtcpPacket;
+
+    if (!config_.rtcp_cname.empty()) {
+        rtcpPacket = rtcpContext_->CreateCompoundPacket(config_.rtcp_cname, config_.rtcp_name);
+    } else {
+        rtcpPacket = rtcpContext_->CreateRtcpRr();
+    }
+
+    if (rtcpPacket && rtcpPacket->Size() > 0) {
+        bool success = transportAdapter_->SendRtcpPacket(rtcpPacket->Data(), rtcpPacket->Size());
+        if (success) {
+            LMRTSP_LOGD("RTCP report sent: size=%zu, lost=%zu, jitter=%u", rtcpPacket->Size(), rtcpContext_->GetLost(),
+                        rtcpContext_->GetJitter());
+        } else {
+            LMRTSP_LOGW("Failed to send RTCP report");
+        }
     }
 }
 
