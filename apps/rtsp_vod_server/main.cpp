@@ -16,12 +16,18 @@
 #include <lmrtsp/rtsp_session.h>
 #include <signal.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <thread>
+#include <vector>
+// Network interfaces enumeration for IPv4 addresses
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
 
 #include "aac_file_reader.h"
 #include "file_manager.h"
@@ -223,6 +229,69 @@ public:
                   << ")" << std::endl;
     }
 };
+
+// Enumerate local IPv4 addresses (loopback included)
+std::vector<std::string> EnumerateLocalIPv4()
+{
+    std::vector<std::string> ips;
+    struct ifaddrs *ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) == -1) {
+        return ips;
+    }
+
+    for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr)
+            continue;
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            auto *sa = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
+            char buf[INET_ADDRSTRLEN] = {0};
+            if (inet_ntop(AF_INET, &(sa->sin_addr), buf, sizeof(buf)) != nullptr) {
+                std::string ip(buf);
+                // Deduplicate
+                if (std::find(ips.begin(), ips.end(), ip) == ips.end()) {
+                    ips.push_back(ip);
+                }
+            }
+        }
+    }
+
+    freeifaddrs(ifaddr);
+    return ips;
+}
+
+// Print prominent RTSP URLs for all local IPs and discovered streams
+void PrintStartupUrls(const std::vector<std::string> &ips, uint16_t port)
+{
+    std::vector<std::string> stream_paths;
+    {
+        std::lock_guard<std::mutex> lock(g_media_mutex);
+        for (const auto &pair : g_media_files) {
+            stream_paths.push_back(pair.first);
+        }
+    }
+    // Sort paths for consistent ordering
+    std::sort(stream_paths.begin(), stream_paths.end());
+
+    std::cout << "\n=== Available RTSP URLs ===" << std::endl;
+    if (ips.empty()) {
+        std::cout << "No local IPv4 addresses detected. Use localhost: rtsp://localhost:" << port
+                  << "/<stream>" << std::endl;
+        return;
+    }
+
+    if (stream_paths.empty()) {
+        std::cout << "No media files found to serve." << std::endl;
+        return;
+    }
+
+    for (const auto &path : stream_paths) {
+        std::cout << "\nStream: " << path << std::endl;
+        for (const auto &ip_addr : ips) {
+            std::cout << "  rtsp://" << ip_addr << ":" << port << path << std::endl;
+        }
+    }
+    std::cout << std::endl;
+}
 
 // Signal handler
 void SignalHandler(int signum)
@@ -573,6 +642,15 @@ int main(int argc, char *argv[])
     }
 
     std::cout << "\n=== Server is running, press Ctrl+C to stop ===" << std::endl;
+
+    // Print prominent URLs for all local IPs (if bound to 0.0.0.0) or the bound IP
+    std::vector<std::string> ips;
+    if (ip == "0.0.0.0") {
+        ips = EnumerateLocalIPv4();
+    } else {
+        ips.push_back(ip);
+    }
+    PrintStartupUrls(ips, port);
 
     // Main loop - monitor sessions and cleanup
     while (g_running) {
