@@ -27,36 +27,52 @@ void RtpPacketizerAac::SubmitFrame(const std::shared_ptr<MediaFrame> &frame)
     auto buf = frame->data;
     const uint8_t *data = buf->Data();
     size_t size = buf->Size();
-    uint32_t timestamp = frame->timestamp; // assume AAC timestamp provided by upstream
+    uint32_t timestamp = frame->timestamp;
 
-    // Simple fragmentation without RFC3640 AU headers (basic payloading).
-    // If needed later, AU headers can be added.
-    size_t max_payload = mtuSize_ - RtpHeaderSize();
-    if (max_payload <= 0)
+    // RFC 3640 AAC-hbr mode: Add AU headers section
+    // AU-headers-length (16 bits) + AU-header (16 bits: 13 bits size + 3 bits index)
+    // For single AU per packet: AU-headers-length = 16 (bits), AU-size = frame size
+
+    size_t au_header_section_size = 4; // 2 bytes for AU-headers-length + 2 bytes for AU-header
+    size_t max_payload = mtuSize_ - RtpHeaderSize() - au_header_section_size;
+
+    if (max_payload <= 0 || size > max_payload) {
+        // Frame too large for single packet, skip for now
+        // TODO: implement fragmentation with multiple AUs
         return;
-
-    size_t offset = 0;
-    while (offset < size) {
-        size_t chunk = std::min(max_payload, size - offset);
-        bool is_last = (offset + chunk) >= size;
-
-        auto packet = std::make_shared<RtpPacket>();
-        packet->version = 2;
-        packet->payload_type = payloadType_;
-        packet->sequence_number = sequenceNumber_++;
-        packet->timestamp = timestamp;
-        packet->ssrc = ssrc_;
-        packet->marker = is_last ? 1 : 0;
-
-        auto payload = std::make_shared<lmcore::DataBuffer>(chunk);
-        payload->Assign(data + offset, chunk);
-        packet->payload = payload;
-
-        if (auto l2 = listener_.lock())
-            l2->OnPacket(packet);
-
-        offset += chunk;
     }
+
+    // Build RTP packet with AU headers
+    auto packet = std::make_shared<RtpPacket>();
+    packet->version = 2;
+    packet->payload_type = payloadType_;
+    packet->sequence_number = sequenceNumber_++;
+    packet->timestamp = timestamp;
+    packet->ssrc = ssrc_;
+    packet->marker = 1; // Single complete AU
+
+    // Construct payload: AU-headers-length + AU-header + AAC frame data
+    auto payload = std::make_shared<lmcore::DataBuffer>(au_header_section_size + size);
+    uint8_t *p = payload->Data();
+
+    // AU-headers-length in bits (16 bits for one AU-header)
+    p[0] = 0x00;
+    p[1] = 0x10; // 16 bits
+
+    // AU-header: 13 bits size + 3 bits AU-Index (0)
+    // Size is in bytes, left-aligned in 16 bits
+    uint16_t au_size = static_cast<uint16_t>(size);
+    p[2] = (au_size >> 5) & 0xFF; // Upper 8 bits of 13-bit size
+    p[3] = (au_size << 3) & 0xFF; // Lower 5 bits of size + 3 bits index (0)
+
+    // Copy AAC frame data
+    std::memcpy(p + 4, data, size);
+    payload->SetSize(au_header_section_size + size);
+
+    packet->payload = payload;
+
+    if (auto l2 = listener_.lock())
+        l2->OnPacket(packet);
 }
 
 } // namespace lmshao::lmrtsp

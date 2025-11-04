@@ -3,12 +3,15 @@
 
 set(VOD_SOURCES
     main.cpp
+    aac_file_reader.cpp
     h264_file_reader.cpp
     ts_file_reader.cpp
+    session_aac_reader.cpp
     session_h264_reader.cpp
     session_ts_reader.cpp
     file_manager.cpp
     session_manager.cpp
+    session_aac_worker_thread.cpp
     session_worker_thread.cpp
     session_ts_worker_thread.cpp
 )

@@ -10,13 +10,9 @@
 #define LMSHAO_RTSP_SESSION_H264_READER_H
 
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "lmcore/mapped_file.h"
-#include "lmrtsp/media_stream_info.h"
-
-using namespace lmshao::lmrtsp;
 
 /**
  * @brief Local frame structure for SessionH264Reader

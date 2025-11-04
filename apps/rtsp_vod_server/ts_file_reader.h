@@ -10,7 +10,6 @@
 #define LMSHAO_RTSP_TS_FILE_READER_H
 
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "lmcore/mapped_file.h"
