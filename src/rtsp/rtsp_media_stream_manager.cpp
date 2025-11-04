@@ -81,7 +81,7 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
     rtp_config.video_type = video_type;
     rtp_config.video_payload_type = payload_type;
     rtp_config.mtu_size = 1400;
-    rtp_config.enable_rtcp = false;
+    rtp_config.enable_rtcp = true;
     // Pass RTSP session for TCP interleaved mode
     rtp_config.rtsp_session = rtspSession_;
 

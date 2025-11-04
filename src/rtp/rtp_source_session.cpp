@@ -121,6 +121,9 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
     // Create transport adapter based on config
     if (config_.transport.type == TransportConfig::Type::UDP) {
         transportAdapter_ = std::make_unique<UdpRtpTransportAdapter>();
+        LMRTSP_LOGD("Using UDP transport adapter: client=%s:%u/%u, server=%u/%u", config_.transport.client_ip.c_str(),
+                    config_.transport.client_rtp_port, config_.transport.client_rtcp_port,
+                    config_.transport.server_rtp_port, config_.transport.server_rtcp_port);
     } else if (config_.transport.type == TransportConfig::Type::TCP_INTERLEAVED) {
         // For TCP interleaved, we need RTSP session
         if (config_.rtsp_session.expired()) {
@@ -190,7 +193,8 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
                 listener->SetRtcpContext(rtcpContext_.get());
             }
 
-            LMRTSP_LOGI("RTCP sender context initialized: SSRC=0x%08x", config_.ssrc);
+            LMRTSP_LOGI("RTCP sender context initialized: SSRC=0x%08x, interval=%ums", config_.ssrc,
+                        config_.rtcp_interval_ms);
         } else {
             LMRTSP_LOGW("Failed to create RTCP sender context");
         }
@@ -323,6 +327,8 @@ void RtpSourceSession::StopRtcpTimer()
 void RtpSourceSession::SendRtcpReport()
 {
     if (!rtcpContext_ || !transportAdapter_) {
+        LMRTSP_LOGW("SendRtcpReport skipped: rtcpContext=%s, transportAdapter=%s", rtcpContext_ ? "valid" : "null",
+                    transportAdapter_ ? "valid" : "null");
         return;
     }
 
@@ -336,12 +342,16 @@ void RtpSourceSession::SendRtcpReport()
     }
 
     if (rtcpPacket && rtcpPacket->Size() > 0) {
+        LMRTSP_LOGD("RTCP report ready: size=%zu, cname=%s", rtcpPacket->Size(),
+                    config_.rtcp_cname.empty() ? "" : config_.rtcp_cname.c_str());
         bool success = transportAdapter_->SendRtcpPacket(rtcpPacket->Data(), rtcpPacket->Size());
         if (success) {
             LMRTSP_LOGD("RTCP report sent: size=%zu", rtcpPacket->Size());
         } else {
             LMRTSP_LOGW("Failed to send RTCP report");
         }
+    } else {
+        LMRTSP_LOGW("RTCP report creation failed or empty");
     }
 }
 

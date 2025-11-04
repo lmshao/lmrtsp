@@ -10,6 +10,7 @@
 
 #include <sstream>
 
+#include "internal_logger.h"
 #include "lmrtsp/rtsp_session.h"
 
 namespace lmshao::lmrtsp {
@@ -29,6 +30,7 @@ bool TcpInterleavedTransportAdapter::Setup(const TransportConfig &config)
     // Validate if RTSP session is valid
     auto session = rtspSession_.lock();
     if (!session) {
+        LMRTSP_LOGE("TCP interleaved Setup failed: RTSP session expired");
         return false;
     }
 
@@ -38,6 +40,8 @@ bool TcpInterleavedTransportAdapter::Setup(const TransportConfig &config)
 
     // Validate channel numbers
     if (!ValidateChannels(rtpChannel_, rtcpChannel_)) {
+        LMRTSP_LOGE("Invalid interleaved channels: rtp=%d, rtcp=%d", static_cast<int>(rtpChannel_),
+                    static_cast<int>(rtcpChannel_));
         return false;
     }
 
@@ -46,6 +50,9 @@ bool TcpInterleavedTransportAdapter::Setup(const TransportConfig &config)
     oss << "RTP/AVP/TCP;interleaved=" << static_cast<int>(rtpChannel_) << "-" << static_cast<int>(rtcpChannel_);
     transportInfo_ = oss.str();
 
+    LMRTSP_LOGD("TCP interleaved adapter Setup: interleaved=%d-%d", static_cast<int>(rtpChannel_),
+                static_cast<int>(rtcpChannel_));
+
     isSetup_ = true;
     return true;
 }
@@ -53,31 +60,47 @@ bool TcpInterleavedTransportAdapter::Setup(const TransportConfig &config)
 bool TcpInterleavedTransportAdapter::SendPacket(const uint8_t *data, size_t size)
 {
     if (!isSetup_ || !data || size == 0) {
+        LMRTSP_LOGE("SendPacket invalid: isSetup=%s, size=%zu", isSetup_ ? "true" : "false", size);
         return false;
     }
 
     auto session = rtspSession_.lock();
     if (!session) {
+        LMRTSP_LOGE("SendPacket failed: RTSP session expired");
         return false;
     }
 
     // Send interleaved RTP data through RTSP session
-    return session->SendInterleavedData(rtpChannel_, data, size);
+    bool ok = session->SendInterleavedData(rtpChannel_, data, size);
+    if (!ok) {
+        LMRTSP_LOGE("Failed to send interleaved RTP: channel=%d, size=%zu", static_cast<int>(rtpChannel_), size);
+    } else {
+        LMRTSP_LOGD("Interleaved RTP sent: channel=%d, size=%zu", static_cast<int>(rtpChannel_), size);
+    }
+    return ok;
 }
 
 bool TcpInterleavedTransportAdapter::SendRtcpPacket(const uint8_t *data, size_t size)
 {
     if (!isSetup_ || !data || size == 0) {
+        LMRTSP_LOGE("SendRtcpPacket invalid: isSetup=%s, size=%zu", isSetup_ ? "true" : "false", size);
         return false;
     }
 
     auto session = rtspSession_.lock();
     if (!session) {
+        LMRTSP_LOGE("SendRtcpPacket failed: RTSP session expired");
         return false;
     }
 
     // Send interleaved RTCP data through RTSP session
-    return session->SendInterleavedData(rtcpChannel_, data, size);
+    bool ok = session->SendInterleavedData(rtcpChannel_, data, size);
+    if (!ok) {
+        LMRTSP_LOGE("Failed to send interleaved RTCP: channel=%d, size=%zu", static_cast<int>(rtcpChannel_), size);
+    } else {
+        LMRTSP_LOGD("Interleaved RTCP sent: channel=%d, size=%zu", static_cast<int>(rtcpChannel_), size);
+    }
+    return ok;
 }
 
 void TcpInterleavedTransportAdapter::Close()
