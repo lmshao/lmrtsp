@@ -475,8 +475,66 @@ std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::s
         sdp += "a=control:track0\r\n";
     } else if (stream_info->media_type == "audio") {
         sdp += "m=audio 0 RTP/AVP " + std::to_string(stream_info->payload_type) + "\r\n";
-        sdp += "a=rtpmap:" + std::to_string(stream_info->payload_type) + " " + stream_info->codec + "/" +
-               std::to_string(stream_info->sample_rate) + "\r\n";
+
+        // Use RFC 3640 compliant codec name for AAC
+        std::string codec_name = stream_info->codec;
+        if (codec_name == "AAC") {
+            codec_name = "mpeg4-generic"; // RFC 3640 standard name
+        }
+
+        sdp += "a=rtpmap:" + std::to_string(stream_info->payload_type) + " " + codec_name + "/" +
+               std::to_string(stream_info->sample_rate);
+
+        // Add channel information to rtpmap
+        if (stream_info->channels > 0) {
+            sdp += "/" + std::to_string(stream_info->channels);
+        }
+        sdp += "\r\n";
+
+        // Add fmtp for AAC (RFC 3640)
+        if (stream_info->codec == "AAC") {
+            // Generate AudioSpecificConfig for AAC-LC
+            // Format: profile(5bits) + sampling_freq_index(4bits) + channel_config(4bits)
+            // AAC-LC profile = 2 (0b00010)
+            // 48000Hz index = 3, 44100Hz index = 4
+            int sampling_freq_index = 15; // default invalid
+            if (stream_info->sample_rate == 96000)
+                sampling_freq_index = 0;
+            else if (stream_info->sample_rate == 88200)
+                sampling_freq_index = 1;
+            else if (stream_info->sample_rate == 64000)
+                sampling_freq_index = 2;
+            else if (stream_info->sample_rate == 48000)
+                sampling_freq_index = 3;
+            else if (stream_info->sample_rate == 44100)
+                sampling_freq_index = 4;
+            else if (stream_info->sample_rate == 32000)
+                sampling_freq_index = 5;
+            else if (stream_info->sample_rate == 24000)
+                sampling_freq_index = 6;
+            else if (stream_info->sample_rate == 22050)
+                sampling_freq_index = 7;
+            else if (stream_info->sample_rate == 16000)
+                sampling_freq_index = 8;
+            else if (stream_info->sample_rate == 12000)
+                sampling_freq_index = 9;
+            else if (stream_info->sample_rate == 11025)
+                sampling_freq_index = 10;
+            else if (stream_info->sample_rate == 8000)
+                sampling_freq_index = 11;
+
+            // AudioSpecificConfig: profile(5) + freq_index(4) + channel(4) = 13 bits, pad to 16 bits
+            uint16_t config = (2 << 11) | (sampling_freq_index << 7) | (stream_info->channels << 3);
+            char config_hex[8];
+            snprintf(config_hex, sizeof(config_hex), "%04X", config);
+
+            // RFC 3640 fmtp parameters
+            sdp +=
+                "a=fmtp:" + std::to_string(stream_info->payload_type) +
+                " streamtype=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=" +
+                std::string(config_hex) + "\r\n";
+        }
+
         sdp += "a=control:track1\r\n";
     }
 

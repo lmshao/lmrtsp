@@ -23,8 +23,11 @@
 #include <memory>
 #include <thread>
 
+#include "aac_file_reader.h"
 #include "file_manager.h"
 #include "h264_file_reader.h"
+#include "session_aac_reader.h"
+#include "session_aac_worker_thread.h"
 #include "session_manager.h"
 #include "session_ts_reader.h"
 #include "session_ts_worker_thread.h"
@@ -55,6 +58,10 @@ std::mutex g_media_mutex;
 std::map<std::string, std::shared_ptr<SessionTSWorkerThread>> g_ts_workers;
 std::mutex g_ts_workers_mutex;
 
+// AAC worker threads
+std::map<std::string, std::shared_ptr<SessionAacWorkerThread>> g_aac_workers;
+std::mutex g_aac_workers_mutex;
+
 // Session event callback for managing worker threads
 class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
 public:
@@ -77,6 +84,17 @@ public:
                 ts_it->second->Stop();
                 g_ts_workers.erase(ts_it);
                 std::cout << "Stopped TS worker for session: " << session_id << std::endl;
+            }
+        }
+
+        // Stop the AAC worker thread if exists
+        {
+            std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
+            auto aac_it = g_aac_workers.find(session_id);
+            if (aac_it != g_aac_workers.end()) {
+                aac_it->second->Stop();
+                g_aac_workers.erase(aac_it);
+                std::cout << "Stopped AAC worker for session: " << session_id << std::endl;
             }
         }
     }
@@ -125,6 +143,18 @@ public:
             } else {
                 std::cout << "Failed to start TS worker thread for session: " << session_id << std::endl;
             }
+        } else if (media.codec == "AAC") {
+            // Start AAC worker thread for this session
+            uint32_t sample_rate = stream_info->sample_rate > 0 ? stream_info->sample_rate : 48000;
+
+            auto aac_worker = std::make_shared<SessionAacWorkerThread>(session, media.file_path, sample_rate);
+            if (aac_worker->Start()) {
+                std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
+                g_aac_workers[session_id] = aac_worker;
+                std::cout << "Started AAC worker thread for session: " << session_id << std::endl;
+            } else {
+                std::cout << "Failed to start AAC worker thread for session: " << session_id << std::endl;
+            }
         } else {
             std::cout << "Unsupported codec: " << media.codec << " for session: " << session_id << std::endl;
         }
@@ -144,6 +174,17 @@ public:
                 ts_it->second->Stop();
                 g_ts_workers.erase(ts_it);
                 std::cout << "Stopped TS worker for session: " << session_id << std::endl;
+            }
+        }
+
+        // Stop the AAC worker thread if exists
+        {
+            std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
+            auto aac_it = g_aac_workers.find(session_id);
+            if (aac_it != g_aac_workers.end()) {
+                aac_it->second->Stop();
+                g_aac_workers.erase(aac_it);
+                std::cout << "Stopped AAC worker for session: " << session_id << std::endl;
             }
         }
     }
@@ -347,6 +388,56 @@ bool ScanMediaDirectory(const std::string &directory)
                 // Release temporary reference
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
+            // Support for AAC files
+            else if (codec == "AAC") {
+                // Use FileManager to get shared MappedFile
+                auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
+                if (!mapped_file) {
+                    std::cerr << "Warning: Failed to map AAC file: " << filepath << std::endl;
+                    continue;
+                }
+
+                // Create temporary AacFileReader to extract information
+                AacFileReader temp_reader(mapped_file);
+                if (!temp_reader.IsValid()) {
+                    std::cerr << "Warning: Invalid AAC file: " << filepath << std::endl;
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
+                    continue;
+                }
+
+                // Create and register media stream
+                auto streamInfo = std::make_shared<MediaStreamInfo>();
+                streamInfo->stream_path = streamPath;
+                streamInfo->media_type = "audio";
+                streamInfo->codec = "AAC";
+                streamInfo->payload_type = 97; // Dynamic payload type for AAC
+                streamInfo->sample_rate = temp_reader.GetSampleRate();
+                streamInfo->channels = temp_reader.GetChannels();
+                streamInfo->clock_rate = temp_reader.GetSampleRate();
+
+                if (!g_server->AddMediaStream(streamPath, streamInfo)) {
+                    std::cerr << "Warning: Failed to register stream: " << streamPath << std::endl;
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
+                    continue;
+                }
+
+                // Get playback info
+                auto playback_info = temp_reader.GetPlaybackInfo();
+                double duration = playback_info.total_duration_;
+                uint32_t bitrate = temp_reader.GetBitrate();
+
+                std::cout << "  [" << ++fileCount << "] " << filename << std::endl;
+                std::cout << "      Stream:     rtsp://localhost:8554" << streamPath << std::endl;
+                std::cout << "      Codec:      " << codec << " (AAC-LC)" << std::endl;
+                std::cout << "      Sample rate: " << streamInfo->sample_rate << " Hz" << std::endl;
+                std::cout << "      Channels:   " << (int)streamInfo->channels << std::endl;
+                std::cout << "      Bitrate:    " << (bitrate / 1000.0) << " kbps" << std::endl;
+                std::cout << "      Duration:   " << duration << " seconds" << std::endl;
+                std::cout << "      Frames:     " << playback_info.total_frames_ << std::endl;
+
+                // Release temporary reference
+                FileManager::GetInstance().ReleaseMappedFile(filepath);
+            }
 
             std::lock_guard<std::mutex> lock(g_media_mutex);
             g_media_files[streamPath] = media;
@@ -528,6 +619,16 @@ int main(int argc, char *argv[])
             pair.second->Stop();
         }
         g_ts_workers.clear();
+    }
+
+    // Stop all AAC worker threads
+    {
+        std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
+        for (auto &pair : g_aac_workers) {
+            std::cout << "Stopping AAC worker: " << pair.first << std::endl;
+            pair.second->Stop();
+        }
+        g_aac_workers.clear();
     }
 
     // Clear file cache
