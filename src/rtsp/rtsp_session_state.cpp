@@ -10,14 +10,14 @@
 
 #include "internal_logger.h"
 #include "lmrtsp/rtsp_server.h"
-#include "lmrtsp/rtsp_session.h"
+#include "lmrtsp/rtsp_server_session.h"
 #include "rtsp_response.h"
 
 namespace lmshao::lmrtsp {
 
 namespace {
 
-RtspResponse HandleOptions(RtspSession *session, const RtspRequest &request)
+RtspResponse HandleOptions(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing OPTIONS request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -29,7 +29,7 @@ RtspResponse HandleOptions(RtspSession *session, const RtspRequest &request)
     return response;
 }
 
-RtspResponse HandleDescribe(RtspSession *session, const RtspRequest &request)
+RtspResponse HandleDescribe(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing DESCRIBE request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -64,7 +64,7 @@ RtspResponse HandleDescribe(RtspSession *session, const RtspRequest &request)
     }
 }
 
-RtspResponse HandleGetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse HandleGetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing GET_PARAMETER request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -72,7 +72,7 @@ RtspResponse HandleGetParameter(RtspSession *session, const RtspRequest &request
     return response;
 }
 
-RtspResponse HandleSetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse HandleSetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing SET_PARAMETER request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -80,7 +80,7 @@ RtspResponse HandleSetParameter(RtspSession *session, const RtspRequest &request
     return response;
 }
 
-RtspResponse HandleAnnounce(RtspSession *session, const RtspRequest &request)
+RtspResponse HandleAnnounce(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing ANNOUNCE request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -88,7 +88,7 @@ RtspResponse HandleAnnounce(RtspSession *session, const RtspRequest &request)
     return response;
 }
 
-RtspResponse HandleRecord(RtspSession *session, const RtspRequest &request)
+RtspResponse HandleRecord(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing RECORD request");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -99,37 +99,37 @@ RtspResponse HandleRecord(RtspSession *session, const RtspRequest &request)
 } // namespace
 
 // InitialState implementations
-RtspResponse InitialState::OnOptions(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnOptions(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RtspResponse InitialState::OnDescribe(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnDescribe(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RtspResponse InitialState::OnAnnounce(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnAnnounce(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RtspResponse InitialState::OnRecord(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnRecord(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RtspResponse InitialState::OnGetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnGetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RtspResponse InitialState::OnSetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnSetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RtspResponse InitialState::OnSetup(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnSetup(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing SETUP request in InitialState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -149,21 +149,21 @@ RtspResponse InitialState::OnSetup(RtspSession *session, const RtspRequest &requ
     }
 }
 
-RtspResponse InitialState::OnPlay(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnPlay(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse InitialState::OnPause(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnPause(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse InitialState::OnTeardown(RtspSession *session, const RtspRequest &request)
+RtspResponse InitialState::OnTeardown(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
@@ -171,44 +171,44 @@ RtspResponse InitialState::OnTeardown(RtspSession *session, const RtspRequest &r
 }
 
 // ReadyState implementations
-RtspResponse ReadyState::OnOptions(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnOptions(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RtspResponse ReadyState::OnDescribe(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnDescribe(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RtspResponse ReadyState::OnAnnounce(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnAnnounce(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RtspResponse ReadyState::OnRecord(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnRecord(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RtspResponse ReadyState::OnGetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnGetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RtspResponse ReadyState::OnSetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnSetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RtspResponse ReadyState::OnSetup(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnSetup(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse ReadyState::OnPlay(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnPlay(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing PLAY request in ReadyState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -234,14 +234,14 @@ RtspResponse ReadyState::OnPlay(RtspSession *session, const RtspRequest &request
     }
 }
 
-RtspResponse ReadyState::OnPause(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnPause(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse ReadyState::OnTeardown(RtspSession *session, const RtspRequest &request)
+RtspResponse ReadyState::OnTeardown(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing TEARDOWN request in ReadyState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -254,51 +254,51 @@ RtspResponse ReadyState::OnTeardown(RtspSession *session, const RtspRequest &req
 }
 
 // PlayingState implementations
-RtspResponse PlayingState::OnOptions(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnOptions(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RtspResponse PlayingState::OnDescribe(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnDescribe(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RtspResponse PlayingState::OnAnnounce(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnAnnounce(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RtspResponse PlayingState::OnRecord(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnRecord(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RtspResponse PlayingState::OnGetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnGetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RtspResponse PlayingState::OnSetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnSetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RtspResponse PlayingState::OnSetup(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnSetup(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse PlayingState::OnPlay(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnPlay(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse PlayingState::OnPause(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnPause(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing PAUSE request in PlayingState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -313,7 +313,7 @@ RtspResponse PlayingState::OnPause(RtspSession *session, const RtspRequest &requ
     }
 }
 
-RtspResponse PlayingState::OnTeardown(RtspSession *session, const RtspRequest &request)
+RtspResponse PlayingState::OnTeardown(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing TEARDOWN request in PlayingState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -326,44 +326,44 @@ RtspResponse PlayingState::OnTeardown(RtspSession *session, const RtspRequest &r
 }
 
 // PausedState implementations
-RtspResponse PausedState::OnOptions(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnOptions(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleOptions(session, request);
 }
 
-RtspResponse PausedState::OnDescribe(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnDescribe(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleDescribe(session, request);
 }
 
-RtspResponse PausedState::OnAnnounce(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnAnnounce(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleAnnounce(session, request);
 }
 
-RtspResponse PausedState::OnRecord(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnRecord(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleRecord(session, request);
 }
 
-RtspResponse PausedState::OnGetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnGetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleGetParameter(session, request);
 }
 
-RtspResponse PausedState::OnSetParameter(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnSetParameter(RtspServerSession *session, const RtspRequest &request)
 {
     return HandleSetParameter(session, request);
 }
 
-RtspResponse PausedState::OnSetup(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnSetup(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse PausedState::OnPlay(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnPlay(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing PLAY request in PausedState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -389,14 +389,14 @@ RtspResponse PausedState::OnPlay(RtspSession *session, const RtspRequest &reques
     }
 }
 
-RtspResponse PausedState::OnPause(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnPause(RtspServerSession *session, const RtspRequest &request)
 {
     int cseq = std::stoi(request.general_header_.at("CSeq"));
     auto response = RtspResponseBuilder().SetStatus(StatusCode::OK).SetCSeq(cseq).Build();
     return response;
 }
 
-RtspResponse PausedState::OnTeardown(RtspSession *session, const RtspRequest &request)
+RtspResponse PausedState::OnTeardown(RtspServerSession *session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Processing TEARDOWN request in PausedState");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
@@ -408,7 +408,7 @@ RtspResponse PausedState::OnTeardown(RtspSession *session, const RtspRequest &re
     return response;
 }
 
-// RtspSessionState is an abstract base class - no default implementations needed
+// RtspServerSessionState is an abstract base class - no default implementations needed
 
 // GetName functions are implemented inline in the header file
 

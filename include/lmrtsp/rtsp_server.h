@@ -26,7 +26,7 @@
 
 namespace lmshao::lmrtsp {
 using namespace lmshao::lmcore;
-class RtspSession;
+class RtspServerSession;
 class RtspRequest;
 class RtspServerListener;
 class RtspServer : public std::enable_shared_from_this<RtspServer>, public ManagedSingleton<RtspServer> {
@@ -43,14 +43,14 @@ public:
     bool IsRunning() const;
 
     // Session management
-    void HandleRequest(std::shared_ptr<RtspSession> session, const RtspRequest &request);
+    void HandleRequest(std::shared_ptr<RtspServerSession> session, const RtspRequest &request);
     void HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSession, const RtspRequest &request);
     void SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession, const RtspRequest &request, int statusCode,
                            const std::string &reasonPhrase);
-    std::shared_ptr<RtspSession> CreateSession(std::shared_ptr<lmnet::Session> lmnetSession);
+    std::shared_ptr<RtspServerSession> CreateSession(std::shared_ptr<lmnet::Session> lmnetSession);
     void RemoveSession(const std::string &sessionId);
-    std::shared_ptr<RtspSession> GetSession(const std::string &sessionId);
-    std::unordered_map<std::string, std::shared_ptr<RtspSession>> GetSessions();
+    std::shared_ptr<RtspServerSession> GetSession(const std::string &sessionId);
+    std::unordered_map<std::string, std::shared_ptr<RtspServerSession>> GetSessions();
 
     // Callback interface
     void SetCallback(std::shared_ptr<IRtspServerCallback> callback);
@@ -87,7 +87,7 @@ private:
 
     // Session management
     mutable std::mutex sessionsMutex_;
-    std::unordered_map<std::string, std::shared_ptr<RtspSession>> sessions_;
+    std::unordered_map<std::string, std::shared_ptr<RtspServerSession>> sessions_;
 
     // Callback interface
     mutable std::mutex callbackMutex_;
@@ -98,7 +98,7 @@ private:
     std::map<std::string, std::shared_ptr<MediaStreamInfo>> mediaStreams_;
 
     // Internal helper methods
-    std::string GetClientIP(std::shared_ptr<RtspSession> session) const;
+    std::string GetClientIP(std::shared_ptr<RtspServerSession> session) const;
     void NotifyCallback(std::function<void(IRtspServerCallback *)> func);
 };
 

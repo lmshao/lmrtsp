@@ -16,13 +16,13 @@
 #include <iostream>
 #include <thread>
 
-SessionTSWorkerThread::SessionTSWorkerThread(std::shared_ptr<RtspSession> session, const std::string &file_path,
+SessionTSWorkerThread::SessionTSWorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
                                              uint32_t bitrate)
     : session_(session), session_id_(session ? session->GetSessionId() : "unknown"), file_path_(file_path),
       running_(false), should_stop_(false), bitrate_(bitrate), packet_counter_(0), packets_sent_(0), bytes_sent_(0)
 {
     if (!session_) {
-        std::cout << "Invalid RtspSession provided to SessionTSWorkerThread" << std::endl;
+        std::cout << "Invalid RtspServerSession provided to SessionTSWorkerThread" << std::endl;
         return;
     }
 

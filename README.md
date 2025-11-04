@@ -144,7 +144,7 @@ More examples can be found in the [`examples/`](examples/) directory and [`apps/
 ## API Reference
 
 - See header files in [`include/lmrtsp/`](include/lmrtsp/) for detailed API documentation
-- Key classes: `RTSPServer`, `RTSPSession`, `MediaStream`, `RTPSession`, etc.
+- Key classes: `RTSPServer`, `RtspServerSession`, `MediaStream`, `RTPSession`, etc.
 
 ## Applications
 

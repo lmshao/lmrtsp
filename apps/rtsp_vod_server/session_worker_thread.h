@@ -11,7 +11,7 @@
 
 #include <lmcore/data_buffer.h>
 #include <lmrtsp/media_types.h>
-#include <lmrtsp/rtsp_session.h>
+#include <lmrtsp/rtsp_server_session.h>
 
 #include <atomic>
 #include <chrono>
@@ -42,7 +42,8 @@ public:
      * @param file_path Path to the H.264 file
      * @param frame_rate Target frame rate for streaming (fps)
      */
-    SessionWorkerThread(std::shared_ptr<RtspSession> session, const std::string &file_path, uint32_t frame_rate = 25);
+    SessionWorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
+                        uint32_t frame_rate = 25);
 
     /**
      * @brief Destructor - ensures proper cleanup
@@ -135,7 +136,7 @@ private:
 
 private:
     // Session management
-    std::shared_ptr<RtspSession> session_;
+    std::shared_ptr<RtspServerSession> session_;
     std::string session_id_;
     std::string file_path_;
 

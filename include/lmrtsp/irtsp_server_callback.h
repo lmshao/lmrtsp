@@ -15,7 +15,7 @@
 namespace lmshao::lmrtsp {
 
 // Forward declaration
-class RtspSession;
+class RtspServerSession;
 
 /**
  * @brief RTSP server callback interface
@@ -107,7 +107,7 @@ public:
      * @brief Session created event
      * @param session Shared pointer to the created session
      */
-    virtual void OnSessionCreated(std::shared_ptr<RtspSession> session)
+    virtual void OnSessionCreated(std::shared_ptr<RtspServerSession> session)
     {
         // Default empty implementation
     }
@@ -125,7 +125,7 @@ public:
      * @brief Session start play event
      * @param session Shared pointer to the session that started playing
      */
-    virtual void OnSessionStartPlay(std::shared_ptr<RtspSession> session)
+    virtual void OnSessionStartPlay(std::shared_ptr<RtspServerSession> session)
     {
         // Default empty implementation
     }

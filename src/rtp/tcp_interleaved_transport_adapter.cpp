@@ -11,12 +11,12 @@
 #include <sstream>
 
 #include "internal_logger.h"
-#include "lmrtsp/rtsp_session.h"
+#include "lmrtsp/rtsp_server_session.h"
 
 namespace lmshao::lmrtsp {
 
-TcpInterleavedTransportAdapter::TcpInterleavedTransportAdapter(std::weak_ptr<RtspSession> RtspSession)
-    : rtspSession_(RtspSession), rtpChannel_(0), rtcpChannel_(1), isSetup_(false)
+TcpInterleavedTransportAdapter::TcpInterleavedTransportAdapter(std::weak_ptr<RtspServerSession> RtspServerSession)
+    : RtspServerSession_(RtspServerSession), rtpChannel_(0), rtcpChannel_(1), isSetup_(false)
 {
 }
 
@@ -28,7 +28,7 @@ TcpInterleavedTransportAdapter::~TcpInterleavedTransportAdapter()
 bool TcpInterleavedTransportAdapter::Setup(const TransportConfig &config)
 {
     // Validate if RTSP session is valid
-    auto session = rtspSession_.lock();
+    auto session = RtspServerSession_.lock();
     if (!session) {
         LMRTSP_LOGE("TCP interleaved Setup failed: RTSP session expired");
         return false;
@@ -64,7 +64,7 @@ bool TcpInterleavedTransportAdapter::SendPacket(const uint8_t *data, size_t size
         return false;
     }
 
-    auto session = rtspSession_.lock();
+    auto session = RtspServerSession_.lock();
     if (!session) {
         LMRTSP_LOGE("SendPacket failed: RTSP session expired");
         return false;
@@ -87,7 +87,7 @@ bool TcpInterleavedTransportAdapter::SendRtcpPacket(const uint8_t *data, size_t 
         return false;
     }
 
-    auto session = rtspSession_.lock();
+    auto session = RtspServerSession_.lock();
     if (!session) {
         LMRTSP_LOGE("SendRtcpPacket failed: RTSP session expired");
         return false;
@@ -121,7 +121,7 @@ bool TcpInterleavedTransportAdapter::IsActive() const
         return false;
     }
 
-    auto session = rtspSession_.lock();
+    auto session = RtspServerSession_.lock();
     return session != nullptr;
 }
 

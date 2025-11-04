@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "lmrtsp/rtsp_session.h"
+#include "lmrtsp/rtsp_server_session.h"
 
 #include <lmcore/time_utils.h>
 #include <lmcore/uuid.h>
@@ -21,9 +21,9 @@
 
 namespace lmshao::lmrtsp {
 
-RtspSession::RtspSession(std::shared_ptr<lmnet::Session> lmnetSession)
+RtspServerSession::RtspServerSession(std::shared_ptr<lmnet::Session> lmnetSession)
     : lmnetSession_(lmnetSession), timeout_(60),
-      mediaStreamManager_(std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspSession>()))
+      mediaStreamManager_(std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspServerSession>()))
 { // Default 60 seconds timeout
 
     // Generate session ID
@@ -35,12 +35,12 @@ RtspSession::RtspSession(std::shared_ptr<lmnet::Session> lmnetSession)
     // Initialize state machine to Initial state
     currentState_ = InitialState::GetInstance();
 
-    LMRTSP_LOGD("RtspSession created with ID: %s", sessionId_.c_str());
+    LMRTSP_LOGD("RtspServerSession created with ID: %s", sessionId_.c_str());
 }
 
-RtspSession::RtspSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RtspServer> server)
+RtspServerSession::RtspServerSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak_ptr<RtspServer> server)
     : lmnetSession_(lmnetSession), rtspServer_(server), timeout_(60),
-      mediaStreamManager_(std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspSession>()))
+      mediaStreamManager_(std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspServerSession>()))
 {
     // Generate session ID
     sessionId_ = GenerateSessionId();
@@ -51,18 +51,18 @@ RtspSession::RtspSession(std::shared_ptr<lmnet::Session> lmnetSession, std::weak
     // Initialize state machine to Initial state
     currentState_ = InitialState::GetInstance();
 
-    LMRTSP_LOGD("RtspSession created with ID: %s and server reference", sessionId_.c_str());
+    LMRTSP_LOGD("RtspServerSession created with ID: %s and server reference", sessionId_.c_str());
 }
 
-RtspSession::~RtspSession()
+RtspServerSession::~RtspServerSession()
 {
-    LMRTSP_LOGD("RtspSession destroyed: %s", sessionId_.c_str());
+    LMRTSP_LOGD("RtspServerSession destroyed: %s", sessionId_.c_str());
 
     // Clean up media streams
     mediaStreams_.clear();
 }
 
-RtspResponse RtspSession::ProcessRequest(const RtspRequest &request)
+RtspResponse RtspServerSession::ProcessRequest(const RtspRequest &request)
 {
     // Update last active time
     UpdateLastActiveTime();
@@ -107,22 +107,22 @@ RtspResponse RtspSession::ProcessRequest(const RtspRequest &request)
     }
 }
 
-void RtspSession::ChangeState(std::shared_ptr<RtspSessionState> newState)
+void RtspServerSession::ChangeState(std::shared_ptr<RtspServerSessionState> newState)
 {
     currentState_ = newState;
 }
 
-std::shared_ptr<RtspSessionState> RtspSession::GetCurrentState() const
+std::shared_ptr<RtspServerSessionState> RtspServerSession::GetCurrentState() const
 {
     return currentState_;
 }
 
-std::string RtspSession::GetSessionId() const
+std::string RtspServerSession::GetSessionId() const
 {
     return sessionId_;
 }
 
-std::string RtspSession::GetClientIP() const
+std::string RtspServerSession::GetClientIP() const
 {
     if (lmnetSession_) {
         return lmnetSession_->host;
@@ -130,7 +130,7 @@ std::string RtspSession::GetClientIP() const
     return "";
 }
 
-uint16_t RtspSession::GetClientPort() const
+uint16_t RtspServerSession::GetClientPort() const
 {
     if (lmnetSession_) {
         return lmnetSession_->port;
@@ -138,17 +138,17 @@ uint16_t RtspSession::GetClientPort() const
     return 0;
 }
 
-std::shared_ptr<lmnet::Session> RtspSession::GetNetworkSession() const
+std::shared_ptr<lmnet::Session> RtspServerSession::GetNetworkSession() const
 {
     return lmnetSession_;
 }
 
-std::weak_ptr<RtspServer> RtspSession::GetRTSPServer() const
+std::weak_ptr<RtspServer> RtspServerSession::GetRTSPServer() const
 {
     return rtspServer_;
 }
 
-bool RtspSession::SetupMedia(const std::string &uri, const std::string &transport)
+bool RtspServerSession::SetupMedia(const std::string &uri, const std::string &transport)
 {
     LMRTSP_LOGD("Setting up media for URI: %s, Transport: %s", uri.c_str(), transport.c_str());
 
@@ -213,7 +213,7 @@ bool RtspSession::SetupMedia(const std::string &uri, const std::string &transpor
 
     // Create media stream manager
     mediaStreamManager_ =
-        std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspSession>(shared_from_this()));
+        std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspServerSession>(shared_from_this()));
 
     // Setup the media stream manager with transport config
     if (!mediaStreamManager_->Setup(transportConfig)) {
@@ -235,7 +235,7 @@ bool RtspSession::SetupMedia(const std::string &uri, const std::string &transpor
     return true;
 }
 
-bool RtspSession::PlayMedia(const std::string &uri, const std::string &range)
+bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &range)
 {
     LMRTSP_LOGD("Playing media for URI: %s, Range: %s", uri.c_str(), range.c_str());
 
@@ -272,7 +272,7 @@ bool RtspSession::PlayMedia(const std::string &uri, const std::string &range)
     return true;
 }
 
-bool RtspSession::PauseMedia(const std::string &uri)
+bool RtspServerSession::PauseMedia(const std::string &uri)
 {
     LMRTSP_LOGD("Pausing media for URI: %s", uri.c_str());
 
@@ -309,7 +309,7 @@ bool RtspSession::PauseMedia(const std::string &uri)
     return true;
 }
 
-bool RtspSession::TeardownMedia(const std::string &uri)
+bool RtspServerSession::TeardownMedia(const std::string &uri)
 {
     LMRTSP_LOGD("Tearing down media for URI: %s", uri.c_str());
 
@@ -339,27 +339,27 @@ bool RtspSession::TeardownMedia(const std::string &uri)
     return true;
 }
 
-void RtspSession::SetSdpDescription(const std::string &sdp)
+void RtspServerSession::SetSdpDescription(const std::string &sdp)
 {
     sdpDescription_ = sdp;
 }
 
-std::string RtspSession::GetSdpDescription() const
+std::string RtspServerSession::GetSdpDescription() const
 {
     return sdpDescription_;
 }
 
-void RtspSession::SetTransportInfo(const std::string &transport)
+void RtspServerSession::SetTransportInfo(const std::string &transport)
 {
     transportInfo_ = transport;
 }
 
-std::string RtspSession::GetTransportInfo() const
+std::string RtspServerSession::GetTransportInfo() const
 {
     return transportInfo_;
 }
 
-std::shared_ptr<MediaStream> RtspSession::GetMediaStream(int track_index)
+std::shared_ptr<MediaStream> RtspServerSession::GetMediaStream(int track_index)
 {
     if (track_index >= 0 && track_index < static_cast<int>(mediaStreams_.size())) {
         return mediaStreams_[track_index];
@@ -367,55 +367,55 @@ std::shared_ptr<MediaStream> RtspSession::GetMediaStream(int track_index)
     return nullptr;
 }
 
-const std::vector<std::shared_ptr<MediaStream>> &RtspSession::GetMediaStreams() const
+const std::vector<std::shared_ptr<MediaStream>> &RtspServerSession::GetMediaStreams() const
 {
     return mediaStreams_;
 }
 
-bool RtspSession::IsPlaying() const
+bool RtspServerSession::IsPlaying() const
 {
     return isPlaying_;
 }
 
-bool RtspSession::IsPaused() const
+bool RtspServerSession::IsPaused() const
 {
     return isPaused_;
 }
 
-bool RtspSession::IsSetup() const
+bool RtspServerSession::IsSetup() const
 {
     return isSetup_;
 }
 
-void RtspSession::UpdateLastActiveTime()
+void RtspServerSession::UpdateLastActiveTime()
 {
     lastActiveTime_ = lmcore::TimeUtils::GetCurrentTimeMs();
 }
 
-bool RtspSession::IsExpired(uint32_t timeout_seconds) const
+bool RtspServerSession::IsExpired(uint32_t timeout_seconds) const
 {
     int64_t current_time = lmcore::TimeUtils::GetCurrentTimeMs();
     return (current_time - lastActiveTime_) > static_cast<int64_t>(timeout_seconds) * 1000;
 }
 
-int64_t RtspSession::GetLastActiveTime() const
+int64_t RtspServerSession::GetLastActiveTime() const
 {
     return lastActiveTime_;
 }
 
-std::string RtspSession::GenerateSessionId()
+std::string RtspServerSession::GenerateSessionId()
 {
     return lmcore::UUID::GenerateShort();
 }
 
-// RtpTransportParams RtspSession::ParseTransportHeader(const std::string &transport) const
+// RtpTransportParams RtspServerSession::ParseTransportHeader(const std::string &transport) const
 // {
 //     RtpTransportParams params;
 //     // TODO: Implement transport header parsing
 //     return params;
 // }
 
-void RtspSession::SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_info)
+void RtspServerSession::SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_info)
 {
     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
     mediaStreamInfo_ = stream_info;
@@ -427,57 +427,57 @@ void RtspSession::SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_inf
     }
 }
 
-std::shared_ptr<MediaStreamInfo> RtspSession::GetMediaStreamInfo() const
+std::shared_ptr<MediaStreamInfo> RtspServerSession::GetMediaStreamInfo() const
 {
     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
     return mediaStreamInfo_;
 }
 
-// void RtspSession::SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender)
+// void RtspServerSession::SetRTPSender(std::shared_ptr<IRTPSender> rtp_sender)
 // {
 //     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
 //     rtpSender_ = rtp_sender;
 // }
 //
-// std::shared_ptr<IRTPSender> RtspSession::GetRTPSender() const
+// std::shared_ptr<IRTPSender> RtspServerSession::GetRTPSender() const
 // {
 //     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
 //     return rtpSender_;
 // }
 //
-// bool RtspSession::HasRTPSender() const
+// bool RtspServerSession::HasRTPSender() const
 // {
 //     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
 //     return rtpSender_ != nullptr;
 // }
 
-// void RtspSession::SetRTPTransportParams(const RtpTransportParams &params)
+// void RtspServerSession::SetRTPTransportParams(const RtpTransportParams &params)
 // {
 //     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
 //     rtpTransportParams_ = params;
 // }
 //
-// RtpTransportParams RtspSession::GetRTPTransportParams() const
+// RtpTransportParams RtspServerSession::GetRTPTransportParams() const
 // {
 //     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
 //     return rtpTransportParams_;
 // }
 //
-// bool RtspSession::HasValidTransport() const
+// bool RtspServerSession::HasValidTransport() const
 // {
 //     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
 //     // TODO: Implement transport validation logic
 //     return true;
 // }
 
-// RtpStatistics RtspSession::GetRTPStatistics() const
+// RtpStatistics RtspServerSession::GetRTPStatistics() const
 // {
 //     RtpStatistics stats;
 //     // TODO: Implement RTP statistics collection
 //     return stats;
 // }
 
-bool RtspSession::PushFrame(const lmrtsp::MediaFrame &frame)
+bool RtspServerSession::PushFrame(const lmrtsp::MediaFrame &frame)
 {
     std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
     if (!mediaStreamManager_) {
@@ -493,7 +493,7 @@ bool RtspSession::PushFrame(const lmrtsp::MediaFrame &frame)
     return mediaStreamManager_->PushFrame(frame);
 }
 
-std::string RtspSession::GetRtpInfo() const
+std::string RtspServerSession::GetRtpInfo() const
 {
     std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
     if (!mediaStreamManager_) {
@@ -503,12 +503,12 @@ std::string RtspSession::GetRtpInfo() const
     return mediaStreamManager_->GetRtpInfo();
 }
 
-std::string RtspSession::GetStreamUri() const
+std::string RtspServerSession::GetStreamUri() const
 {
     return streamUri_;
 }
 
-bool RtspSession::SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size)
+bool RtspServerSession::SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size)
 {
     if (!lmnetSession_) {
         LMRTSP_LOGE("Network session not available");

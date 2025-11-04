@@ -14,7 +14,7 @@
 
 #include "internal_logger.h"
 #include "lmrtsp/irtsp_server_callback.h"
-#include "lmrtsp/rtsp_session.h"
+#include "lmrtsp/rtsp_server_session.h"
 #include "rtsp_response.h"
 #include "rtsp_server_listener.h"
 
@@ -95,7 +95,7 @@ bool RtspServer::Stop()
     return true;
 }
 
-void RtspServer::HandleRequest(std::shared_ptr<RtspSession> session, const RtspRequest &request)
+void RtspServer::HandleRequest(std::shared_ptr<RtspServerSession> session, const RtspRequest &request)
 {
     LMRTSP_LOGD("Handling %s request for session %s", request.method_.c_str(), session->GetSessionId().c_str());
 
@@ -242,9 +242,9 @@ void RtspServer::SendErrorResponse(std::shared_ptr<lmnet::Session> lmnetSession,
     }
 }
 
-std::shared_ptr<RtspSession> RtspServer::CreateSession(std::shared_ptr<lmnet::Session> lmnetSession)
+std::shared_ptr<RtspServerSession> RtspServer::CreateSession(std::shared_ptr<lmnet::Session> lmnetSession)
 {
-    auto session = std::make_shared<RtspSession>(lmnetSession, weak_from_this());
+    auto session = std::make_shared<RtspServerSession>(lmnetSession, weak_from_this());
     {
         std::lock_guard<std::mutex> lock(sessionsMutex_);
         sessions_[session->GetSessionId()] = session;
@@ -255,7 +255,7 @@ std::shared_ptr<RtspSession> RtspServer::CreateSession(std::shared_ptr<lmnet::Se
 
 void RtspServer::RemoveSession(const std::string &sessionId)
 {
-    std::shared_ptr<RtspSession> session;
+    std::shared_ptr<RtspServerSession> session;
     {
         std::lock_guard<std::mutex> lock(sessionsMutex_);
         auto it = sessions_.find(sessionId);
@@ -272,7 +272,7 @@ void RtspServer::RemoveSession(const std::string &sessionId)
     }
 }
 
-std::shared_ptr<RtspSession> RtspServer::GetSession(const std::string &sessionId)
+std::shared_ptr<RtspServerSession> RtspServer::GetSession(const std::string &sessionId)
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     auto it = sessions_.find(sessionId);
@@ -282,7 +282,7 @@ std::shared_ptr<RtspSession> RtspServer::GetSession(const std::string &sessionId
     return nullptr;
 }
 
-std::unordered_map<std::string, std::shared_ptr<RtspSession>> RtspServer::GetSessions()
+std::unordered_map<std::string, std::shared_ptr<RtspServerSession>> RtspServer::GetSessions()
 {
     std::lock_guard<std::mutex> lock(sessionsMutex_);
     return sessions_;
@@ -542,7 +542,7 @@ std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::s
 }
 
 // Helper methods
-std::string RtspServer::GetClientIP(std::shared_ptr<RtspSession> session) const
+std::string RtspServer::GetClientIP(std::shared_ptr<RtspServerSession> session) const
 {
     if (session && session->GetNetworkSession()) {
         return session->GetNetworkSession()->host;

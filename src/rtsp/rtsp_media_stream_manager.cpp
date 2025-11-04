@@ -9,13 +9,13 @@
 #include "internal_logger.h"
 #include "lmrtsp/media_types.h"
 #include "lmrtsp/rtp_source_session.h"
-#include "lmrtsp/rtsp_session.h"
+#include "lmrtsp/rtsp_server_session.h"
 #include "rtp/udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
 
-RtspMediaStreamManager::RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RtspSession> rtsp_session)
-    : rtspSession_(rtsp_session), state_(StreamState::IDLE), active_(false), sendThreadRunning_(false),
+RtspMediaStreamManager::RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RtspServerSession> rtsp_session)
+    : RtspServerSession_(rtsp_session), state_(StreamState::IDLE), active_(false), sendThreadRunning_(false),
       sequenceNumber_(0), timestamp_(0), ssrc_(0)
 {
 }
@@ -39,9 +39,9 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
 
     LMRTSP_LOGD("RtspMediaStreamManager::Setup - Checking codec type");
 
-    auto session = rtspSession_.lock();
+    auto session = RtspServerSession_.lock();
     if (session) {
-        LMRTSP_LOGI("Successfully locked rtspSession");
+        LMRTSP_LOGI("Successfully locked RtspServerSession");
         auto stream_info = session->GetMediaStreamInfo();
         LMRTSP_LOGI("GetMediaStreamInfo returned: %p", (void *)stream_info.get());
         if (stream_info) {
@@ -69,7 +69,7 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
             LMRTSP_LOGW("No MediaStreamInfo available, using default H264");
         }
     } else {
-        LMRTSP_LOGW("Cannot lock rtspSession, using default H264");
+        LMRTSP_LOGW("Cannot lock RtspServerSession, using default H264");
     }
 
     LMRTSP_LOGI("Final codec configuration - video_type: %d, payload_type: %d", static_cast<int>(video_type),
@@ -83,7 +83,7 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
     rtp_config.mtu_size = 1400;
     rtp_config.enable_rtcp = true;
     // Pass RTSP session for TCP interleaved mode
-    rtp_config.rtsp_session = rtspSession_;
+    rtp_config.rtsp_session = RtspServerSession_;
 
     // Initialize RTP session (this will create and setup transport)
     if (!rtpSession_->Initialize(rtp_config)) {

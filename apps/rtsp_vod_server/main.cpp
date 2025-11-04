@@ -13,7 +13,7 @@
 #include <lmrtsp/lmrtsp_logger.h>
 #include <lmrtsp/media_stream_info.h>
 #include <lmrtsp/rtsp_server.h>
-#include <lmrtsp/rtsp_session.h>
+#include <lmrtsp/rtsp_server_session.h>
 #include <signal.h>
 
 #include <algorithm>
@@ -67,7 +67,7 @@ std::mutex g_aac_workers_mutex;
 // Session event callback for managing worker threads
 class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
 public:
-    void OnSessionCreated(std::shared_ptr<RtspSession> session) override
+    void OnSessionCreated(std::shared_ptr<RtspServerSession> session) override
     {
         std::cout << "Session created: " << session->GetSessionId() << std::endl;
     }
@@ -101,7 +101,7 @@ public:
         }
     }
 
-    void OnSessionStartPlay(std::shared_ptr<RtspSession> session) override
+    void OnSessionStartPlay(std::shared_ptr<RtspServerSession> session) override
     {
         std::string session_id = session->GetSessionId();
         std::cout << "Session start play: " << session_id << std::endl;
@@ -274,8 +274,8 @@ void PrintStartupUrls(const std::vector<std::string> &ips, uint16_t port)
 
     std::cout << "\n=== Available RTSP URLs ===" << std::endl;
     if (ips.empty()) {
-        std::cout << "No local IPv4 addresses detected. Use localhost: rtsp://localhost:" << port
-                  << "/<stream>" << std::endl;
+        std::cout << "No local IPv4 addresses detected. Use localhost: rtsp://localhost:" << port << "/<stream>"
+                  << std::endl;
         return;
     }
 

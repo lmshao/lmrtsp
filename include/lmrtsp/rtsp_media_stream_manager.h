@@ -28,7 +28,7 @@
 
 namespace lmshao {
 namespace lmrtsp {
-class RtspSession;
+class RtspServerSession;
 class RtpSourceSession;
 
 // Dummy media frame for build-only mode
@@ -55,7 +55,7 @@ enum class StreamState {
  */
 class RtspMediaStreamManager {
 public:
-    explicit RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RtspSession> rtsp_session);
+    explicit RtspMediaStreamManager(std::weak_ptr<lmshao::lmrtsp::RtspServerSession> rtsp_session);
     ~RtspMediaStreamManager();
 
     /**
@@ -125,7 +125,7 @@ private:
      */
     void ProcessFrame(const lmrtsp::MediaFrame &frame);
 
-    std::weak_ptr<lmshao::lmrtsp::RtspSession> rtspSession_;
+    std::weak_ptr<lmshao::lmrtsp::RtspServerSession> RtspServerSession_;
     std::unique_ptr<RtpSourceSession> rtpSession_;
 
     // Persist the transport config to build proper Transport header
