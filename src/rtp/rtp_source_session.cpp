@@ -13,6 +13,8 @@
 #include "i_rtp_packetizer.h"
 #include "i_rtp_transport_adapter.h"
 #include "internal_logger.h"
+#include "lmcore/time_utils.h"
+#include "lmrtsp/rtcp_context.h"
 #include "rtp_packetizer_aac.h"
 #include "rtp_packetizer_h264.h"
 #include "rtp_packetizer_ts.h"
@@ -40,6 +42,57 @@ uint16_t GenerateRandomSequenceNumber()
     return dis(gen);
 }
 } // namespace
+
+// Helper class to handle packetized RTP packets
+class RtpSourceSession::PacketizerListener : public IRtpPacketizerListener {
+public:
+    PacketizerListener(IRtpTransportAdapter *transport, RtcpSenderContext *rtcpContext)
+        : transport_(transport), rtcpContext_(rtcpContext)
+    {
+    }
+
+    void SetRtcpContext(RtcpSenderContext *context) { rtcpContext_ = context; }
+
+    void OnPacket(const std::shared_ptr<RtpPacket> &packet) override
+    {
+        if (!transport_ || !packet) {
+            LMRTSP_LOGE("Invalid packet or transport");
+            return;
+        }
+
+        // Serialize packet and send
+        auto serialized = packet->Serialize();
+        if (serialized && serialized->Size() > 0) {
+            bool success = transport_->SendPacket(serialized->Data(), serialized->Size());
+            if (!success) {
+                LMRTSP_LOGE("Failed to send RTP packet - SSRC %u, seq %u, size %u", packet->ssrc,
+                            packet->sequence_number, serialized->Size());
+            } else {
+                LMRTSP_LOGD("Sent RTP packet - SSRC %u, seq %u, timestamp %u, payload type %u, size %u", packet->ssrc,
+                            packet->sequence_number, packet->timestamp, packet->payload_type, serialized->Size());
+
+                // Update RTCP statistics
+                if (rtcpContext_) {
+                    rtcpContext_->OnRtp(packet->sequence_number, packet->timestamp,
+                                        lmcore::TimeUtils::GetCurrentTimeMs(), 90000, // 90kHz for video
+                                        serialized->Size());
+                }
+            }
+        }
+    }
+
+    void OnError(int code, const std::string &message) override
+    {
+        // Simple error handling - in real implementation, this would be logged
+        LMRTSP_LOGE("Packetizer error: %d - %s", code, message.c_str());
+        (void)code;
+        (void)message;
+    }
+
+private:
+    IRtpTransportAdapter *transport_;
+    RtcpSenderContext *rtcpContext_;
+};
 
 RtpSourceSession::RtpSourceSession() {}
 
@@ -89,15 +142,15 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
         }
     }
 
-    // Create video packetizer
+    // Create video packetizer (note: RTCP context will be initialized later)
     if (config_.video_type == MediaType::H264) {
         videoPacketizer_ =
             std::make_unique<RtpPacketizerH264>(config_.ssrc, sequenceNumber_, config_.video_payload_type,
                                                 90000, // H264 clock rate
                                                 config_.mtu_size);
-        // Set up listener for video packetizer
+        // Set up listener for video packetizer (RTCP context set after initialization)
         videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
-            std::make_shared<PacketizerListener>(transportAdapter_.get()));
+            std::make_shared<PacketizerListener>(transportAdapter_.get(), nullptr));
         videoPacketizer_->SetListener(videoListener_);
     } else if (config_.video_type == MediaType::MP2T) {
         auto tsPacketizer = std::make_unique<RtpPacketizerTs>();
@@ -107,7 +160,7 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
         videoPacketizer_ = std::move(tsPacketizer);
         // Set up listener for TS packetizer
         videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
-            std::make_shared<PacketizerListener>(transportAdapter_.get()));
+            std::make_shared<PacketizerListener>(transportAdapter_.get(), nullptr));
         videoPacketizer_->SetListener(videoListener_);
     } else if (config_.video_type == MediaType::AAC) {
         videoPacketizer_ = std::make_unique<RtpPacketizerAac>(config_.ssrc, sequenceNumber_, config_.video_payload_type,
@@ -115,7 +168,7 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
                                                               config_.mtu_size);
         // Set up listener for AAC packetizer
         videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
-            std::make_shared<PacketizerListener>(transportAdapter_.get()));
+            std::make_shared<PacketizerListener>(transportAdapter_.get(), nullptr));
         videoPacketizer_->SetListener(videoListener_);
     }
 
@@ -123,6 +176,24 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
     if (!videoPacketizer_) {
         transportAdapter_.reset();
         return false;
+    }
+
+    // Initialize RTCP if enabled
+    if (config_.enable_rtcp) {
+        rtcpContext_ = RtcpSenderContext::Create();
+        if (rtcpContext_) {
+            rtcpContext_->Initialize(config_.ssrc, config_.ssrc);
+
+            // Update listener with RTCP context
+            if (videoListener_) {
+                auto listener = std::static_pointer_cast<PacketizerListener>(videoListener_);
+                listener->SetRtcpContext(rtcpContext_.get());
+            }
+
+            LMRTSP_LOGI("RTCP sender context initialized: SSRC=0x%08x", config_.ssrc);
+        } else {
+            LMRTSP_LOGW("Failed to create RTCP sender context");
+        }
     }
 
     initialized_ = true;
@@ -148,6 +219,12 @@ bool RtpSourceSession::Start()
     }
 
     running_ = true;
+
+    // Start RTCP timer if enabled
+    if (config_.enable_rtcp && rtcpContext_) {
+        StartRtcpTimer();
+    }
+
     LMRTSP_LOGD("RTP source session started");
     return true;
 }
@@ -159,6 +236,11 @@ void RtpSourceSession::Stop()
     }
 
     running_ = false;
+
+    // Stop RTCP timer
+    if (config_.enable_rtcp) {
+        StopRtcpTimer();
+    }
 
     // Clean up packetizers
     videoPacketizer_.reset();
@@ -215,42 +297,52 @@ bool RtpSourceSession::SendFrame(const std::shared_ptr<MediaFrame> &frame)
     return true;
 }
 
-// Helper class to handle packetized RTP packets
-class RtpSourceSession::PacketizerListener : public IRtpPacketizerListener {
-public:
-    explicit PacketizerListener(IRtpTransportAdapter *transport) : transport_(transport) {}
-
-    void OnPacket(const std::shared_ptr<RtpPacket> &packet) override
-    {
-        if (!transport_ || !packet) {
-            LMRTSP_LOGE("Invalid packet or transport");
-            return;
-        }
-
-        // Serialize packet and send
-        auto serialized = packet->Serialize();
-        if (serialized && serialized->Size() > 0) {
-            bool success = transport_->SendPacket(serialized->Data(), serialized->Size());
-            if (!success) {
-                LMRTSP_LOGE("Failed to send RTP packet - SSRC %u, seq %u, size %u", packet->ssrc,
-                            packet->sequence_number, serialized->Size());
-            } else {
-                LMRTSP_LOGD("Sent RTP packet - SSRC %u, seq %u, timestamp %u, payload type %u, size %u", packet->ssrc,
-                            packet->sequence_number, packet->timestamp, packet->payload_type, serialized->Size());
-            }
-        }
+void RtpSourceSession::StartRtcpTimer()
+{
+    if (!rtcpTimer_) {
+        rtcpTimer_ = std::make_unique<lmcore::AsyncTimer>(1);
+        rtcpTimer_->Start();
     }
 
-    void OnError(int code, const std::string &message) override
-    {
-        // Simple error handling - in real implementation, this would be logged
-        LMRTSP_LOGE("Packetizer error: %d - %s", code, message.c_str());
-        (void)code;
-        (void)message;
+    // Schedule repeating RTCP report
+    rtcpTimerId_ = rtcpTimer_->ScheduleRepeating([this]() { SendRtcpReport(); }, config_.rtcp_interval_ms);
+
+    LMRTSP_LOGI("RTCP timer started: interval=%ums", config_.rtcp_interval_ms);
+}
+
+void RtpSourceSession::StopRtcpTimer()
+{
+    if (rtcpTimer_ && rtcpTimerId_ != 0) {
+        rtcpTimer_->Cancel(rtcpTimerId_);
+        rtcpTimer_->Stop();
+        rtcpTimerId_ = 0;
+        LMRTSP_LOGI("RTCP timer stopped");
+    }
+}
+
+void RtpSourceSession::SendRtcpReport()
+{
+    if (!rtcpContext_ || !transportAdapter_) {
+        return;
     }
 
-private:
-    IRtpTransportAdapter *transport_;
-};
+    // Create compound packet (SR + SDES) if CNAME is provided, otherwise just SR
+    std::shared_ptr<lmcore::DataBuffer> rtcpPacket;
+
+    if (!config_.rtcp_cname.empty()) {
+        rtcpPacket = rtcpContext_->CreateCompoundPacket(config_.rtcp_cname, config_.rtcp_name);
+    } else {
+        rtcpPacket = rtcpContext_->CreateRtcpSr();
+    }
+
+    if (rtcpPacket && rtcpPacket->Size() > 0) {
+        bool success = transportAdapter_->SendRtcpPacket(rtcpPacket->Data(), rtcpPacket->Size());
+        if (success) {
+            LMRTSP_LOGD("RTCP report sent: size=%zu", rtcpPacket->Size());
+        } else {
+            LMRTSP_LOGW("Failed to send RTCP report");
+        }
+    }
+}
 
 } // namespace lmshao::lmrtsp

@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 
+#include "lmcore/async_timer.h"
 #include "lmrtsp/media_types.h"
 #include "lmrtsp/transport_config.h"
 
@@ -22,6 +23,7 @@ class IRtpTransportAdapter;
 class IRtpPacketizer;
 class IRtpPacketizerListener;
 class RtspSession;
+class RtcpSenderContext;
 
 struct RtpSourceSessionConfig {
     std::string session_id; // Unique session identifier
@@ -34,6 +36,9 @@ struct RtpSourceSessionConfig {
     uint32_t mtu_size = 1400; // Maximum transmission unit
 
     bool enable_rtcp = false;          // Enable RTCP
+    uint32_t rtcp_interval_ms = 5000;  // RTCP report interval in milliseconds
+    std::string rtcp_cname;            // RTCP CNAME (Canonical Name)
+    std::string rtcp_name;             // RTCP NAME (User Name)
     uint32_t send_buffer_size = 65536; // Send buffer size (bytes)
 
     // For TCP interleaved mode
@@ -59,9 +64,17 @@ public:
     std::string GetTransportInfo() const;
     IRtpTransportAdapter *GetTransportAdapter() const { return transportAdapter_.get(); }
 
+    // Get RTCP context (for statistics)
+    RtcpSenderContext *GetRtcpContext() const { return rtcpContext_.get(); }
+
 private:
     // Forward declaration for listener
     class PacketizerListener;
+
+    // RTCP methods
+    void StartRtcpTimer();
+    void StopRtcpTimer();
+    void SendRtcpReport();
 
     RtpSourceSessionConfig config_;
     bool initialized_ = false;
@@ -75,6 +88,11 @@ private:
     std::unique_ptr<IRtpTransportAdapter> transportAdapter_;
     std::unique_ptr<IRtpPacketizer> videoPacketizer_;
     std::shared_ptr<IRtpPacketizerListener> videoListener_;
+
+    // RTCP support
+    std::shared_ptr<RtcpSenderContext> rtcpContext_;
+    std::unique_ptr<lmcore::AsyncTimer> rtcpTimer_;
+    lmcore::AsyncTimer::TimerId rtcpTimerId_ = 0;
 };
 
 } // namespace lmshao::lmrtsp
