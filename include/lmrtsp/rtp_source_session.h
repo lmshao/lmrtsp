@@ -21,6 +21,7 @@ namespace lmshao::lmrtsp {
 class IRtpTransportAdapter;
 class IRtpPacketizer;
 class IRtpPacketizerListener;
+class RtspSession;
 
 struct RtpSourceSessionConfig {
     std::string session_id; // Unique session identifier
@@ -34,6 +35,9 @@ struct RtpSourceSessionConfig {
 
     bool enable_rtcp = false;          // Enable RTCP
     uint32_t send_buffer_size = 65536; // Send buffer size (bytes)
+
+    // For TCP interleaved mode
+    std::weak_ptr<RtspSession> rtsp_session;
 };
 
 class RtpSourceSession {

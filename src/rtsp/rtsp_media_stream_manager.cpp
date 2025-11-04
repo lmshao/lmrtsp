@@ -82,6 +82,8 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
     rtp_config.video_payload_type = payload_type;
     rtp_config.mtu_size = 1400;
     rtp_config.enable_rtcp = false;
+    // Pass RTSP session for TCP interleaved mode
+    rtp_config.rtsp_session = rtspSession_;
 
     // Initialize RTP session (this will create and setup transport)
     if (!rtpSession_->Initialize(rtp_config)) {
@@ -103,6 +105,8 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
                             transport_config_.client_rtp_port, transport_config_.client_rtcp_port);
             }
         }
+    } else if (config.type == TransportConfig::Type::TCP_INTERLEAVED) {
+        LMRTSP_LOGI("TCP interleaved mode: interleaved=%d-%d", config.rtpChannel, config.rtcpChannel);
     }
 
     state_ = StreamState::SETUP;

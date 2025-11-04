@@ -16,6 +16,7 @@
 #include "rtp_packetizer_aac.h"
 #include "rtp_packetizer_h264.h"
 #include "rtp_packetizer_ts.h"
+#include "tcp_interleaved_transport_adapter.h"
 #include "udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
@@ -68,10 +69,13 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
     if (config_.transport.type == TransportConfig::Type::UDP) {
         transportAdapter_ = std::make_unique<UdpRtpTransportAdapter>();
     } else if (config_.transport.type == TransportConfig::Type::TCP_INTERLEAVED) {
-        // For TCP interleaved, we need RTSP session - simplified implementation
-        // In real implementation, this would need proper RTSP session reference
-        LMRTSP_LOGE("TCP_INTERLEAVED transport type is not supported in this simple implementation ");
-        return false; // Not supported in this simple implementation
+        // For TCP interleaved, we need RTSP session
+        if (config_.rtsp_session.expired()) {
+            LMRTSP_LOGE("TCP_INTERLEAVED transport requires valid RTSP session");
+            return false;
+        }
+        transportAdapter_ = std::make_unique<TcpInterleavedTransportAdapter>(config_.rtsp_session);
+        LMRTSP_LOGI("Created TCP interleaved transport adapter");
     } else {
         return false; // Unsupported transport type
     }
