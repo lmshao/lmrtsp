@@ -102,6 +102,10 @@ bool UdpRtpTransportAdapter::Setup(const TransportConfig &config)
     serverRtcpPort_ = config.server_rtcp_port;
     unicast_ = config.unicast;
 
+    LMRTSP_LOGD("UDP adapter Setup: mode=%s, client=%s:%u/%u, server=%u/%u, unicast=%s",
+                config_.mode == TransportConfig::Mode::SOURCE ? "SOURCE" : "SINK", client_ip_.c_str(), clientRtpPort_,
+                clientRtcpPort_, serverRtpPort_, serverRtcpPort_, unicast_ ? "true" : "false");
+
     bool success = false;
 
     if (config_.mode == TransportConfig::Mode::SOURCE) {
@@ -183,6 +187,9 @@ bool UdpRtpTransportAdapter::SendRtcpPacket(const uint8_t *data, size_t size)
         return false;
     }
 
+    LMRTSP_LOGD("Preparing to send RTCP packet: size=%zu to %s:%u (mode=%s)", size, client_ip_.c_str(), clientRtcpPort_,
+                config_.mode == TransportConfig::Mode::SOURCE ? "SOURCE" : "SINK");
+
     bool result = false;
 
     // In SERVER mode, use UdpClient to send data
@@ -199,7 +206,9 @@ bool UdpRtpTransportAdapter::SendRtcpPacket(const uint8_t *data, size_t size)
     }
 
     if (!result) {
-        LMRTSP_LOGE("Failed to send RTCP packet to %s:%u", client_ip_.c_str(), clientRtcpPort_);
+        LMRTSP_LOGE("Failed to send RTCP packet to %s:%u, size=%zu", client_ip_.c_str(), clientRtcpPort_, size);
+    } else {
+        LMRTSP_LOGD("RTCP packet sent successfully: size=%zu to %s:%u", size, client_ip_.c_str(), clientRtcpPort_);
     }
 
     return result;

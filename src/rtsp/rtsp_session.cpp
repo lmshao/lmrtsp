@@ -172,6 +172,8 @@ bool RtspSession::SetupMedia(const std::string &uri, const std::string &transpor
             if (dashPos != std::string::npos) {
                 transportConfig.rtpChannel = std::stoi(channelStr.substr(0, dashPos));
                 transportConfig.rtcpChannel = std::stoi(channelStr.substr(dashPos + 1));
+                LMRTSP_LOGD("Parsed interleaved channels: rtp=%d, rtcp=%d", transportConfig.rtpChannel,
+                            transportConfig.rtcpChannel);
             }
         }
     } else {
@@ -200,6 +202,8 @@ bool RtspSession::SetupMedia(const std::string &uri, const std::string &transpor
                     LMRTSP_LOGW("Failed to parse client port numbers");
                 }
             }
+        } else {
+            LMRTSP_LOGW("No client_port found in Transport header; RTCP over UDP will be disabled");
         }
 
         // Server ports will be allocated dynamically (set to 0)
@@ -524,7 +528,15 @@ bool RtspSession::SendInterleavedData(uint8_t channel, const uint8_t *data, size
     interleavedFrame.insert(interleavedFrame.end(), data, data + size);
 
     // Send via network session
-    return lmnetSession_->Send(interleavedFrame.data(), interleavedFrame.size());
+    bool ok = lmnetSession_->Send(interleavedFrame.data(), interleavedFrame.size());
+    if (!ok) {
+        LMRTSP_LOGE("SendInterleavedData failed: channel=%d, payload_size=%zu, frame_size=%zu",
+                    static_cast<int>(channel), size, interleavedFrame.size());
+    } else {
+        LMRTSP_LOGD("SendInterleavedData ok: channel=%d, payload_size=%zu, frame_size=%zu", static_cast<int>(channel),
+                    size, interleavedFrame.size());
+    }
+    return ok;
 }
 
 } // namespace lmshao::lmrtsp

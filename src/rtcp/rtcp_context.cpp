@@ -93,8 +93,8 @@ std::shared_ptr<lmcore::DataBuffer> RtcpContext::CreateRtcpSdes(const std::strin
     }
 
     size_t sdesSize = sdes->GetSize();
-    auto buffer = std::make_shared<lmcore::DataBuffer>(sdesSize);
-    std::memcpy(buffer->Data(), sdes.get(), sdesSize);
+    auto buffer = lmcore::DataBuffer::Create(sdesSize);
+    buffer->Append(sdes.get(), sdesSize);
 
     LMRTSP_LOGD("Created SDES: SSRC=0x%08x, CNAME=%s", rtcpSsrc_, cname.c_str());
     return buffer;
@@ -114,8 +114,8 @@ std::shared_ptr<lmcore::DataBuffer> RtcpContext::CreateRtcpBye(const std::string
     }
 
     size_t byeSize = bye->GetSize();
-    auto buffer = std::make_shared<lmcore::DataBuffer>(byeSize);
-    std::memcpy(buffer->Data(), bye.get(), byeSize);
+    auto buffer = lmcore::DataBuffer::Create(byeSize);
+    buffer->Append(bye.get(), byeSize);
 
     LMRTSP_LOGD("Created BYE: SSRC=0x%08x, reason=%s", rtcpSsrc_, reason.empty() ? "(none)" : reason.c_str());
     return buffer;
@@ -140,10 +140,10 @@ std::shared_ptr<lmcore::DataBuffer> RtcpContext::CreateCompoundPacket(const std:
 
     // Combine into compound packet
     size_t totalSize = srOrRr->Size() + sdes->Size();
-    auto buffer = std::make_shared<lmcore::DataBuffer>(totalSize);
+    auto buffer = lmcore::DataBuffer::Create(totalSize);
 
-    std::memcpy(buffer->Data(), srOrRr->Data(), srOrRr->Size());
-    std::memcpy(buffer->Data() + srOrRr->Size(), sdes->Data(), sdes->Size());
+    buffer->Append(srOrRr);
+    buffer->Append(sdes);
 
     LMRTSP_LOGD("Created compound packet: SR/RR + SDES, total size=%zu", totalSize);
     return buffer;
@@ -255,8 +255,8 @@ std::shared_ptr<lmcore::DataBuffer> RtcpSenderContext::CreateRtcpSr()
 
     // Create data buffer
     size_t srSize = sr->GetSize();
-    auto buffer = std::make_shared<lmcore::DataBuffer>(srSize);
-    std::memcpy(buffer->Data(), sr.get(), srSize);
+    auto buffer = lmcore::DataBuffer::Create(srSize);
+    buffer->Append(sr.get(), srSize);
 
     LMRTSP_LOGD("Created SR: SSRC=0x%08x, packets=%u, bytes=%u", rtcpSsrc_, static_cast<uint32_t>(totalPackets_),
                 static_cast<uint32_t>(totalBytes_));
@@ -483,8 +483,8 @@ std::shared_ptr<lmcore::DataBuffer> RtcpReceiverContext::CreateRtcpRr()
 
     // Create data buffer
     size_t rrSize = rr->GetSize();
-    auto buffer = std::make_shared<lmcore::DataBuffer>(rrSize);
-    std::memcpy(buffer->Data(), rr.get(), rrSize);
+    auto buffer = lmcore::DataBuffer::Create(rrSize);
+    buffer->Append(rr.get(), rrSize);
 
     LMRTSP_LOGD("Created RR: SSRC=0x%08x, lost=%zu, jitter=%u", rtcpSsrc_, GetLost(), static_cast<uint32_t>(jitter_));
 
