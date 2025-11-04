@@ -102,10 +102,7 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspSession> session, const RtspR
     // Get client IP for callback notifications
     std::string client_ip = GetClientIP(session);
 
-    // Process request directly through session state machine
-    RtspResponse response = session->ProcessRequest(request);
-
-    // Notify callback about the request after processing
+    // Pre-process SETUP request - extract and set media stream info BEFORE processing
     const std::string &method = request.method_;
     if (method == "SETUP") {
         // Extract stream path from URI (remove /track0, /track1, etc and rtsp:// prefix)
@@ -126,12 +123,21 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspSession> session, const RtspR
             stream_path = stream_path.substr(0, track_pos);
         }
 
-        // Set media stream info on session for later use
+        // Set media stream info on session BEFORE ProcessRequest
         auto stream_info = GetMediaStream(stream_path);
         if (stream_info) {
             session->SetMediaStreamInfo(stream_info);
+            LMRTSP_LOGD("Set MediaStreamInfo before ProcessRequest - codec: %s", stream_info->codec.c_str());
+        } else {
+            LMRTSP_LOGW("No MediaStreamInfo found for stream: %s", stream_path.c_str());
         }
+    }
 
+    // Process request directly through session state machine
+    RtspResponse response = session->ProcessRequest(request);
+
+    // Notify callback about the request after processing
+    if (method == "SETUP") {
         std::string transport = "";
         auto it = request.general_header_.find("Transport");
         if (it != request.general_header_.end()) {
@@ -249,11 +255,20 @@ std::shared_ptr<RtspSession> RtspServer::CreateSession(std::shared_ptr<lmnet::Se
 
 void RtspServer::RemoveSession(const std::string &sessionId)
 {
-    std::lock_guard<std::mutex> lock(sessionsMutex_);
-    auto it = sessions_.find(sessionId);
-    if (it != sessions_.end()) {
-        LMRTSP_LOGD("Removing RTSP session: %s", sessionId.c_str());
-        sessions_.erase(it);
+    std::shared_ptr<RtspSession> session;
+    {
+        std::lock_guard<std::mutex> lock(sessionsMutex_);
+        auto it = sessions_.find(sessionId);
+        if (it != sessions_.end()) {
+            LMRTSP_LOGD("Removing RTSP session: %s", sessionId.c_str());
+            session = it->second; // Keep reference before erasing
+            sessions_.erase(it);
+        }
+    }
+
+    // Notify callback about session destruction (outside lock to avoid deadlock)
+    if (session) {
+        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnSessionDestroyed(sessionId); });
     }
 }
 

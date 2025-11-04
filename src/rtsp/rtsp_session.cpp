@@ -415,6 +415,12 @@ void RtspSession::SetMediaStreamInfo(std::shared_ptr<MediaStreamInfo> stream_inf
 {
     std::lock_guard<std::mutex> lock(mediaInfoMutex_);
     mediaStreamInfo_ = stream_info;
+    if (stream_info) {
+        LMRTSP_LOGI("SetMediaStreamInfo called - codec: %s, stream_path: %s", stream_info->codec.c_str(),
+                    stream_info->stream_path.c_str());
+    } else {
+        LMRTSP_LOGW("SetMediaStreamInfo called with nullptr");
+    }
 }
 
 std::shared_ptr<MediaStreamInfo> RtspSession::GetMediaStreamInfo() const
