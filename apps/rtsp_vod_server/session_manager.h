@@ -9,7 +9,7 @@
 #ifndef LMSHAO_RTSP_SESSION_MANAGER_H
 #define LMSHAO_RTSP_SESSION_MANAGER_H
 
-#include <lmrtsp/rtsp_session.h>
+#include <lmrtsp/rtsp_server_session.h>
 
 #include <memory>
 #include <mutex>
@@ -49,7 +49,8 @@ public:
      * @param frame_rate Target frame rate
      * @return true if started successfully, false otherwise
      */
-    bool StartSession(std::shared_ptr<RtspSession> session, const std::string &file_path, uint32_t frame_rate = 25);
+    bool StartSession(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
+                      uint32_t frame_rate = 25);
 
     /**
      * @brief Stop a session worker thread

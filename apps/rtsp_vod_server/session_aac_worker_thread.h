@@ -9,7 +9,7 @@
 #ifndef SESSION_AAC_WORKER_THREAD_H
 #define SESSION_AAC_WORKER_THREAD_H
 
-#include <lmrtsp/rtsp_session.h>
+#include <lmrtsp/rtsp_server_session.h>
 
 #include <atomic>
 #include <memory>
@@ -32,7 +32,7 @@ public:
      * @param file_path Path to AAC file
      * @param sample_rate Audio sample rate (e.g., 48000, 44100)
      */
-    SessionAacWorkerThread(std::shared_ptr<lmshao::lmrtsp::RtspSession> session, const std::string &file_path,
+    SessionAacWorkerThread(std::shared_ptr<lmshao::lmrtsp::RtspServerSession> session, const std::string &file_path,
                            uint32_t sample_rate);
 
     ~SessionAacWorkerThread();
@@ -65,7 +65,7 @@ private:
      */
     std::chrono::microseconds GetFrameInterval() const;
 
-    std::shared_ptr<lmshao::lmrtsp::RtspSession> session_;
+    std::shared_ptr<lmshao::lmrtsp::RtspServerSession> session_;
     std::string file_path_;
     uint32_t sample_rate_;
 

@@ -144,7 +144,7 @@ int main()
 ## API参考
 
 - 详细的API文档请参见[`include/lmrtsp/`](include/lmrtsp/)中的头文件
-- 关键类：`RTSPServer`、`RTSPSession`、`MediaStream`、`RTPSession`等
+- 关键类：`RTSPServer`、`RtspServerSession`、`MediaStream`、`RTPSession`等
 
 ## 应用程序
 

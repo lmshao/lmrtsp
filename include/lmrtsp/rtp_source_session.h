@@ -22,7 +22,7 @@ namespace lmshao::lmrtsp {
 class IRtpTransportAdapter;
 class IRtpPacketizer;
 class IRtpPacketizerListener;
-class RtspSession;
+class RtspServerSession;
 class RtcpSenderContext;
 
 struct RtpSourceSessionConfig {
@@ -42,7 +42,7 @@ struct RtpSourceSessionConfig {
     uint32_t send_buffer_size = 65536; // Send buffer size (bytes)
 
     // For TCP interleaved mode
-    std::weak_ptr<RtspSession> rtsp_session;
+    std::weak_ptr<RtspServerSession> rtsp_session;
 };
 
 class RtpSourceSession {

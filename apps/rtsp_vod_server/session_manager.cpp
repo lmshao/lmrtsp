@@ -24,11 +24,11 @@ SessionManager::~SessionManager()
               << ", finished: " << total_sessions_finished_.load() << std::endl;
 }
 
-bool SessionManager::StartSession(std::shared_ptr<RtspSession> session, const std::string &file_path,
+bool SessionManager::StartSession(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
                                   uint32_t frame_rate)
 {
     if (!session) {
-        std::cout << "Cannot start session: invalid RtspSession" << std::endl;
+        std::cout << "Cannot start session: invalid RtspServerSession" << std::endl;
         return false;
     }
 

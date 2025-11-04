@@ -16,7 +16,7 @@
 
 #include "file_manager.h"
 
-SessionAacWorkerThread::SessionAacWorkerThread(std::shared_ptr<lmshao::lmrtsp::RtspSession> session,
+SessionAacWorkerThread::SessionAacWorkerThread(std::shared_ptr<lmshao::lmrtsp::RtspServerSession> session,
                                                const std::string &file_path, uint32_t sample_rate)
     : session_(session), file_path_(file_path), sample_rate_(sample_rate)
 {

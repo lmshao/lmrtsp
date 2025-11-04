@@ -13,7 +13,7 @@
 
 #include "internal_logger.h"
 #include "lmrtsp/rtsp_server.h"
-#include "lmrtsp/rtsp_session.h"
+#include "lmrtsp/rtsp_server_session.h"
 #include "rtsp_request.h"
 
 namespace lmshao::lmrtsp {
@@ -90,8 +90,8 @@ void RtspServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
         // Get all session IDs and check lmnet sessions
         auto sessions = server->GetSessions();
         for (const auto &pair : sessions) {
-            auto RtspSession = pair.second;
-            if (RtspSession && RtspSession->GetNetworkSession() == session) {
+            auto RtspServerSession = pair.second;
+            if (RtspServerSession && RtspServerSession->GetNetworkSession() == session) {
                 // Found related session, mark for deletion
                 sessionsToRemove.push_back(pair.first);
             }
@@ -237,27 +237,27 @@ bool RtspServerListener::ParseRTSPRequest(const std::string &data, std::shared_p
             return true;
         } else {
             // Get or create RTSP session for stateful requests
-            std::shared_ptr<RtspSession> RtspSession = nullptr;
+            std::shared_ptr<RtspServerSession> RtspServerSession = nullptr;
 
             // Check if session ID already exists
             std::string sessionId;
             if (request.general_header_.find(SESSION) != request.general_header_.end()) {
                 sessionId = request.general_header_.at(SESSION);
-                RtspSession = server->GetSession(sessionId);
+                RtspServerSession = server->GetSession(sessionId);
                 LMRTSP_LOGD("Found existing session ID: %s", sessionId.c_str());
             }
 
             // For SETUP request, create a new session if none exists
             // For other requests, session must already exist
-            if (!RtspSession && request.method_ == METHOD_SETUP) {
+            if (!RtspServerSession && request.method_ == METHOD_SETUP) {
                 LMRTSP_LOGD("Creating new RTSP session for SETUP request");
-                RtspSession = server->CreateSession(session);
+                RtspServerSession = server->CreateSession(session);
             }
 
             // Handle request
-            if (RtspSession) {
+            if (RtspServerSession) {
                 LMRTSP_LOGD("Handling stateful request [%s]: \n%s", request.method_.c_str(), completeRequest.c_str());
-                server->HandleRequest(RtspSession, request);
+                server->HandleRequest(RtspServerSession, request);
             } else {
                 LMRTSP_LOGE("Failed to create or find RTSP session for method: [%s]. Request:\n%s",
                             request.method_.c_str(), completeRequest.c_str());

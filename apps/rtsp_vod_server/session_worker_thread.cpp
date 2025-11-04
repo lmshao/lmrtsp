@@ -18,14 +18,14 @@
 
 #include "session_h264_reader.h"
 
-SessionWorkerThread::SessionWorkerThread(std::shared_ptr<RtspSession> session, const std::string &file_path,
+SessionWorkerThread::SessionWorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
                                          uint32_t frame_rate)
     : session_(session), session_id_(session ? session->GetSessionId() : "unknown"), file_path_(file_path),
       running_(false), should_stop_(false), frame_rate_(frame_rate), frame_counter_(0), frames_sent_(0), bytes_sent_(0)
 {
 
     if (!session_) {
-        std::cout << "Invalid RtspSession provided to SessionWorkerThread" << std::endl;
+        std::cout << "Invalid RtspServerSession provided to SessionWorkerThread" << std::endl;
         return;
     }
 
