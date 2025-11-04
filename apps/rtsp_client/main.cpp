@@ -6,8 +6,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "lmrtsp/rtsp_client.h"
-
 #include <signal.h>
 
 #include <atomic>
@@ -20,6 +18,7 @@
 
 #include "lmrtsp/irtsp_client_callback.h"
 #include "lmrtsp/media_types.h"
+#include "lmrtsp/rtsp_client.h"
 #include "lmrtsp/rtsp_client_session.h"
 
 using namespace lmshao::lmrtsp;

@@ -9,6 +9,7 @@
 #include "internal_logger.h"
 #include "lmrtsp/media_types.h"
 #include "lmrtsp/rtp_source_session.h"
+#include "lmrtsp/rtsp_session.h"
 #include "rtp/udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
@@ -32,11 +33,49 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
     // Create RTP source session
     rtpSession_ = std::make_unique<RtpSourceSession>();
 
+    // Get media stream info from RTSP session to determine codec type
+    MediaType video_type = MediaType::H264; // default
+    uint8_t payload_type = 96;              // default for H264
+
+    LMRTSP_LOGD("RtspMediaStreamManager::Setup - Checking codec type");
+
+    auto session = rtspSession_.lock();
+    if (session) {
+        LMRTSP_LOGI("Successfully locked rtspSession");
+        auto stream_info = session->GetMediaStreamInfo();
+        LMRTSP_LOGI("GetMediaStreamInfo returned: %p", (void *)stream_info.get());
+        if (stream_info) {
+            LMRTSP_LOGI("Got MediaStreamInfo - codec: %s, payload_type: %d", stream_info->codec.c_str(),
+                        stream_info->payload_type);
+            // Determine media type from codec string
+            if (stream_info->codec == "MP2T") {
+                video_type = MediaType::MP2T;
+                payload_type = 33; // RFC 3551 payload type for MP2T
+                LMRTSP_LOGI("Using MP2T codec with payload type 33");
+            } else if (stream_info->codec == "H264") {
+                video_type = MediaType::H264;
+                payload_type = 96; // Dynamic payload type for H264
+                LMRTSP_LOGI("Using H264 codec with payload type 96");
+            }
+            // Use payload_type from stream_info if specified
+            if (stream_info->payload_type > 0) {
+                payload_type = stream_info->payload_type;
+            }
+        } else {
+            LMRTSP_LOGW("No MediaStreamInfo available, using default H264");
+        }
+    } else {
+        LMRTSP_LOGW("Cannot lock rtspSession, using default H264");
+    }
+
+    LMRTSP_LOGI("Final codec configuration - video_type: %d, payload_type: %d", static_cast<int>(video_type),
+                payload_type);
+
     // Prepare config for RTP session
     RtpSourceSessionConfig rtp_config;
     rtp_config.transport = config;
-    rtp_config.video_type = MediaType::H264;
-    rtp_config.video_payload_type = 96;
+    rtp_config.video_type = video_type;
+    rtp_config.video_payload_type = payload_type;
     rtp_config.mtu_size = 1400;
     rtp_config.enable_rtcp = false;
 

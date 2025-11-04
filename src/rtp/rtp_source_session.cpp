@@ -14,6 +14,7 @@
 #include "i_rtp_transport_adapter.h"
 #include "internal_logger.h"
 #include "rtp_packetizer_h264.h"
+#include "rtp_packetizer_ts.h"
 #include "udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
@@ -93,6 +94,16 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
         videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
             std::make_shared<PacketizerListener>(transportAdapter_.get()));
         videoPacketizer_->SetListener(videoListener_);
+    } else if (config_.video_type == MediaType::MP2T) {
+        auto tsPacketizer = std::make_unique<RtpPacketizerTs>();
+        tsPacketizer->SetSsrc(config_.ssrc);
+        tsPacketizer->SetPayloadType(config_.video_payload_type);
+        tsPacketizer->SetMtuSize(config_.mtu_size);
+        videoPacketizer_ = std::move(tsPacketizer);
+        // Set up listener for TS packetizer
+        videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
+            std::make_shared<PacketizerListener>(transportAdapter_.get()));
+        videoPacketizer_->SetListener(videoListener_);
     }
 
     // Check if video packetizer was created
@@ -163,8 +174,8 @@ bool RtpSourceSession::SendFrame(const std::shared_ptr<MediaFrame> &frame)
         return false;
     }
 
-    // Only support H264 video frames
-    if (frame->media_type != MediaType::H264 || !videoPacketizer_) {
+    // Support H264 and MP2T video frames
+    if ((frame->media_type != MediaType::H264 && frame->media_type != MediaType::MP2T) || !videoPacketizer_) {
         LMRTSP_LOGE("SendFrame failed - media_type: %d, video_packetizer: %s", static_cast<int>(frame->media_type),
                     videoPacketizer_ ? "valid" : "null");
         return false; // Unsupported media type or no video packetizer

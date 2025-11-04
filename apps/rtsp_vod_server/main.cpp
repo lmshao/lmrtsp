@@ -26,7 +26,10 @@
 #include "file_manager.h"
 #include "h264_file_reader.h"
 #include "session_manager.h"
+#include "session_ts_reader.h"
+#include "session_ts_worker_thread.h"
 #include "session_worker_thread.h"
+#include "ts_file_reader.h"
 
 using namespace lmshao::lmrtsp;
 using namespace lmshao::lmnet;
@@ -48,6 +51,10 @@ std::string g_media_directory;
 std::map<std::string, MediaFile> g_media_files;
 std::mutex g_media_mutex;
 
+// TS worker threads (separate from H264 workers managed by SessionManager)
+std::map<std::string, std::shared_ptr<SessionTSWorkerThread>> g_ts_workers;
+std::mutex g_ts_workers_mutex;
+
 // Session event callback for managing worker threads
 class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
 public:
@@ -59,8 +66,19 @@ public:
     void OnSessionDestroyed(const std::string &session_id) override
     {
         std::cout << "Session destroyed: " << session_id << std::endl;
-        // Stop the worker thread for this session
+        // Stop the H264 worker thread for this session
         SessionManager::GetInstance().StopSession(session_id);
+
+        // Stop the TS worker thread if exists
+        {
+            std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
+            auto ts_it = g_ts_workers.find(session_id);
+            if (ts_it != g_ts_workers.end()) {
+                ts_it->second->Stop();
+                g_ts_workers.erase(ts_it);
+                std::cout << "Stopped TS worker for session: " << session_id << std::endl;
+            }
+        }
     }
 
     void OnSessionStartPlay(std::shared_ptr<RtspSession> session) override
@@ -86,19 +104,48 @@ public:
         }
 
         const MediaFile &media = it->second;
-        uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
 
-        // Start worker thread for this session
-        if (!SessionManager::GetInstance().StartSession(session, media.file_path, frame_rate)) {
-            std::cout << "Failed to start worker thread for session: " << session_id << std::endl;
+        // Handle different codecs
+        if (media.codec == "H264") {
+            uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
+
+            // Start H264 worker thread for this session
+            if (!SessionManager::GetInstance().StartSession(session, media.file_path, frame_rate)) {
+                std::cout << "Failed to start H264 worker thread for session: " << session_id << std::endl;
+            }
+        } else if (media.codec == "MP2T") {
+            // Start TS worker thread for this session
+            uint32_t bitrate = 2000000; // 2 Mbps default, could be read from stream_info if available
+
+            auto ts_worker = std::make_shared<SessionTSWorkerThread>(session, media.file_path, bitrate);
+            if (ts_worker->Start()) {
+                std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
+                g_ts_workers[session_id] = ts_worker;
+                std::cout << "Started TS worker thread for session: " << session_id << std::endl;
+            } else {
+                std::cout << "Failed to start TS worker thread for session: " << session_id << std::endl;
+            }
+        } else {
+            std::cout << "Unsupported codec: " << media.codec << " for session: " << session_id << std::endl;
         }
     }
 
     void OnSessionStopPlay(const std::string &session_id) override
     {
         std::cout << "Session stop play: " << session_id << std::endl;
-        // Stop the worker thread for this session
+        // Stop the H264 worker thread for this session
         SessionManager::GetInstance().StopSession(session_id);
+
+        // Stop the TS worker thread if exists
+        {
+            std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
+            auto ts_it = g_ts_workers.find(session_id);
+            if (ts_it != g_ts_workers.end()) {
+                ts_it->second->Stop();
+                g_ts_workers.erase(ts_it);
+                std::cout << "Stopped TS worker for session: " << session_id << std::endl;
+            }
+        }
     }
 
     void OnPlayReceived(const std::string &client_ip, const std::string &stream_path,
@@ -254,7 +301,52 @@ bool ScanMediaDirectory(const std::string &directory)
                 // Release temporary reference
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
-            // Add support for other codecs here (AAC, TS)
+            // Support for TS files
+            else if (codec == "MP2T") {
+                // Use FileManager to get shared MappedFile
+                auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
+                if (!mapped_file) {
+                    std::cerr << "Warning: Failed to map TS file: " << filepath << std::endl;
+                    continue;
+                }
+
+                // Create temporary SessionTSReader to extract information
+                SessionTSReader temp_reader(mapped_file);
+
+                // Create and register media stream
+                auto streamInfo = std::make_shared<MediaStreamInfo>();
+                streamInfo->stream_path = streamPath;
+                streamInfo->media_type = "video"; // TS can contain both audio and video
+                streamInfo->codec = "MP2T";
+                streamInfo->payload_type = 33; // Static payload type for MP2T
+                streamInfo->clock_rate = 90000;
+
+                // TS doesn't have separate SPS/PPS
+                streamInfo->width = 0;      // Unknown until parsed
+                streamInfo->height = 0;     // Unknown until parsed
+                streamInfo->frame_rate = 0; // Will use packet-based timing
+
+                if (!g_server->AddMediaStream(streamPath, streamInfo)) {
+                    std::cerr << "Warning: Failed to register stream: " << streamPath << std::endl;
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
+                    continue;
+                }
+
+                // Get playback info
+                auto playback_info = temp_reader.GetPlaybackInfo();
+                double duration = playback_info.total_duration_;
+                uint32_t bitrate = temp_reader.GetBitrate();
+
+                std::cout << "  [" << ++fileCount << "] " << filename << std::endl;
+                std::cout << "      Stream:     rtsp://localhost:8554" << streamPath << std::endl;
+                std::cout << "      Codec:      " << codec << " (MPEG-TS)" << std::endl;
+                std::cout << "      Bitrate:    " << (bitrate / 1000000.0) << " Mbps" << std::endl;
+                std::cout << "      Duration:   " << duration << " seconds" << std::endl;
+                std::cout << "      Packets:    " << playback_info.total_packets_ << std::endl;
+
+                // Release temporary reference
+                FileManager::GetInstance().ReleaseMappedFile(filepath);
+            }
 
             std::lock_guard<std::mutex> lock(g_media_mutex);
             g_media_files[streamPath] = media;
@@ -425,8 +517,18 @@ int main(int argc, char *argv[])
     // Cleanup
     std::cout << "\nShutting down..." << std::endl;
 
-    // Stop all session worker threads
+    // Stop all session worker threads (H264)
     SessionManager::GetInstance().StopAllSessions();
+
+    // Stop all TS worker threads
+    {
+        std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
+        for (auto &pair : g_ts_workers) {
+            std::cout << "Stopping TS worker: " << pair.first << std::endl;
+            pair.second->Stop();
+        }
+        g_ts_workers.clear();
+    }
 
     // Clear file cache
     FileManager::GetInstance().ClearCache();
