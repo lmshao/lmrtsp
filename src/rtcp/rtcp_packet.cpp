@@ -8,29 +8,42 @@
 
 #include "lmrtsp/rtcp_packet.h"
 
-#include <arpa/inet.h>
-#include <sys/time.h>
+#include <lmcore/byte_order.h>
+#include <lmcore/time_utils.h>
 
 #include <cstring>
 
-#include "internal_logger.h"
-
 namespace lmshao::lmrtsp {
 
-// ============================================================================
-// RtcpHeader
-// ============================================================================
+namespace {
+
+void UnixMsToNtp(uint64_t unixMs, uint32_t &ntpH, uint32_t &ntpL)
+{
+    // Use lmcore to convert Unix time to NTP timestamp (handles cross-platform)
+    uint64_t ntp = lmcore::TimeUtils::UnixToNtp(static_cast<int64_t>(unixMs));
+
+    ntpH = (ntp >> 32) & 0xFFFFFFFF;
+    ntpL = ntp & 0xFFFFFFFF;
+}
+
+uint64_t NtpToUnixMs(uint32_t ntpH, uint32_t ntpL)
+{
+    uint64_t ntp = (static_cast<uint64_t>(ntpH) << 32) | ntpL;
+    return static_cast<uint64_t>(lmcore::TimeUtils::NtpToUnix(ntp));
+}
+
+} // anonymous namespace
 
 void RtcpHeader::SetSize(size_t sizeBytes)
 {
     // Length is in 32-bit words minus one
-    length = htons((sizeBytes / 4) - 1);
+    length = lmcore::ByteOrder::HostToNetwork16((sizeBytes / 4) - 1);
 }
 
 size_t RtcpHeader::GetSize() const
 {
     // Convert from 32-bit words to bytes
-    return (ntohs(length) + 1) * 4;
+    return (lmcore::ByteOrder::NetworkToHost16(length) + 1) * 4;
 }
 
 size_t RtcpHeader::GetPaddingSize() const
@@ -42,10 +55,6 @@ size_t RtcpHeader::GetPaddingSize() const
     const uint8_t *ptr = reinterpret_cast<const uint8_t *>(this);
     return ptr[GetSize() - 1];
 }
-
-// ============================================================================
-// RtcpSenderReport
-// ============================================================================
 
 std::shared_ptr<RtcpSenderReport> RtcpSenderReport::Create(size_t reportCount)
 {
@@ -65,28 +74,28 @@ std::shared_ptr<RtcpSenderReport> RtcpSenderReport::Create(size_t reportCount)
 
 RtcpSenderReport &RtcpSenderReport::SetSsrc(uint32_t ssrcValue)
 {
-    ssrc = htonl(ssrcValue);
+    ssrc = lmcore::ByteOrder::HostToNetwork32(ssrcValue);
     return *this;
 }
 
 RtcpSenderReport &RtcpSenderReport::SetNtpTimestamp(uint64_t unixTimeMs)
 {
-    RtcpUtils::UnixMsToNtp(unixTimeMs, ntpTimestampH, ntpTimestampL);
-    ntpTimestampH = htonl(ntpTimestampH);
-    ntpTimestampL = htonl(ntpTimestampL);
+    UnixMsToNtp(unixTimeMs, ntpTimestampH, ntpTimestampL);
+    ntpTimestampH = lmcore::ByteOrder::HostToNetwork32(ntpTimestampH);
+    ntpTimestampL = lmcore::ByteOrder::HostToNetwork32(ntpTimestampL);
     return *this;
 }
 
 RtcpSenderReport &RtcpSenderReport::SetRtpTimestamp(uint32_t timestamp)
 {
-    rtpTimestamp = htonl(timestamp);
+    rtpTimestamp = lmcore::ByteOrder::HostToNetwork32(timestamp);
     return *this;
 }
 
 RtcpSenderReport &RtcpSenderReport::SetCounts(uint32_t packets, uint32_t octets)
 {
-    packetCount = htonl(packets);
-    octetCount = htonl(octets);
+    packetCount = lmcore::ByteOrder::HostToNetwork32(packets);
+    octetCount = lmcore::ByteOrder::HostToNetwork32(octets);
     return *this;
 }
 
@@ -109,12 +118,9 @@ std::vector<RtcpReportBlock *> RtcpSenderReport::GetReportBlocks()
 
 uint64_t RtcpSenderReport::GetNtpUnixMs() const
 {
-    return RtcpUtils::NtpToUnixMs(ntohl(ntpTimestampH), ntohl(ntpTimestampL));
+    return NtpToUnixMs(lmcore::ByteOrder::NetworkToHost32(ntpTimestampH),
+                       lmcore::ByteOrder::NetworkToHost32(ntpTimestampL));
 }
-
-// ============================================================================
-// RtcpReceiverReport
-// ============================================================================
 
 std::shared_ptr<RtcpReceiverReport> RtcpReceiverReport::Create(size_t reportCount)
 {
@@ -150,10 +156,6 @@ std::vector<RtcpReportBlock *> RtcpReceiverReport::GetReportBlocks()
     return blocks;
 }
 
-// ============================================================================
-// RtcpSdes
-// ============================================================================
-
 std::shared_ptr<RtcpSdes> RtcpSdes::Create(const std::vector<SdesChunk> &chunks)
 {
     if (chunks.empty()) {
@@ -188,7 +190,7 @@ std::shared_ptr<RtcpSdes> RtcpSdes::Create(const std::vector<SdesChunk> &chunks)
     uint8_t *ptr = reinterpret_cast<uint8_t *>(sdes.get()) + sizeof(RtcpHeader);
     for (const auto &chunk : chunks) {
         // Write SSRC
-        *reinterpret_cast<uint32_t *>(ptr) = htonl(chunk.ssrc);
+        *reinterpret_cast<uint32_t *>(ptr) = lmcore::ByteOrder::HostToNetwork32(chunk.ssrc);
         ptr += 4;
 
         // Write SDES items
@@ -229,10 +231,6 @@ std::shared_ptr<RtcpSdes> RtcpSdes::Create(const std::vector<std::pair<uint32_t,
     return Create(chunks);
 }
 
-// ============================================================================
-// RtcpBye
-// ============================================================================
-
 std::shared_ptr<RtcpBye> RtcpBye::Create(const std::vector<uint32_t> &ssrcs, const std::string &reason)
 {
     if (ssrcs.empty()) {
@@ -259,7 +257,7 @@ std::shared_ptr<RtcpBye> RtcpBye::Create(const std::vector<uint32_t> &ssrcs, con
     // Write SSRCs
     uint8_t *ptr = reinterpret_cast<uint8_t *>(bye.get()) + sizeof(RtcpHeader);
     for (uint32_t ssrc : ssrcs) {
-        *reinterpret_cast<uint32_t *>(ptr) = htonl(ssrc);
+        *reinterpret_cast<uint32_t *>(ptr) = lmcore::ByteOrder::HostToNetwork32(ssrc);
         ptr += 4;
     }
 
@@ -279,7 +277,7 @@ std::vector<uint32_t> RtcpBye::GetSsrcs() const
         reinterpret_cast<const uint32_t *>(reinterpret_cast<const uint8_t *>(this) + sizeof(RtcpHeader));
 
     for (size_t i = 0; i < count; ++i) {
-        ssrcs.push_back(ntohl(ptr[i]));
+        ssrcs.push_back(lmcore::ByteOrder::NetworkToHost32(ptr[i]));
     }
 
     return ssrcs;
@@ -302,10 +300,6 @@ std::string RtcpBye::GetReason() const
 
     return std::string(reinterpret_cast<const char *>(ptr), reasonLen);
 }
-
-// ============================================================================
-// RtcpFeedback
-// ============================================================================
 
 const uint8_t *RtcpFeedback::GetFci() const
 {
@@ -357,51 +351,12 @@ std::shared_ptr<RtcpFeedback> RtcpFeedback::CreateRtpfb(RtpfbType fmt, const voi
     return fb;
 }
 
-// ============================================================================
-// NackItem
-// ============================================================================
-
-NackItem::NackItem(uint16_t packetId, uint16_t bitmask) : pid(htons(packetId)), blp(bitmask) {}
-
-// ============================================================================
-// RtcpUtils
-// ============================================================================
+NackItem::NackItem(uint16_t packetId, uint16_t bitmask)
+    : pid(lmcore::ByteOrder::HostToNetwork16(packetId)), blp(bitmask)
+{
+}
 
 namespace RtcpUtils {
-
-void UnixMsToNtp(uint64_t unixMs, uint32_t &ntpH, uint32_t &ntpL)
-{
-    // Convert milliseconds to microseconds and add NTP epoch offset
-    uint64_t ntpUs = unixMs * 1000 + NTP_OFFSET_US;
-
-    // High 32 bits: seconds since 1900
-    ntpH = ntpUs / 1000000;
-
-    // Low 32 bits: fractional seconds (32-bit fixed-point)
-    uint64_t fraction = ntpUs % 1000000;
-    ntpL = (fraction << 32) / 1000000;
-}
-
-uint64_t NtpToUnixMs(uint32_t ntpH, uint32_t ntpL)
-{
-    // Convert NTP timestamp to microseconds
-    uint64_t ntpUs = static_cast<uint64_t>(ntpH) * 1000000;
-    ntpUs += (static_cast<uint64_t>(ntpL) * 1000000) >> 32;
-
-    // Subtract NTP epoch offset and convert to milliseconds
-    if (ntpUs < NTP_OFFSET_US) {
-        return 0;
-    }
-    return (ntpUs - NTP_OFFSET_US) / 1000;
-}
-
-void GetCurrentNtpTimestamp(uint32_t &ntpH, uint32_t &ntpL)
-{
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    uint64_t unixMs = static_cast<uint64_t>(tv.tv_sec) * 1000 + tv.tv_usec / 1000;
-    UnixMsToNtp(unixMs, ntpH, ntpL);
-}
 
 uint32_t GetLsrFromNtp(uint32_t ntpH, uint32_t ntpL)
 {
