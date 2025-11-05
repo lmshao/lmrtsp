@@ -9,17 +9,13 @@
 #ifndef LMSHAO_LMRTSP_RTCP_CONTEXT_H
 #define LMSHAO_LMRTSP_RTCP_CONTEXT_H
 
+#include <lmcore/data_buffer.h>
+
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <vector>
 
-#include "rtcp_def.h"
 #include "rtcp_packet.h"
-
-namespace lmshao::lmcore {
-class DataBuffer;
-}
 
 namespace lmshao::lmrtsp {
 
@@ -40,10 +36,11 @@ public:
 
     /**
      * Process incoming RTCP packet
-     * @param rtcp RTCP header pointer
-     * @param size Packet size in bytes
+     * @param buffer RTCP packet data buffer (read-only)
+     * @note This is a synchronous call. The buffer is only accessed during
+     *       the function execution and not stored.
      */
-    virtual void OnRtcp(const uint8_t *data, size_t size);
+    virtual void OnRtcp(const lmcore::DataBuffer &buffer);
 
     /**
      * Process outgoing RTP packet (for statistics)
@@ -136,7 +133,7 @@ public:
     /**
      * Process incoming RTCP packet (RR, XR, etc.)
      */
-    void OnRtcp(const uint8_t *data, size_t size) override;
+    void OnRtcp(const lmcore::DataBuffer &buffer) override;
 
     /**
      * Create RTCP Sender Report
@@ -180,7 +177,7 @@ public:
     /**
      * Process incoming RTCP packet (SR, BYE, etc.)
      */
-    void OnRtcp(const uint8_t *data, size_t size) override;
+    void OnRtcp(const lmcore::DataBuffer &buffer) override;
 
     /**
      * Process incoming RTP packet

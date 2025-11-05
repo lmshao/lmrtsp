@@ -266,22 +266,8 @@ struct NackItem {
  */
 namespace RtcpUtils {
 /**
- * Convert Unix timestamp (ms) to NTP timestamp
- */
-void UnixMsToNtp(uint64_t unixMs, uint32_t &ntpH, uint32_t &ntpL);
-
-/**
- * Convert NTP timestamp to Unix timestamp (ms)
- */
-uint64_t NtpToUnixMs(uint32_t ntpH, uint32_t ntpL);
-
-/**
- * Get current NTP timestamp
- */
-void GetCurrentNtpTimestamp(uint32_t &ntpH, uint32_t &ntpL);
-
-/**
  * Calculate LSR (Last SR timestamp) from NTP timestamp
+ * LSR is the middle 32 bits of the 64-bit NTP timestamp
  */
 uint32_t GetLsrFromNtp(uint32_t ntpH, uint32_t ntpL);
 

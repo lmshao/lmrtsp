@@ -272,7 +272,7 @@ void RtpSinkSession::HandleRtcpData(std::shared_ptr<lmcore::DataBuffer> buffer)
     }
 
     // Process RTCP packet (SR, BYE, etc.)
-    rtcpContext_->OnRtcp(buffer->Data(), buffer->Size());
+    rtcpContext_->OnRtcp(*buffer);
     LMRTSP_LOGD("Processed RTCP packet: size=%zu", buffer->Size());
 }
 

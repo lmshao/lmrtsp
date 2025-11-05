@@ -8,30 +8,17 @@
 
 #include "lmrtsp/rtcp_context.h"
 
-#include <algorithm>
-#include <chrono>
+#include <lmcore/byte_order.h>
+#include <lmcore/data_buffer.h>
+#include <lmcore/time_utils.h>
+
 #include <cmath>
 #include <cstring>
 
 #include "internal_logger.h"
-#include "lmcore/byte_order.h"
-#include "lmcore/data_buffer.h"
 #include "lmrtsp/rtcp_packet.h"
 
 namespace lmshao::lmrtsp {
-
-namespace {
-// Get current time in milliseconds
-uint64_t GetCurrentTimeMs()
-{
-    auto now = std::chrono::system_clock::now();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-}
-} // namespace
-
-//=============================================================================
-// RtcpContext
-//=============================================================================
 
 void RtcpContext::Initialize(uint32_t rtcpSsrc, uint32_t rtpSsrc)
 {
@@ -39,11 +26,10 @@ void RtcpContext::Initialize(uint32_t rtcpSsrc, uint32_t rtpSsrc)
     rtpSsrc_ = rtpSsrc;
 }
 
-void RtcpContext::OnRtcp(const uint8_t *data, size_t size)
+void RtcpContext::OnRtcp(const lmcore::DataBuffer &buffer)
 {
     // Base implementation - to be overridden
-    (void)data;
-    (void)size;
+    (void)buffer;
 }
 
 void RtcpContext::OnRtp(uint16_t seq, uint32_t timestamp, uint64_t ntpTimestampMs, uint32_t sampleRate, size_t bytes)
@@ -149,17 +135,16 @@ std::shared_ptr<lmcore::DataBuffer> RtcpContext::CreateCompoundPacket(const std:
     return buffer;
 }
 
-//=============================================================================
-// RtcpSenderContext
-//=============================================================================
-
 RtcpSenderContext::Ptr RtcpSenderContext::Create()
 {
     return std::make_shared<RtcpSenderContext>();
 }
 
-void RtcpSenderContext::OnRtcp(const uint8_t *data, size_t size)
+void RtcpSenderContext::OnRtcp(const lmcore::DataBuffer &buffer)
 {
+    const uint8_t *data = buffer.Data();
+    size_t size = buffer.Size();
+
     if (!data || size < sizeof(RtcpHeader)) {
         LMRTSP_LOGW("Invalid RTCP packet: data=%p, size=%zu", data, size);
         return;
@@ -201,7 +186,7 @@ void RtcpSenderContext::ProcessReceiverReport(const RtcpReceiverReport *rr)
         return;
     }
 
-    uint64_t currentTimeMs = GetCurrentTimeMs();
+    uint64_t currentTimeMs = lmcore::TimeUtils::GetCurrentTimeMs();
     uint32_t senderSsrc = lmcore::ByteOrder::NetworkToHost32(rr->ssrc);
 
     // Process each report block
@@ -242,7 +227,7 @@ std::shared_ptr<lmcore::DataBuffer> RtcpSenderContext::CreateRtcpSr()
         return nullptr;
     }
 
-    uint64_t currentTimeMs = GetCurrentTimeMs();
+    uint64_t currentTimeMs = lmcore::TimeUtils::GetCurrentTimeMs();
 
     sr->SetSsrc(rtcpSsrc_)
         .SetNtpTimestamp(currentTimeMs)
@@ -284,17 +269,16 @@ uint32_t RtcpSenderContext::GetAverageRtt() const
     return static_cast<uint32_t>(totalRtt / rttMap_.size());
 }
 
-//=============================================================================
-// RtcpReceiverContext
-//=============================================================================
-
 RtcpReceiverContext::Ptr RtcpReceiverContext::Create()
 {
     return std::make_shared<RtcpReceiverContext>();
 }
 
-void RtcpReceiverContext::OnRtcp(const uint8_t *data, size_t size)
+void RtcpReceiverContext::OnRtcp(const lmcore::DataBuffer &buffer)
 {
+    const uint8_t *data = buffer.Data();
+    size_t size = buffer.Size();
+
     if (!data || size < sizeof(RtcpHeader)) {
         LMRTSP_LOGW("Invalid RTCP packet: data=%p, size=%zu", data, size);
         return;
@@ -340,7 +324,7 @@ void RtcpReceiverContext::ProcessSenderReport(const RtcpSenderReport *sr)
     uint32_t ntpL = lmcore::ByteOrder::NetworkToHost32(sr->ntpTimestampL);
 
     lastSrLsr_ = RtcpUtils::GetLsrFromNtp(ntpH, ntpL);
-    lastSrNtpMs_ = GetCurrentTimeMs();
+    lastSrNtpMs_ = lmcore::TimeUtils::GetCurrentTimeMs();
 
     LMRTSP_LOGD("Processed SR: SSRC=0x%08x, LSR=0x%08x", lmcore::ByteOrder::NetworkToHost32(sr->ssrc), lastSrLsr_);
 }
@@ -467,7 +451,7 @@ std::shared_ptr<lmcore::DataBuffer> RtcpReceiverContext::CreateRtcpRr()
         // LSR and DLSR
         block->lastSr = lmcore::ByteOrder::HostToNetwork32(lastSrLsr_);
         if (lastSrNtpMs_ > 0) {
-            uint64_t currentTimeMs = GetCurrentTimeMs();
+            uint64_t currentTimeMs = lmcore::TimeUtils::GetCurrentTimeMs();
             uint64_t dlsrMs = currentTimeMs - lastSrNtpMs_;
             // Convert to 1/65536 seconds
             uint32_t dlsr = static_cast<uint32_t>((dlsrMs * 65536) / 1000);
