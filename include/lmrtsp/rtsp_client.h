@@ -17,11 +17,9 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <unordered_map>
 
 #include "lmrtsp/irtsp_client_callback.h"
-#include "lmrtsp/media_stream_info.h"
 #include "lmrtsp/rtsp_request.h"
 #include "lmrtsp/rtsp_response.h"
 

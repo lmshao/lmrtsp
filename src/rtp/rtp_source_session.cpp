@@ -17,6 +17,7 @@
 #include "lmrtsp/rtcp_context.h"
 #include "rtp_packetizer_aac.h"
 #include "rtp_packetizer_h264.h"
+#include "rtp_packetizer_h265.h"
 #include "rtp_packetizer_ts.h"
 #include "tcp_interleaved_transport_adapter.h"
 #include "udp_rtp_transport_adapter.h"
@@ -165,6 +166,15 @@ bool RtpSourceSession::Initialize(const RtpSourceSessionConfig &config)
         videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
             std::make_shared<PacketizerListener>(transportAdapter_.get(), nullptr));
         videoPacketizer_->SetListener(videoListener_);
+    } else if (config_.video_type == MediaType::H265) {
+        videoPacketizer_ =
+            std::make_unique<RtpPacketizerH265>(config_.ssrc, sequenceNumber_, config_.video_payload_type,
+                                                90000, // H265 clock rate
+                                                config_.mtu_size);
+        // Set up listener for H265 packetizer
+        videoListener_ = std::static_pointer_cast<IRtpPacketizerListener>(
+            std::make_shared<PacketizerListener>(transportAdapter_.get(), nullptr));
+        videoPacketizer_->SetListener(videoListener_);
     } else if (config_.video_type == MediaType::AAC) {
         videoPacketizer_ = std::make_unique<RtpPacketizerAac>(config_.ssrc, sequenceNumber_, config_.video_payload_type,
                                                               48000, // AAC clock rate (will be updated from stream)
@@ -273,9 +283,9 @@ bool RtpSourceSession::SendFrame(const std::shared_ptr<MediaFrame> &frame)
         return false;
     }
 
-    // Support H264, MP2T and AAC frames
-    if ((frame->media_type != MediaType::H264 && frame->media_type != MediaType::MP2T &&
-         frame->media_type != MediaType::AAC) ||
+    // Support H264, H265, MP2T and AAC frames
+    if ((frame->media_type != MediaType::H264 && frame->media_type != MediaType::H265 &&
+         frame->media_type != MediaType::MP2T && frame->media_type != MediaType::AAC) ||
         !videoPacketizer_) {
         LMRTSP_LOGE("SendFrame failed - media_type: %d, video_packetizer: %s", static_cast<int>(frame->media_type),
                     videoPacketizer_ ? "valid" : "null");

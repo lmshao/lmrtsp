@@ -10,6 +10,7 @@
  * and serves media files from a specified directory.
  */
 
+#include <lmnet/network_utils.h>
 #include <lmrtsp/lmrtsp_logger.h>
 #include <lmrtsp/media_stream_info.h>
 #include <lmrtsp/rtsp_server.h>
@@ -24,21 +25,19 @@
 #include <memory>
 #include <thread>
 #include <vector>
-// Network interfaces enumeration for IPv4 addresses
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <netinet/in.h>
 
 #include "aac_file_reader.h"
 #include "file_manager.h"
 #include "session_aac_worker_thread.h"
+#include "session_h265_reader.h"
+#include "session_h265_worker_thread.h"
 #include "session_manager.h"
 #include "session_ts_reader.h"
 #include "session_ts_worker_thread.h"
 
 using namespace lmshao::lmrtsp;
-using namespace lmshao::lmnet;
 using namespace lmshao::lmcore;
+namespace lmnet = lmshao::lmnet;
 
 // Media file manager
 struct MediaFile {
@@ -63,6 +62,10 @@ std::mutex g_ts_workers_mutex;
 // AAC worker threads
 std::map<std::string, std::shared_ptr<SessionAacWorkerThread>> g_aac_workers;
 std::mutex g_aac_workers_mutex;
+
+// H265 worker threads
+std::map<std::string, std::shared_ptr<SessionH265WorkerThread>> g_h265_workers;
+std::mutex g_h265_workers_mutex;
 
 // Session event callback for managing worker threads
 class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
@@ -97,6 +100,17 @@ public:
                 aac_it->second->Stop();
                 g_aac_workers.erase(aac_it);
                 std::cout << "Stopped AAC worker for session: " << session_id << std::endl;
+            }
+        }
+
+        // Stop the H265 worker thread if exists
+        {
+            std::lock_guard<std::mutex> h265_lock(g_h265_workers_mutex);
+            auto h265_it = g_h265_workers.find(session_id);
+            if (h265_it != g_h265_workers.end()) {
+                h265_it->second->Stop();
+                g_h265_workers.erase(h265_it);
+                std::cout << "Stopped H265 worker for session: " << session_id << std::endl;
             }
         }
     }
@@ -156,6 +170,18 @@ public:
                 std::cout << "Started AAC worker thread for session: " << session_id << std::endl;
             } else {
                 std::cout << "Failed to start AAC worker thread for session: " << session_id << std::endl;
+            }
+        } else if (media.codec == "H265") {
+            // Start H265 worker thread for this session
+            uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
+
+            auto h265_worker = std::make_shared<SessionH265WorkerThread>(session, media.file_path, frame_rate);
+            if (h265_worker->Start()) {
+                std::lock_guard<std::mutex> h265_lock(g_h265_workers_mutex);
+                g_h265_workers[session_id] = h265_worker;
+                std::cout << "Started H265 worker thread for session: " << session_id << std::endl;
+            } else {
+                std::cout << "Failed to start H265 worker thread for session: " << session_id << std::endl;
             }
         } else {
             std::cout << "Unsupported codec: " << media.codec << " for session: " << session_id << std::endl;
@@ -230,33 +256,10 @@ public:
     }
 };
 
-// Enumerate local IPv4 addresses (loopback included)
+// Enumerate local IPv4 addresses (using lmnet cross-platform implementation)
 std::vector<std::string> EnumerateLocalIPv4()
 {
-    std::vector<std::string> ips;
-    struct ifaddrs *ifaddr = nullptr;
-    if (getifaddrs(&ifaddr) == -1) {
-        return ips;
-    }
-
-    for (struct ifaddrs *ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == nullptr)
-            continue;
-        if (ifa->ifa_addr->sa_family == AF_INET) {
-            auto *sa = reinterpret_cast<struct sockaddr_in *>(ifa->ifa_addr);
-            char buf[INET_ADDRSTRLEN] = {0};
-            if (inet_ntop(AF_INET, &(sa->sin_addr), buf, sizeof(buf)) != nullptr) {
-                std::string ip(buf);
-                // Deduplicate
-                if (std::find(ips.begin(), ips.end(), ip) == ips.end()) {
-                    ips.push_back(ip);
-                }
-            }
-        }
-    }
-
-    freeifaddrs(ifaddr);
-    return ips;
+    return lmnet::NetworkUtils::GetAllIPv4Addresses();
 }
 
 // Print prominent RTSP URLs for all local IPs and discovered streams
@@ -314,6 +317,8 @@ std::string GetCodecFromExtension(const std::string &filename)
 
     if (ext == ".h264" || ext == ".264") {
         return "H264";
+    } else if (ext == ".h265" || ext == ".265" || ext == ".hevc") {
+        return "H265";
     } else if (ext == ".aac") {
         return "AAC";
     } else if (ext == ".ts" || ext == ".m2ts") {
@@ -503,6 +508,49 @@ bool ScanMediaDirectory(const std::string &directory)
                 // Release temporary reference
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
+            // Support for H265 files
+            else if (codec == "H265") {
+                auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
+                if (!mapped_file) {
+                    std::cerr << "Warning: Failed to map H.265 file: " << filepath << std::endl;
+                    continue;
+                }
+
+                SessionH265Reader temp_reader(mapped_file);
+
+                auto streamInfo = std::make_shared<MediaStreamInfo>();
+                streamInfo->stream_path = streamPath;
+                streamInfo->media_type = "video";
+                streamInfo->codec = "H265";
+                streamInfo->payload_type = 98;
+                streamInfo->clock_rate = 90000;
+
+                streamInfo->width = 1920;
+                streamInfo->height = 1080;
+                streamInfo->frame_rate = temp_reader.GetFrameRate();
+                streamInfo->vps = temp_reader.GetVPS();
+                streamInfo->sps = temp_reader.GetSPS();
+                streamInfo->pps = temp_reader.GetPPS();
+
+                if (!g_server->AddMediaStream(streamPath, streamInfo)) {
+                    std::cerr << "Warning: Failed to register stream: " << streamPath << std::endl;
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
+                    continue;
+                }
+
+                auto playback_info = temp_reader.GetPlaybackInfo();
+                double duration = playback_info.total_duration_;
+
+                std::cout << "  [" << ++fileCount << "] " << filename << std::endl;
+                std::cout << "      Stream:     rtsp://localhost:8554" << streamPath << std::endl;
+                std::cout << "      Codec:      " << codec << std::endl;
+                std::cout << "      Resolution: " << streamInfo->width << "x" << streamInfo->height << std::endl;
+                std::cout << "      Frame rate: " << streamInfo->frame_rate << " fps" << std::endl;
+                std::cout << "      Duration:   " << duration << " seconds" << std::endl;
+                std::cout << "      Frames:     " << playback_info.total_frames_ << std::endl;
+
+                FileManager::GetInstance().ReleaseMappedFile(filepath);
+            }
 
             std::lock_guard<std::mutex> lock(g_media_mutex);
             g_media_files[streamPath] = media;
@@ -522,7 +570,7 @@ void PrintUsage(const char *programName)
     std::cout << "Usage: " << programName << " [options] <media_directory>\n" << std::endl;
 
     std::cout << "Parameters:" << std::endl;
-    std::cout << "  media_directory  Directory containing media files (.h264, .aac, .ts)" << std::endl;
+    std::cout << "  media_directory  Directory containing media files (.h264, .h265, .aac, .ts)" << std::endl;
     std::cout << "" << std::endl;
 
     std::cout << "Options:" << std::endl;
@@ -544,7 +592,7 @@ void PrintUsage(const char *programName)
     std::cout << "  vlc rtsp://localhost:8554/movie.h264" << std::endl;
     std::cout << "" << std::endl;
 
-    std::cout << "Supported formats: .h264, .264, .aac, .ts, .m2ts" << std::endl;
+    std::cout << "Supported formats: .h264, .264, .h265, .265, .hevc, .aac, .ts, .m2ts" << std::endl;
 }
 
 int main(int argc, char *argv[])

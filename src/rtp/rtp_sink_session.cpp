@@ -19,6 +19,7 @@
 #include "lmrtsp/rtcp_context.h"
 #include "lmrtsp/rtp_packet.h"
 #include "rtp_depacketizer_h264.h"
+#include "rtp_depacketizer_h265.h"
 #include "udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
@@ -129,6 +130,10 @@ bool RtpSinkSession::Initialize(const RtpSinkSessionConfig &config)
     // Create video depacketizer based on media type
     if (config_.video_type == MediaType::H264) {
         videoDepacketizer_ = std::make_unique<RtpDepacketizerH264>();
+        depacketizerListener_ = std::make_shared<DepacketizerListener>(this);
+        videoDepacketizer_->SetListener(depacketizerListener_);
+    } else if (config_.video_type == MediaType::H265) {
+        videoDepacketizer_ = std::make_unique<RtpDepacketizerH265>();
         depacketizerListener_ = std::make_shared<DepacketizerListener>(this);
         videoDepacketizer_->SetListener(depacketizerListener_);
     } else {
