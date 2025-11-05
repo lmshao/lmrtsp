@@ -56,6 +56,10 @@ bool RtspMediaStreamManager::Setup(const lmshao::lmrtsp::TransportConfig &config
                 video_type = MediaType::H264;
                 payload_type = 96; // Dynamic payload type for H264
                 LMRTSP_LOGI("Using H264 codec with payload type 96");
+            } else if (stream_info->codec == "H265") {
+                video_type = MediaType::H265;
+                payload_type = 98; // Dynamic payload type for H265
+                LMRTSP_LOGI("Using H265 codec with payload type 98");
             } else if (stream_info->codec == "AAC") {
                 video_type = MediaType::AAC;
                 payload_type = 97; // Dynamic payload type for AAC

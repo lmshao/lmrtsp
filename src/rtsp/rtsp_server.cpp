@@ -466,6 +466,17 @@ std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::s
                    " packetization-mode=1;profile-level-id=" + profileLevelId + ";sprop-parameter-sets=" + spsBase64 +
                    "," + ppsBase64 + "\r\n";
         }
+        // Add fmtp with H.265 parameters if available (RFC 7798)
+        else if (stream_info->codec == "H265" && !stream_info->vps.empty() && !stream_info->sps.empty() &&
+                 !stream_info->pps.empty()) {
+            // Base64 encode VPS, SPS and PPS
+            std::string vpsBase64 = lmcore::Base64::Encode(stream_info->vps);
+            std::string spsBase64 = lmcore::Base64::Encode(stream_info->sps);
+            std::string ppsBase64 = lmcore::Base64::Encode(stream_info->pps);
+
+            sdp += "a=fmtp:" + std::to_string(stream_info->payload_type) + " sprop-vps=" + vpsBase64 +
+                   ";sprop-sps=" + spsBase64 + ";sprop-pps=" + ppsBase64 + "\r\n";
+        }
 
         if (stream_info->width > 0 && stream_info->height > 0) {
             sdp += "a=framerate:" + std::to_string(stream_info->frame_rate) + "\r\n";

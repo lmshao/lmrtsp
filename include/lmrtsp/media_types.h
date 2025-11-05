@@ -30,6 +30,7 @@ enum class MediaType : uint8_t {
     // Dynamic payload types (commonly used in SDP)
     H264 = 96,
     AAC = 97,
+    H265 = 98,
     UNKNOWN = 255,
 };
 

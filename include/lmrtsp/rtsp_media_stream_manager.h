@@ -17,30 +17,13 @@
 #include <queue>
 #include <string>
 #include <thread>
-#include <vector>
 
-#include "../src/rtp/i_rtp_transport_adapter.h"
 #include "lmrtsp/media_types.h"
-
-// #include "i_rtp_packetizer.h"
-// #include "rtp_session.h"
-// #include "rtp_transport_adapter.h"
-
-namespace lmshao {
-namespace lmrtsp {
-class RtspServerSession;
-class RtpSourceSession;
-
-// Dummy media frame for build-only mode
-// struct MediaFrame {
-//     std::vector<uint8_t> data{};
-//     uint32_t timestamp = 0;
-//     bool marker = false;
-// };
-} // namespace lmrtsp
-} // namespace lmshao
+#include "lmrtsp/transport_config.h"
 
 namespace lmshao::lmrtsp {
+class RtspServerSession;
+class RtpSourceSession;
 // Stream state enumeration and RtspMediaStreamManager should be inside this namespace
 enum class StreamState {
     IDLE,
