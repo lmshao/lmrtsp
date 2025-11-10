@@ -107,6 +107,7 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspServerSession> session, const
     if (method == "SETUP") {
         // Extract stream path from URI (remove /track0, /track1, etc and rtsp:// prefix)
         std::string stream_path = request.uri_;
+        int track_index = -1;
 
         // Remove rtsp:// prefix if present
         size_t rtsp_pos = stream_path.find("rtsp://");
@@ -117,17 +118,45 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspServerSession> session, const
             }
         }
 
-        // Remove /track0, /track1 suffix
-        size_t track_pos = stream_path.find("/track");
+        size_t track_pos = stream_path.rfind("/track");
         if (track_pos != std::string::npos) {
-            stream_path = stream_path.substr(0, track_pos);
+            // Verify it's followed by digits (track number)
+            bool is_track_suffix = true;
+            std::string track_num_str;
+            for (size_t i = track_pos + 6; i < stream_path.length(); ++i) {
+                if (!std::isdigit(stream_path[i])) {
+                    is_track_suffix = false;
+                    break;
+                }
+                track_num_str += stream_path[i];
+            }
+            if (is_track_suffix && !track_num_str.empty()) {
+                track_index = std::stoi(track_num_str);
+                stream_path = stream_path.substr(0, track_pos);
+                LMRTSP_LOGD("Extracted track index: %d from SETUP URI", track_index);
+            }
         }
 
-        // Set media stream info on session BEFORE ProcessRequest
+        // Get media stream info
         auto stream_info = GetMediaStream(stream_path);
         if (stream_info) {
-            session->SetMediaStreamInfo(stream_info);
-            LMRTSP_LOGD("Set MediaStreamInfo before ProcessRequest - codec: %s", stream_info->codec.c_str());
+            // Check if this is a multi-track stream and track index is specified
+            if (track_index >= 0 && !stream_info->sub_tracks.empty()) {
+                if (track_index < static_cast<int>(stream_info->sub_tracks.size())) {
+                    // Set the specific sub-track as media stream info
+                    session->SetMediaStreamInfo(stream_info->sub_tracks[track_index]);
+                    LMRTSP_LOGD("Set sub-track %d MediaStreamInfo - codec: %s", track_index,
+                                stream_info->sub_tracks[track_index]->codec.c_str());
+                } else {
+                    LMRTSP_LOGW("Track index %d out of range (total tracks: %zu)", track_index,
+                                stream_info->sub_tracks.size());
+                    session->SetMediaStreamInfo(stream_info);
+                }
+            } else {
+                // Single track stream or no track index specified
+                session->SetMediaStreamInfo(stream_info);
+                LMRTSP_LOGD("Set MediaStreamInfo before ProcessRequest - codec: %s", stream_info->codec.c_str());
+            }
         } else {
             LMRTSP_LOGW("No MediaStreamInfo found for stream: %s", stream_path.c_str());
         }
@@ -408,149 +437,7 @@ uint16_t RtspServer::GetServerPort() const
     return serverPort_;
 }
 
-// SDP generation implementation
-std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::string &server_ip, uint16_t server_port)
-{
-    // Extract path from full RTSP URL if needed
-    std::string path = stream_path;
-    if (stream_path.find("rtsp://") == 0) {
-        // Find the path part after host:port
-        size_t schemeEnd = stream_path.find("://");
-        if (schemeEnd != std::string::npos) {
-            size_t hostStart = schemeEnd + 3;
-            size_t pathStart = stream_path.find('/', hostStart);
-            if (pathStart != std::string::npos) {
-                path = stream_path.substr(pathStart);
-            }
-        }
-    }
-
-    auto stream_info = GetMediaStream(path);
-    if (!stream_info) {
-        LMRTSP_LOGE("Media stream not found: %s (original: %s)", path.c_str(), stream_path.c_str());
-        return "";
-    }
-
-    // Basic SDP generation logic
-    std::string sdp;
-    sdp += "v=0\r\n";
-    sdp += "o=- 0 0 IN IP4 " + server_ip + "\r\n";
-    sdp += "s=RTSP Session\r\n";
-    sdp += "c=IN IP4 " + server_ip + "\r\n";
-    sdp += "t=0 0\r\n";
-    sdp += "a=range:npt=0-\r\n"; // Add range attribute for VLC compatibility
-
-    // Session-level control attribute - use wildcard
-    sdp += "a=control:*\r\n";
-
-    if (stream_info->media_type == "video") {
-        // Use UDP mode (RTP/AVP), not TCP
-        sdp += "m=video 0 RTP/AVP " + std::to_string(stream_info->payload_type) + "\r\n";
-        sdp += "a=rtpmap:" + std::to_string(stream_info->payload_type) + " " + stream_info->codec + "/" +
-               std::to_string(stream_info->clock_rate) + "\r\n";
-
-        // Add fmtp with H.264 parameters if available
-        if (stream_info->codec == "H264" && !stream_info->sps.empty() && !stream_info->pps.empty()) {
-            // Extract profile-level-id from SPS (bytes 1-3)
-            std::string profileLevelId = "42001f"; // Default: Baseline Profile Level 3.1
-            if (stream_info->sps.size() >= 4) {
-                std::vector<uint8_t> profile_bytes = {stream_info->sps[1], stream_info->sps[2], stream_info->sps[3]};
-                profileLevelId = lmcore::Hex::Encode(profile_bytes);
-            }
-
-            // Base64 encode SPS and PPS
-            std::string spsBase64 = lmcore::Base64::Encode(stream_info->sps);
-            std::string ppsBase64 = lmcore::Base64::Encode(stream_info->pps);
-
-            sdp += "a=fmtp:" + std::to_string(stream_info->payload_type) +
-                   " packetization-mode=1;profile-level-id=" + profileLevelId + ";sprop-parameter-sets=" + spsBase64 +
-                   "," + ppsBase64 + "\r\n";
-        }
-        // Add fmtp with H.265 parameters if available (RFC 7798)
-        else if (stream_info->codec == "H265" && !stream_info->vps.empty() && !stream_info->sps.empty() &&
-                 !stream_info->pps.empty()) {
-            // Base64 encode VPS, SPS and PPS
-            std::string vpsBase64 = lmcore::Base64::Encode(stream_info->vps);
-            std::string spsBase64 = lmcore::Base64::Encode(stream_info->sps);
-            std::string ppsBase64 = lmcore::Base64::Encode(stream_info->pps);
-
-            sdp += "a=fmtp:" + std::to_string(stream_info->payload_type) + " sprop-vps=" + vpsBase64 +
-                   ";sprop-sps=" + spsBase64 + ";sprop-pps=" + ppsBase64 + "\r\n";
-        }
-
-        if (stream_info->width > 0 && stream_info->height > 0) {
-            sdp += "a=framerate:" + std::to_string(stream_info->frame_rate) + "\r\n";
-        }
-
-        // Media-level control attribute - use relative path
-        sdp += "a=control:track0\r\n";
-    } else if (stream_info->media_type == "audio") {
-        sdp += "m=audio 0 RTP/AVP " + std::to_string(stream_info->payload_type) + "\r\n";
-
-        // Use RFC 3640 compliant codec name for AAC
-        std::string codec_name = stream_info->codec;
-        if (codec_name == "AAC") {
-            codec_name = "mpeg4-generic"; // RFC 3640 standard name
-        }
-
-        sdp += "a=rtpmap:" + std::to_string(stream_info->payload_type) + " " + codec_name + "/" +
-               std::to_string(stream_info->sample_rate);
-
-        // Add channel information to rtpmap
-        if (stream_info->channels > 0) {
-            sdp += "/" + std::to_string(stream_info->channels);
-        }
-        sdp += "\r\n";
-
-        // Add fmtp for AAC (RFC 3640)
-        if (stream_info->codec == "AAC") {
-            // Generate AudioSpecificConfig for AAC-LC
-            // Format: profile(5bits) + sampling_freq_index(4bits) + channel_config(4bits)
-            // AAC-LC profile = 2 (0b00010)
-            // 48000Hz index = 3, 44100Hz index = 4
-            int sampling_freq_index = 15; // default invalid
-            if (stream_info->sample_rate == 96000)
-                sampling_freq_index = 0;
-            else if (stream_info->sample_rate == 88200)
-                sampling_freq_index = 1;
-            else if (stream_info->sample_rate == 64000)
-                sampling_freq_index = 2;
-            else if (stream_info->sample_rate == 48000)
-                sampling_freq_index = 3;
-            else if (stream_info->sample_rate == 44100)
-                sampling_freq_index = 4;
-            else if (stream_info->sample_rate == 32000)
-                sampling_freq_index = 5;
-            else if (stream_info->sample_rate == 24000)
-                sampling_freq_index = 6;
-            else if (stream_info->sample_rate == 22050)
-                sampling_freq_index = 7;
-            else if (stream_info->sample_rate == 16000)
-                sampling_freq_index = 8;
-            else if (stream_info->sample_rate == 12000)
-                sampling_freq_index = 9;
-            else if (stream_info->sample_rate == 11025)
-                sampling_freq_index = 10;
-            else if (stream_info->sample_rate == 8000)
-                sampling_freq_index = 11;
-
-            // AudioSpecificConfig: profile(5) + freq_index(4) + channel(4) = 13 bits, pad to 16 bits
-            uint16_t config = (2 << 11) | (sampling_freq_index << 7) | (stream_info->channels << 3);
-            char config_hex[8];
-            snprintf(config_hex, sizeof(config_hex), "%04X", config);
-
-            // RFC 3640 fmtp parameters
-            sdp +=
-                "a=fmtp:" + std::to_string(stream_info->payload_type) +
-                " streamtype=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=" +
-                std::string(config_hex) + "\r\n";
-        }
-
-        sdp += "a=control:track1\r\n";
-    }
-
-    return sdp;
-}
+// SDP generation moved to rtsp_server_sdp.cpp
 
 // Helper methods
 std::string RtspServer::GetClientIP(std::shared_ptr<RtspServerSession> session) const

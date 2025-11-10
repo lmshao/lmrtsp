@@ -85,11 +85,21 @@ public:
 
     // New media frame interface for RtspMediaStreamManager
     bool PushFrame(const lmrtsp::MediaFrame &frame);
+    bool PushFrame(const lmrtsp::MediaFrame &frame, int track_index); // Multi-track version
     std::string GetRtpInfo() const;
     std::string GetStreamUri() const; // Get saved stream URI for RTP-Info in PLAY response
 
     // TCP interleaved data sending (for TcpInterleavedTransportAdapter)
     bool SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size);
+
+    // Multi-track support: get track information
+    struct TrackInfo {
+        std::string uri; // Track URI (e.g., /file.mkv/track0)
+        std::shared_ptr<MediaStreamInfo> stream_info;
+        int track_index = -1; // Track index from SDP (0, 1, 2, ...)
+    };
+    std::vector<TrackInfo> GetTracks() const;
+    bool IsMultiTrack() const;
 
 private:
     // Helper methods
@@ -100,7 +110,20 @@ private:
     std::shared_ptr<lmnet::Session> lmnetSession_;
     std::weak_ptr<RtspServer> rtspServer_;
 
-    // New media stream manager (replaces MediaStream)
+    // Multi-track support: internal track info for each media stream
+    struct InternalTrackInfo {
+        std::string uri; // Track URI (e.g., /file.mkv/track0)
+        std::shared_ptr<MediaStreamInfo> stream_info;
+        std::unique_ptr<lmshao::lmrtsp::RtspMediaStreamManager> stream_manager;
+        std::string transport_info;
+        int track_index = -1; // Track index from SDP (0, 1, 2, ...)
+    };
+
+    // Map of track index to InternalTrackInfo
+    std::map<int, InternalTrackInfo> tracks_;
+    mutable std::mutex tracksMutex_;
+
+    // Legacy single-track support (for backward compatibility)
     std::unique_ptr<lmshao::lmrtsp::RtspMediaStreamManager> mediaStreamManager_;
     mutable std::mutex mediaStreamManagerMutex_;
 
@@ -110,7 +133,7 @@ private:
     std::string sdpDescription_;
     std::string transportInfo_; // legacy
 
-    // Media stream info and RTP
+    // Primary media stream info (for single-track or main track)
     mutable std::mutex mediaInfoMutex_;
     std::shared_ptr<MediaStreamInfo> mediaStreamInfo_;
     // std::shared_ptr<IRTPSender> rtpSender_;

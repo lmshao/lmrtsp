@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -32,6 +33,8 @@
 #include "session_h265_reader.h"
 #include "session_h265_worker_thread.h"
 #include "session_manager.h"
+#include "session_mkv_reader.h"
+#include "session_mkv_worker_thread.h"
 #include "session_ts_reader.h"
 #include "session_ts_worker_thread.h"
 
@@ -42,9 +45,10 @@ namespace lmnet = lmshao::lmnet;
 // Media file manager
 struct MediaFile {
     std::string filename;
-    std::string stream_path; // RTSP URL path
-    std::string file_path;   // Full file path
-    std::string codec;       // H264, AAC, MP2T
+    std::string stream_path;   // RTSP URL path
+    std::string file_path;     // Full file path
+    std::string codec;         // H264, H265, AAC, MP2T, MKV
+    uint64_t track_number = 0; // For MKV files (0 = not used)
     // Note: No longer storing H264FileReader, using MappedFile through FileManager
 };
 
@@ -66,6 +70,10 @@ std::mutex g_aac_workers_mutex;
 // H265 worker threads
 std::map<std::string, std::shared_ptr<SessionH265WorkerThread>> g_h265_workers;
 std::mutex g_h265_workers_mutex;
+
+// MKV worker threads
+std::map<std::string, std::shared_ptr<SessionMkvWorkerThread>> g_mkv_workers;
+std::mutex g_mkv_workers_mutex;
 
 // Session event callback for managing worker threads
 class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
@@ -113,6 +121,17 @@ public:
                 std::cout << "Stopped H265 worker for session: " << session_id << std::endl;
             }
         }
+
+        // Stop the MKV worker thread if exists
+        {
+            std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
+            auto mkv_it = g_mkv_workers.find(session_id);
+            if (mkv_it != g_mkv_workers.end()) {
+                mkv_it->second->Stop();
+                g_mkv_workers.erase(mkv_it);
+                std::cout << "Stopped MKV worker for session: " << session_id << std::endl;
+            }
+        }
     }
 
     void OnSessionStartPlay(std::shared_ptr<RtspServerSession> session) override
@@ -120,7 +139,116 @@ public:
         std::string session_id = session->GetSessionId();
         std::cout << "Session start play: " << session_id << std::endl;
 
-        // Get media stream info to determine file path
+        // Write to debug file to avoid output corruption
+        std::ofstream debug("/tmp/vod_debug.txt", std::ios::app);
+        debug << "====== OnSessionStartPlay called ======" << std::endl;
+        debug << "Session ID: " << session_id << std::endl;
+
+        bool is_multi = session->IsMultiTrack();
+        debug << "IsMultiTrack: " << (is_multi ? "TRUE" : "FALSE") << std::endl;
+        std::cout << "DEBUG: IsMultiTrack = " << (is_multi ? "TRUE" : "FALSE") << std::endl;
+
+        // Check if this is a multi-track session
+        if (is_multi) {
+            debug << "Entering multi-track branch" << std::endl;
+            std::cout << "Multi-track session detected" << std::endl;
+            auto tracks = session->GetTracks();
+            std::cout << "Starting " << tracks.size() << " workers for multi-track session" << std::endl;
+
+            for (const auto &track : tracks) {
+                std::cout << "  Track " << track.track_index << ": " << track.uri << std::endl;
+
+                if (!track.stream_info) {
+                    std::cout << "  Warning: No stream info for track " << track.track_index << std::endl;
+                    continue;
+                }
+
+                // Extract path from URI (e.g., rtsp://host/path -> /path)
+                std::string track_path = track.uri;
+                size_t path_start = track_path.find("://");
+                if (path_start != std::string::npos) {
+                    path_start = track_path.find('/', path_start + 3);
+                    if (path_start != std::string::npos) {
+                        track_path = track_path.substr(path_start);
+                    }
+                }
+
+                // Map track0 -> track1, track1 -> track2 (RTSP vs MKV track numbering)
+                // In RTSP SDP, tracks are numbered from 0
+                // But in g_media_files, they use MKV internal track numbers (usually starting from 1)
+                size_t track_pos = track_path.rfind("/track");
+                if (track_pos != std::string::npos) {
+                    std::string base_path = track_path.substr(0, track_pos);
+                    int rtsp_track_idx = track.track_index;
+
+                    // Find the MKV track number from stream_info
+                    std::string mkv_track_path = track.stream_info->stream_path;
+                    std::cout << "  MKV stream path: " << mkv_track_path << std::endl;
+                    track_path = mkv_track_path;
+                }
+
+                // Find the media file for this track
+                std::lock_guard<std::mutex> lock(g_media_mutex);
+                auto it = g_media_files.find(track_path);
+                if (it == g_media_files.end()) {
+                    std::cout << "  Warning: Media file not found for track path: " << track_path << std::endl;
+                    continue;
+                }
+
+                const MediaFile &media = it->second;
+
+                // Start worker for this track
+                if (media.codec == "MKV") {
+                    uint32_t frame_rate;
+
+                    // Calculate correct frame rate based on media type
+                    if (track.stream_info->media_type == "video") {
+                        // Video: use configured frame rate
+                        frame_rate = track.stream_info->frame_rate > 0 ? track.stream_info->frame_rate : 25;
+                        std::cout << "  DEBUG: Video track, frame_rate=" << frame_rate << std::endl;
+                    } else if (track.stream_info->media_type == "audio") {
+                        // Audio: calculate frame rate from sample rate
+                        // AAC frame size is typically 1024 samples
+                        // Frame rate = sample_rate / samples_per_frame
+                        uint32_t sample_rate = track.stream_info->sample_rate;
+                        uint32_t samples_per_frame = 1024; // AAC-LC standard
+                        if (sample_rate > 0) {
+                            frame_rate = (sample_rate * 1000) / samples_per_frame; // *1000 for better precision
+                        } else {
+                            frame_rate = 46875; // Default: 48000Hz / 1024 * 1000 = 46.875 fps * 1000
+                        }
+                        std::cout << "  DEBUG: Audio track, sample_rate=" << sample_rate
+                                  << ", frame_rate=" << frame_rate << std::endl;
+                    } else {
+                        frame_rate = 25; // Fallback
+                        std::cout << "  DEBUG: Unknown media_type='" << track.stream_info->media_type
+                                  << "', frame_rate=" << frame_rate << std::endl;
+                    }
+
+                    // Create unique worker key for multi-track: session_id + track index
+                    std::string worker_key = session_id + "_track" + std::to_string(track.track_index);
+
+                    auto mkv_worker = std::make_shared<SessionMkvWorkerThread>(
+                        session, media.file_path, media.track_number, track.track_index, frame_rate);
+                    if (mkv_worker->Start()) {
+                        std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
+                        g_mkv_workers[worker_key] = mkv_worker;
+                        std::cout << "  Started MKV worker for track " << track.track_index << " (file track "
+                                  << media.track_number << ", " << track.stream_info->codec << ", rate=" << frame_rate
+                                  << ")" << std::endl;
+                    } else {
+                        std::cout << "  Failed to start MKV worker for track " << track.track_index << std::endl;
+                    }
+                } else {
+                    std::cout << "  Unsupported codec for multi-track: " << media.codec << std::endl;
+                }
+            }
+
+            std::cout << "Multi-track workers started for session: " << session_id << std::endl;
+            return;
+        }
+
+        // Single-track session (legacy mode)
         auto stream_info = session->GetMediaStreamInfo();
         if (!stream_info) {
             std::cout << "No media stream info for session: " << session_id << std::endl;
@@ -182,6 +310,20 @@ public:
                 std::cout << "Started H265 worker thread for session: " << session_id << std::endl;
             } else {
                 std::cout << "Failed to start H265 worker thread for session: " << session_id << std::endl;
+            }
+        } else if (media.codec == "MKV") {
+            // Start MKV worker thread for this session
+            uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
+
+            auto mkv_worker =
+                std::make_shared<SessionMkvWorkerThread>(session, media.file_path, media.track_number, frame_rate);
+            if (mkv_worker->Start()) {
+                std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
+                g_mkv_workers[session_id] = mkv_worker;
+                std::cout << "Started MKV worker thread for session: " << session_id << " (track " << media.track_number
+                          << ")" << std::endl;
+            } else {
+                std::cout << "Failed to start MKV worker thread for session: " << session_id << std::endl;
             }
         } else {
             std::cout << "Unsupported codec: " << media.codec << " for session: " << session_id << std::endl;
@@ -323,6 +465,8 @@ std::string GetCodecFromExtension(const std::string &filename)
         return "AAC";
     } else if (ext == ".ts" || ext == ".m2ts") {
         return "MP2T";
+    } else if (ext == ".mkv" || ext == ".webm") {
+        return "MKV";
     }
 
     return "";
@@ -551,9 +695,210 @@ bool ScanMediaDirectory(const std::string &directory)
 
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
+            // Support for MKV files
+            else if (codec == "MKV") {
+                auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
+                if (!mapped_file) {
+                    std::cerr << "Warning: Failed to map MKV file: " << filepath << std::endl;
+                    continue;
+                }
 
-            std::lock_guard<std::mutex> lock(g_media_mutex);
-            g_media_files[streamPath] = media;
+                // Use MkvDemuxer to scan tracks
+                lmshao::lmmkv::MkvDemuxer scanner;
+
+                struct ScanListener : public lmshao::lmmkv::IMkvDemuxListener {
+                    lmshao::lmmkv::MkvInfo info;
+                    std::vector<lmshao::lmmkv::MkvTrackInfo> tracks;
+
+                    void OnInfo(const lmshao::lmmkv::MkvInfo &i) override { info = i; }
+                    void OnTrack(const lmshao::lmmkv::MkvTrackInfo &t) override { tracks.push_back(t); }
+                    void OnFrame(const lmshao::lmmkv::MkvFrame &) override {}
+                    void OnEndOfStream() override {}
+                    void OnError(int, const std::string &) override {}
+                };
+
+                auto scan_listener = std::make_shared<ScanListener>();
+                scanner.SetListener(scan_listener);
+
+                if (!scanner.Start()) {
+                    std::cerr << "Warning: Failed to start MKV scanner for: " << filepath << std::endl;
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
+                    continue;
+                }
+
+                // Quick scan - only parse headers
+                const uint8_t *data = mapped_file->Data();
+                size_t scan_size = std::min(mapped_file->Size(), size_t(1024 * 1024)); // Scan first 1MB
+                scanner.Consume(data, scan_size);
+                scanner.Stop();
+
+                // Find first video track for main stream registration
+                uint64_t default_video_track = 0;
+                for (const auto &track : scan_listener->tracks) {
+                    if (track.codec_id.find("V_MPEG4/ISO/AVC") == 0 || track.codec_id.find("V_MPEGH/ISO/HEVC") == 0) {
+                        default_video_track = track.track_number;
+                        break;
+                    }
+                }
+
+                // Register streams for each supported track
+                for (const auto &track : scan_listener->tracks) {
+                    std::string track_codec;
+                    MediaType media_type;
+
+                    if (track.codec_id.find("V_MPEG4/ISO/AVC") == 0) {
+                        track_codec = "H264";
+                        media_type = MediaType::H264;
+                    } else if (track.codec_id.find("V_MPEGH/ISO/HEVC") == 0) {
+                        track_codec = "H265";
+                        media_type = MediaType::H265;
+                    } else if (track.codec_id.find("A_AAC") == 0) {
+                        track_codec = "AAC";
+                        media_type = MediaType::AAC;
+                    } else {
+                        // Skip unsupported codecs
+                        std::cout << "      Skipping unsupported track " << track.track_number << " (" << track.codec_id
+                                  << ")" << std::endl;
+                        continue;
+                    }
+
+                    // Generate stream path: /filename.mkv/track{N}
+                    std::string track_stream_path = "/" + filename + "/track" + std::to_string(track.track_number);
+
+                    // Create MediaFile entry
+                    MediaFile media;
+                    media.filename = filename;
+                    media.stream_path = track_stream_path;
+                    media.file_path = filepath;
+                    media.codec = "MKV"; // Mark as MKV container
+                    media.track_number = track.track_number;
+
+                    // Create and register media stream
+                    auto streamInfo = std::make_shared<MediaStreamInfo>();
+                    streamInfo->stream_path = track_stream_path;
+                    streamInfo->codec = track_codec;
+                    streamInfo->clock_rate = 90000;
+
+                    if (track_codec == "H264" || track_codec == "H265") {
+                        // Video track
+                        streamInfo->media_type = "video";
+                        streamInfo->payload_type = (track_codec == "H264") ? 96 : 98;
+                        streamInfo->width = track.width > 0 ? track.width : 1920;
+                        streamInfo->height = track.height > 0 ? track.height : 1080;
+
+                        // Estimate frame rate from duration (will be refined during playback)
+                        streamInfo->frame_rate = 25; // Default
+
+                        // Extract parameter sets from codec_private
+                        SessionMkvReader temp_reader(mapped_file, track.track_number);
+                        if (temp_reader.Initialize()) {
+                            streamInfo->frame_rate = temp_reader.GetFrameRate();
+
+                            if (track_codec == "H264") {
+                                streamInfo->sps = temp_reader.GetSPS();
+                                streamInfo->pps = temp_reader.GetPPS();
+                            } else {
+                                streamInfo->vps = temp_reader.GetVPS();
+                                streamInfo->sps = temp_reader.GetSPS();
+                                streamInfo->pps = temp_reader.GetPPS();
+                            }
+                        }
+                    } else if (track_codec == "AAC") {
+                        // Audio track
+                        streamInfo->media_type = "audio";
+                        streamInfo->payload_type = 97;
+                        streamInfo->sample_rate = track.sample_rate > 0 ? track.sample_rate : 48000;
+                        streamInfo->channels = track.channels > 0 ? track.channels : 2;
+                        streamInfo->clock_rate = streamInfo->sample_rate;
+                    }
+
+                    if (!g_server->AddMediaStream(track_stream_path, streamInfo)) {
+                        std::cerr << "Warning: Failed to register MKV stream: " << track_stream_path << std::endl;
+                        continue;
+                    }
+
+                    std::cout << "  [" << ++fileCount << "] " << filename << " - Track " << track.track_number
+                              << std::endl;
+                    std::cout << "      Stream:     rtsp://localhost:8554" << track_stream_path << std::endl;
+                    std::cout << "      Codec:      " << track_codec << " (from MKV)" << std::endl;
+
+                    if (streamInfo->media_type == "video") {
+                        std::cout << "      Resolution: " << streamInfo->width << "x" << streamInfo->height
+                                  << std::endl;
+                        std::cout << "      Frame rate: " << streamInfo->frame_rate << " fps" << std::endl;
+                    } else {
+                        std::cout << "      Sample rate: " << streamInfo->sample_rate << " Hz" << std::endl;
+                        std::cout << "      Channels:   " << (int)streamInfo->channels << std::endl;
+                    }
+
+                    std::cout << "      Duration:   " << scan_listener->info.duration_seconds << " seconds"
+                              << std::endl;
+
+                    // Store in global map
+                    std::lock_guard<std::mutex> lock(g_media_mutex);
+                    g_media_files[track_stream_path] = media;
+                }
+
+                // Register main stream with multi-track support
+                if (!scan_listener->tracks.empty()) {
+                    std::string main_stream_path = "/" + filename;
+
+                    // Create main stream info with sub-tracks
+                    auto main_stream_info = std::make_shared<MediaStreamInfo>();
+                    main_stream_info->stream_path = main_stream_path;
+                    // Use first track's type as main type (usually video)
+                    main_stream_info->media_type = "multi";
+                    main_stream_info->codec = "MKV";
+
+                    // Collect all registered tracks as sub-tracks
+                    for (const auto &track : scan_listener->tracks) {
+                        // Find the registered stream info for this track
+                        std::string track_stream_path = "/" + filename + "/track" + std::to_string(track.track_number);
+                        auto track_info = g_server->GetMediaStream(track_stream_path);
+                        if (track_info) {
+                            main_stream_info->sub_tracks.push_back(track_info);
+                        }
+                    }
+
+                    if (!main_stream_info->sub_tracks.empty()) {
+                        if (g_server->AddMediaStream(main_stream_path, main_stream_info)) {
+                            // Create MediaFile entry for main stream pointing to first video track
+                            MediaFile main_media;
+                            main_media.filename = filename;
+                            main_media.stream_path = main_stream_path;
+                            main_media.file_path = filepath;
+                            main_media.codec = "MKV";
+                            main_media.track_number = default_video_track;
+
+                            std::lock_guard<std::mutex> lock(g_media_mutex);
+                            g_media_files[main_stream_path] = main_media;
+
+                            std::cout << "  [" << ++fileCount << "] " << filename << " (Multi-Track Stream)"
+                                      << std::endl;
+                            std::cout << "      Stream:     rtsp://localhost:8554" << main_stream_path << std::endl;
+                            std::cout << "      Tracks:     " << main_stream_info->sub_tracks.size() << " (";
+                            for (size_t i = 0; i < main_stream_info->sub_tracks.size(); ++i) {
+                                if (i > 0)
+                                    std::cout << ", ";
+                                std::cout << main_stream_info->sub_tracks[i]->codec;
+                            }
+                            std::cout << ")" << std::endl;
+                            std::cout << "      Note:       Multi-track RTSP streaming with synchronized A/V"
+                                      << std::endl;
+                        }
+                    }
+                }
+
+                FileManager::GetInstance().ReleaseMappedFile(filepath);
+            }
+            // Note: For MKV files, we already registered all tracks and main stream above
+            // So we don't need to add anything else to g_media_files here
+
+            // For non-MKV files, register the media info
+            if (codec != "MKV") {
+                std::lock_guard<std::mutex> lock(g_media_mutex);
+                g_media_files[streamPath] = media;
+            }
         }
     } catch (const std::filesystem::filesystem_error &e) {
         std::cerr << "Filesystem error: " << e.what() << std::endl;
@@ -570,7 +915,7 @@ void PrintUsage(const char *programName)
     std::cout << "Usage: " << programName << " [options] <media_directory>\n" << std::endl;
 
     std::cout << "Parameters:" << std::endl;
-    std::cout << "  media_directory  Directory containing media files (.h264, .h265, .aac, .ts)" << std::endl;
+    std::cout << "  media_directory  Directory containing media files (.h264, .h265, .aac, .ts, .mkv)" << std::endl;
     std::cout << "" << std::endl;
 
     std::cout << "Options:" << std::endl;
@@ -587,12 +932,17 @@ void PrintUsage(const char *programName)
     std::cout << "Playback:" << std::endl;
     std::cout << "  The server will automatically discover all media files in the directory." << std::endl;
     std::cout << "  For file \"movie.h264\", use: rtsp://server:8554/movie.h264" << std::endl;
+    std::cout << "  For MKV file with multiple tracks, use: rtsp://server:8554/movie.mkv/track1" << std::endl;
     std::cout << "" << std::endl;
     std::cout << "  ffplay rtsp://localhost:8554/movie.h264" << std::endl;
+    std::cout << "  ffplay rtsp://localhost:8554/movie.mkv/track1" << std::endl;
     std::cout << "  vlc rtsp://localhost:8554/movie.h264" << std::endl;
     std::cout << "" << std::endl;
 
-    std::cout << "Supported formats: .h264, .264, .h265, .265, .hevc, .aac, .ts, .m2ts" << std::endl;
+    std::cout << "Supported formats:" << std::endl;
+    std::cout << "  Video: .h264, .264, .h265, .265, .hevc" << std::endl;
+    std::cout << "  Audio: .aac" << std::endl;
+    std::cout << "  Container: .ts, .m2ts, .mkv, .webm (H.264/H.265/AAC tracks)" << std::endl;
 }
 
 int main(int argc, char *argv[])
@@ -751,6 +1101,26 @@ int main(int argc, char *argv[])
             pair.second->Stop();
         }
         g_aac_workers.clear();
+    }
+
+    // Stop all H265 worker threads
+    {
+        std::lock_guard<std::mutex> h265_lock(g_h265_workers_mutex);
+        for (auto &pair : g_h265_workers) {
+            std::cout << "Stopping H265 worker: " << pair.first << std::endl;
+            pair.second->Stop();
+        }
+        g_h265_workers.clear();
+    }
+
+    // Stop all MKV worker threads
+    {
+        std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
+        for (auto &pair : g_mkv_workers) {
+            std::cout << "Stopping MKV worker: " << pair.first << std::endl;
+            pair.second->Stop();
+        }
+        g_mkv_workers.clear();
     }
 
     // Clear file cache

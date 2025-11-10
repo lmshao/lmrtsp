@@ -152,11 +152,21 @@ bool RtspServerSession::SetupMedia(const std::string &uri, const std::string &tr
 {
     LMRTSP_LOGD("Setting up media for URI: %s, Transport: %s", uri.c_str(), transport.c_str());
 
-    // Parse transport parameters (removed by request)
-    // rtpTransportParams_ = ParseTransportHeader(transport);
-
-    // Create new media stream manager
-    std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+    // Extract track index from URI (e.g., /file.mkv/track0 -> 0)
+    int track_index = -1;
+    size_t track_pos = uri.rfind("/track");
+    if (track_pos != std::string::npos) {
+        std::string track_num_str;
+        for (size_t i = track_pos + 6; i < uri.length(); ++i) {
+            if (!std::isdigit(uri[i]))
+                break;
+            track_num_str += uri[i];
+        }
+        if (!track_num_str.empty()) {
+            track_index = std::stoi(track_num_str);
+            LMRTSP_LOGD("Detected multi-track SETUP: track index = %d", track_index);
+        }
+    }
 
     // Create transport config from parsed parameters
     lmshao::lmrtsp::TransportConfig transportConfig;
@@ -211,27 +221,55 @@ bool RtspServerSession::SetupMedia(const std::string &uri, const std::string &tr
         transportConfig.server_rtcp_port = 0;
     }
 
-    // Create media stream manager
-    mediaStreamManager_ =
-        std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(std::weak_ptr<RtspServerSession>(shared_from_this()));
+    // Multi-track or single-track setup
+    if (track_index >= 0) {
+        // Multi-track setup: create a separate stream manager for this track
+        std::lock_guard<std::mutex> lock(tracksMutex_);
 
-    // Setup the media stream manager with transport config
-    if (!mediaStreamManager_->Setup(transportConfig)) {
-        LMRTSP_LOGE("Failed to setup media stream manager");
-        mediaStreamManager_.reset();
-        return false;
+        InternalTrackInfo track_info;
+        track_info.uri = uri;
+        track_info.track_index = track_index;
+        track_info.stream_info = mediaStreamInfo_; // Set by HandleRequest before SetupMedia
+
+        // Create stream manager for this track
+        track_info.stream_manager = std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(
+            std::weak_ptr<RtspServerSession>(shared_from_this()));
+
+        if (!track_info.stream_manager->Setup(transportConfig)) {
+            LMRTSP_LOGE("Failed to setup stream manager for track %d", track_index);
+            return false;
+        }
+
+        track_info.transport_info = track_info.stream_manager->GetTransportInfo();
+        tracks_[track_index] = std::move(track_info);
+
+        // Update transportInfo_ with the latest track's transport (for SETUP response)
+        transportInfo_ = tracks_[track_index].transport_info;
+
+        LMRTSP_LOGD("Multi-track setup completed: track %d, Transport: %s", track_index, transportInfo_.c_str());
+    } else {
+        // Single-track setup (legacy mode)
+        std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
+
+        mediaStreamManager_ = std::make_unique<lmshao::lmrtsp::RtspMediaStreamManager>(
+            std::weak_ptr<RtspServerSession>(shared_from_this()));
+
+        if (!mediaStreamManager_->Setup(transportConfig)) {
+            LMRTSP_LOGE("Failed to setup media stream manager");
+            mediaStreamManager_.reset();
+            return false;
+        }
+
+        transportInfo_ = mediaStreamManager_->GetTransportInfo();
+        streamUri_ = uri;
+
+        LMRTSP_LOGD("Single-track setup completed, Transport: %s", transportInfo_.c_str());
     }
-
-    // Get transport info from media stream manager
-    transportInfo_ = mediaStreamManager_->GetTransportInfo();
-
-    // Save stream URI for RTP-Info in PLAY response
-    streamUri_ = uri;
 
     // Set setup flag
     isSetup_ = true;
 
-    LMRTSP_LOGD("Media setup completed for session: %s, Transport: %s", sessionId_.c_str(), transportInfo_.c_str());
+    LMRTSP_LOGD("Media setup completed for session: %s", sessionId_.c_str());
     return true;
 }
 
@@ -244,7 +282,45 @@ bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &ran
         return false;
     }
 
-    // Start playing media stream manager
+    // Check if this is multi-track or single-track
+    bool is_multi_track = false;
+    {
+        std::lock_guard<std::mutex> lock(tracksMutex_);
+        if (!tracks_.empty()) {
+            is_multi_track = true;
+            // Multi-track: start all track stream managers
+            LMRTSP_LOGD("Starting %zu tracks for multi-track session", tracks_.size());
+            for (auto &[track_index, track_info] : tracks_) {
+                if (!track_info.stream_manager) {
+                    LMRTSP_LOGE("Track %d stream manager not available", track_index);
+                    continue;
+                }
+                if (!track_info.stream_manager->Play()) {
+                    LMRTSP_LOGE("Failed to start playing track %d", track_index);
+                    return false;
+                }
+                LMRTSP_LOGD("Track %d started playing", track_index);
+            }
+
+            // Set playing state
+            isPlaying_ = true;
+            isPaused_ = false;
+
+            LMRTSP_LOGD("All tracks started for multi-track session: %s", sessionId_.c_str());
+        }
+    } // Release lock before calling callback
+
+    // Notify callback for multi-track (outside lock to avoid deadlock)
+    if (is_multi_track) {
+        if (auto server = rtspServer_.lock()) {
+            if (auto callback = server->GetCallback()) {
+                callback->OnSessionStartPlay(shared_from_this());
+            }
+        }
+        return true;
+    }
+
+    // Single-track (legacy mode)
     std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
     if (!mediaStreamManager_) {
         LMRTSP_LOGE("Media stream manager not initialized");
@@ -493,8 +569,53 @@ bool RtspServerSession::PushFrame(const lmrtsp::MediaFrame &frame)
     return mediaStreamManager_->PushFrame(frame);
 }
 
+bool RtspServerSession::PushFrame(const lmrtsp::MediaFrame &frame, int track_index)
+{
+    std::lock_guard<std::mutex> lock(tracksMutex_);
+
+    auto it = tracks_.find(track_index);
+    if (it == tracks_.end()) {
+        LMRTSP_LOGE("Track %d not found", track_index);
+        return false;
+    }
+
+    if (!it->second.stream_manager) {
+        LMRTSP_LOGE("Track %d stream manager not initialized", track_index);
+        return false;
+    }
+
+    if (!isPlaying_) {
+        LMRTSP_LOGW("Cannot push frame: session not in playing state");
+        return false;
+    }
+
+    return it->second.stream_manager->PushFrame(frame);
+}
+
 std::string RtspServerSession::GetRtpInfo() const
 {
+    // Check for multi-track
+    {
+        std::lock_guard<std::mutex> lock(tracksMutex_);
+        if (!tracks_.empty()) {
+            // Multi-track: generate RTP-Info for all tracks
+            std::string rtp_info;
+            for (const auto &[track_index, track_info] : tracks_) {
+                if (track_info.stream_manager) {
+                    std::string track_rtp_info = track_info.stream_manager->GetRtpInfo();
+                    if (!track_rtp_info.empty()) {
+                        if (!rtp_info.empty()) {
+                            rtp_info += ",";
+                        }
+                        rtp_info += track_rtp_info;
+                    }
+                }
+            }
+            return rtp_info;
+        }
+    }
+
+    // Single-track (legacy)
     std::lock_guard<std::mutex> lock(mediaStreamManagerMutex_);
     if (!mediaStreamManager_) {
         return "";
@@ -506,6 +627,26 @@ std::string RtspServerSession::GetRtpInfo() const
 std::string RtspServerSession::GetStreamUri() const
 {
     return streamUri_;
+}
+
+std::vector<RtspServerSession::TrackInfo> RtspServerSession::GetTracks() const
+{
+    std::lock_guard<std::mutex> lock(tracksMutex_);
+    std::vector<TrackInfo> result;
+    for (const auto &[track_index, internal_track] : tracks_) {
+        TrackInfo track_info;
+        track_info.uri = internal_track.uri;
+        track_info.stream_info = internal_track.stream_info;
+        track_info.track_index = internal_track.track_index;
+        result.push_back(track_info);
+    }
+    return result;
+}
+
+bool RtspServerSession::IsMultiTrack() const
+{
+    std::lock_guard<std::mutex> lock(tracksMutex_);
+    return !tracks_.empty();
 }
 
 bool RtspServerSession::SendInterleavedData(uint8_t channel, const uint8_t *data, size_t size)

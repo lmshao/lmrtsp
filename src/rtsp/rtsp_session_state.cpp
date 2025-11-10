@@ -203,9 +203,24 @@ RtspResponse ReadyState::OnSetParameter(RtspServerSession *session, const RtspRe
 
 RtspResponse ReadyState::OnSetup(RtspServerSession *session, const RtspRequest &request)
 {
+    // Allow multiple SETUP requests for multi-track streams (e.g., MKV with video+audio)
+    LMRTSP_LOGD("Processing additional SETUP request in ReadyState (multi-track support)");
     int cseq = std::stoi(request.general_header_.at("CSeq"));
-    auto response = RtspResponseBuilder().SetStatus(StatusCode::MethodNotValidInThisState).SetCSeq(cseq).Build();
-    return response;
+
+    // Process the SETUP request (for additional tracks)
+    if (session->SetupMedia(request.uri_, request.general_header_.at("Transport"))) {
+        // Stay in ReadyState (already setup)
+        auto response = RtspResponseBuilder()
+                            .SetStatus(StatusCode::OK)
+                            .SetCSeq(cseq)
+                            .SetSession(session->GetSessionId())
+                            .SetTransport(session->GetTransportInfo())
+                            .Build();
+        return response;
+    } else {
+        auto response = RtspResponseBuilder().SetStatus(StatusCode::InternalServerError).SetCSeq(cseq).Build();
+        return response;
+    }
 }
 
 RtspResponse ReadyState::OnPlay(RtspServerSession *session, const RtspRequest &request)

@@ -2,6 +2,7 @@
 #define LMSHAO_LMRTSP_MEDIA_STREAM_INFO_H
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,11 @@ struct MediaStreamInfo {
     // Control parameters
     bool enabled = true;
     uint32_t max_packet_size = 1400;
+
+    // Multi-track support (for containers like MKV)
+    // If this stream contains multiple tracks, they are stored here
+    // Each sub-track is identified by track0, track1, etc. in SETUP requests
+    std::vector<std::shared_ptr<MediaStreamInfo>> sub_tracks;
 
     // Constructor
     MediaStreamInfo() = default;
