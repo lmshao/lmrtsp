@@ -21,7 +21,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "lmrtsp/irtsp_server_callback.h"
+#include "lmrtsp/irtsp_server_listener.h"
 #include "lmrtsp/media_stream_info.h"
 
 namespace lmshao::lmrtsp {
@@ -52,9 +52,9 @@ public:
     std::shared_ptr<RtspServerSession> GetSession(const std::string &sessionId);
     std::unordered_map<std::string, std::shared_ptr<RtspServerSession>> GetSessions();
 
-    // Callback interface
-    void SetCallback(std::shared_ptr<IRtspServerCallback> callback);
-    std::shared_ptr<IRtspServerCallback> GetCallback() const;
+    // Listener interface
+    void SetListener(std::shared_ptr<IRtspServerListener> listener);
+    std::shared_ptr<IRtspServerListener> GetListener() const;
 
     // Media stream management
     bool AddMediaStream(const std::string &stream_path, std::shared_ptr<MediaStreamInfo> stream_info);
@@ -89,9 +89,9 @@ private:
     mutable std::mutex sessionsMutex_;
     std::unordered_map<std::string, std::shared_ptr<RtspServerSession>> sessions_;
 
-    // Callback interface
-    mutable std::mutex callbackMutex_;
-    std::shared_ptr<IRtspServerCallback> callback_;
+    // Listener interface
+    mutable std::mutex listenerMutex_;
+    std::shared_ptr<IRtspServerListener> listener_;
 
     // Media stream management
     mutable std::mutex streamsMutex_;
@@ -99,7 +99,7 @@ private:
 
     // Internal helper methods
     std::string GetClientIP(std::shared_ptr<RtspServerSession> session) const;
-    void NotifyCallback(std::function<void(IRtspServerCallback *)> func);
+    void NotifyListener(std::function<void(IRtspServerListener *)> func);
 };
 
 } // namespace lmshao::lmrtsp

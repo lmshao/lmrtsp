@@ -13,7 +13,7 @@
 #include <memory>
 #include <thread>
 
-#include "lmrtsp/irtsp_server_callback.h"
+#include "lmrtsp/irtsp_server_listener.h"
 #include "lmrtsp/media_stream_info.h"
 #include "lmrtsp/rtsp_server.h"
 
@@ -22,8 +22,8 @@ using namespace lmshao::lmrtsp;
 // Global server instance for signal handling
 std::shared_ptr<RtspServer> g_server;
 
-// RTSP Server Callback Implementation
-class RtspProtocolCallback : public IRtspServerCallback {
+// RTSP Server Listener Implementation
+class RtspProtocolListener : public IRtspServerListener {
 public:
     void OnClientConnected(const std::string &client_ip, const std::string &user_agent) override
     {
@@ -208,10 +208,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Create and set callback
-    auto callback = std::make_shared<RtspProtocolCallback>();
-    g_server->SetCallback(callback);
-    std::cout << "[INFO] RTSP callback handler registered" << std::endl;
+    // Create and set listener
+    auto listener = std::make_shared<RtspProtocolListener>();
+    g_server->SetListener(listener);
+    std::cout << "[INFO] RTSP listener handler registered" << std::endl;
 
     // Add sample media streams
     auto video_stream = createSampleVideoStream();

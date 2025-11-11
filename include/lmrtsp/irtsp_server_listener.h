@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
-#define LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
+#ifndef LMSHAO_LMRTSP_IRTSP_SERVER_LISTENER_H
+#define LMSHAO_LMRTSP_IRTSP_SERVER_LISTENER_H
 
 #include <memory>
 #include <string>
@@ -18,14 +18,14 @@ namespace lmshao::lmrtsp {
 class RtspServerSession;
 
 /**
- * @brief RTSP server callback interface
+ * @brief RTSP server listener interface
  *
- * This interface defines callback methods for RTSP server to notify
+ * This interface defines listener methods for RTSP server to notify
  * upper layer applications about various events.
  */
-class IRtspServerCallback {
+class IRtspServerListener {
 public:
-    virtual ~IRtspServerCallback() = default;
+    virtual ~IRtspServerListener() = default;
 
     /**
      * @brief Client connection event
@@ -142,4 +142,4 @@ public:
 
 } // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_LMRTSP_IRTSP_SERVER_CALLBACK_H
+#endif // LMSHAO_LMRTSP_IRTSP_SERVER_LISTENER_H

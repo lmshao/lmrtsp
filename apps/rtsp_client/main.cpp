@@ -16,7 +16,7 @@
 #include <string>
 #include <thread>
 
-#include "lmrtsp/irtsp_client_callback.h"
+#include "lmrtsp/irtsp_client_listener.h"
 #include "lmrtsp/media_types.h"
 #include "lmrtsp/rtsp_client.h"
 #include "lmrtsp/rtsp_client_session.h"
@@ -32,7 +32,7 @@ void SignalHandler(int signal)
     g_running = false;
 }
 
-class SimpleRTSPClient : public IRtspClientCallback, public std::enable_shared_from_this<SimpleRTSPClient> {
+class SimpleRTSPClient : public IRtspClientListener, public std::enable_shared_from_this<SimpleRTSPClient> {
 public:
     explicit SimpleRTSPClient(const std::string &output_file)
         : output_filename_(output_file), frames_received_(0), total_bytes_received_(0)
@@ -57,10 +57,10 @@ public:
             return false;
         }
 
-        // Create RTSP client - callback will be set after initialization
+        // Create RTSP client - listener will be set after initialization
         client_ = std::make_shared<RtspClient>();
         client_->SetUserAgent("lmrtsp-client-demo/1.0");
-        // Note: callback set in main after shared_ptr is created
+        // Note: listener set in main after shared_ptr is created
 
         std::cout << "RTSP Client initialized" << std::endl;
         std::cout << "RTSP URL: " << rtsp_url_ << std::endl;
@@ -69,10 +69,10 @@ public:
         return true;
     }
 
-    void SetCallbackToClient()
+    void SetListenerToClient()
     {
         if (client_) {
-            client_->SetCallback(shared_from_this());
+            client_->SetListener(shared_from_this());
         }
     }
 
@@ -201,7 +201,7 @@ private:
         std::cout << "==================\n" << std::endl;
     }
 
-    // IRtspClientCallback implementation
+    // IRtspClientListener implementation
     void OnConnected(const std::string &server_url) override
     {
         std::cout << "✓ Connected to: " << server_url << std::endl;
@@ -346,8 +346,8 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        // Set callback now that shared_ptr exists
-        client->SetCallbackToClient();
+        // Set listener now that shared_ptr exists
+        client->SetListenerToClient();
 
         if (!client->Start()) {
             std::cerr << "Failed to start RTSP client" << std::endl;

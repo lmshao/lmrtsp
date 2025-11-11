@@ -94,9 +94,9 @@ bool RtspClientSession::HandleDescribeResponse(const std::string &sdp)
 
         // Notify callback
         if (auto client = client_.lock()) {
-            auto callback = client->GetCallback();
-            if (callback) {
-                callback->OnDescribeReceived(url_, sdp);
+            auto listener = client->GetListener();
+            if (listener) {
+                listener->OnDescribeReceived(url_, sdp);
             }
         }
 
@@ -141,9 +141,9 @@ bool RtspClientSession::HandleSetupResponse(const std::string &session_id, const
 
         // Notify callback
         if (auto client = client_.lock()) {
-            auto callback = client->GetCallback();
-            if (callback) {
-                callback->OnSetupReceived(url_, sessionId_, transport);
+            auto listener = client->GetListener();
+            if (listener) {
+                listener->OnSetupReceived(url_, sessionId_, transport);
             }
         }
 
@@ -168,9 +168,9 @@ bool RtspClientSession::HandlePlayResponse(const std::string &rtp_info)
 
         // Notify callback
         if (auto client = client_.lock()) {
-            auto callback = client->GetCallback();
-            if (callback) {
-                callback->OnPlayReceived(url_, sessionId_, rtp_info);
+            auto listener = client->GetListener();
+            if (listener) {
+                listener->OnPlayReceived(url_, sessionId_, rtp_info);
             }
         }
 
@@ -192,9 +192,9 @@ bool RtspClientSession::HandlePauseResponse()
 
         // Notify callback
         if (auto client = client_.lock()) {
-            auto callback = client->GetCallback();
-            if (callback) {
-                callback->OnPauseReceived(url_, sessionId_);
+            auto listener = client->GetListener();
+            if (listener) {
+                listener->OnPauseReceived(url_, sessionId_);
             }
         }
 
@@ -216,9 +216,9 @@ bool RtspClientSession::HandleTeardownResponse()
 
         // Notify callback
         if (auto client = client_.lock()) {
-            auto callback = client->GetCallback();
-            if (callback) {
-                callback->OnTeardownReceived(url_, sessionId_);
+            auto listener = client->GetListener();
+            if (listener) {
+                listener->OnTeardownReceived(url_, sessionId_);
             }
         }
 
@@ -240,9 +240,9 @@ void RtspClientSession::SetState(RtspClientSessionState new_state)
 
     // Notify callback
     if (auto client = client_.lock()) {
-        auto callback = client->GetCallback();
-        if (callback) {
-            callback->OnStateChanged(url_, GetStateString(old_state), GetStateString(new_state));
+        auto listener = client->GetListener();
+        if (listener) {
+            listener->OnStateChanged(url_, GetStateString(old_state), GetStateString(new_state));
         }
     }
 }
@@ -358,9 +358,9 @@ void RtspClientSession::OnFrame(const std::shared_ptr<MediaFrame> &frame)
 
         // Forward to callback
         if (auto client = client_.lock()) {
-            auto callback = client->GetCallback();
-            if (callback) {
-                callback->OnFrame(frame);
+            auto listener = client->GetListener();
+            if (listener) {
+                listener->OnFrame(frame);
             }
         }
     } catch (const std::exception &e) {
@@ -374,9 +374,9 @@ void RtspClientSession::OnError(int code, const std::string &message)
 
     // Forward to callback
     if (auto client = client_.lock()) {
-        auto callback = client->GetCallback();
-        if (callback) {
-            callback->OnError(url_, code, message);
+        auto listener = client->GetListener();
+        if (listener) {
+            listener->OnError(url_, code, message);
         }
     }
 }

@@ -75,8 +75,8 @@ std::mutex g_h265_workers_mutex;
 std::map<std::string, std::shared_ptr<SessionMkvWorkerThread>> g_mkv_workers;
 std::mutex g_mkv_workers_mutex;
 
-// Session event callback for managing worker threads
-class SessionEventCallback : public lmshao::lmrtsp::IRtspServerCallback {
+// Session event listener for managing worker threads
+class SessionEventListener : public lmshao::lmrtsp::IRtspServerListener {
 public:
     void OnSessionCreated(std::shared_ptr<RtspServerSession> session) override
     {
@@ -1008,9 +1008,9 @@ int main(int argc, char *argv[])
     // Get server instance
     g_server = RtspServer::GetInstance();
 
-    // Set session event callback
-    auto callback = std::make_shared<SessionEventCallback>();
-    g_server->SetCallback(callback);
+    // Set session event listener
+    auto listener = std::make_shared<SessionEventListener>();
+    g_server->SetListener(listener);
 
     // Initialize server
     if (!g_server->Init(ip, port)) {

@@ -19,7 +19,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "lmrtsp/irtsp_client_callback.h"
+#include "lmrtsp/irtsp_client_listener.h"
 #include "lmrtsp/rtsp_request.h"
 #include "lmrtsp/rtsp_response.h"
 
@@ -36,7 +36,7 @@ class RtspClientSession;
 class RtspClient : public std::enable_shared_from_this<RtspClient> {
 public:
     RtspClient();
-    explicit RtspClient(std::shared_ptr<IRtspClientCallback> callback);
+    explicit RtspClient(std::shared_ptr<IRtspClientListener> listener);
     ~RtspClient();
 
     // Connection management
@@ -57,9 +57,9 @@ public:
     void RemoveSession(const std::string &session_id);
     std::shared_ptr<RtspClientSession> GetSession(const std::string &session_id);
 
-    // Callback management
-    void SetCallback(std::shared_ptr<IRtspClientCallback> callback);
-    std::shared_ptr<IRtspClientCallback> GetCallback() const;
+    // Listener management
+    void SetListener(std::shared_ptr<IRtspClientListener> listener);
+    std::shared_ptr<IRtspClientListener> GetListener() const;
 
     // Configuration
     void SetUserAgent(const std::string &user_agent);
@@ -85,9 +85,9 @@ private:
     mutable std::mutex sessionsMutex_;
     std::unordered_map<std::string, std::shared_ptr<RtspClientSession>> sessions_;
 
-    // Callback interface
-    mutable std::mutex callbackMutex_;
-    std::shared_ptr<IRtspClientCallback> callback_;
+    // Listener interface
+    mutable std::mutex listenerMutex_;
+    std::shared_ptr<IRtspClientListener> listener_;
 
     // Configuration
     std::string userAgent_ = "lmrtsp-client/1.0";
@@ -105,7 +105,7 @@ private:
 
     // Error handling
     void NotifyError(int error_code, const std::string &error_message);
-    void NotifyCallback(std::function<void(IRtspClientCallback *)> func);
+    void NotifyListener(std::function<void(IRtspClientListener *)> func);
 
     // TCP client listener
     class TcpClientListener;

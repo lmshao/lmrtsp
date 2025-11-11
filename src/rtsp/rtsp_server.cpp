@@ -13,7 +13,7 @@
 #include <lmnet/tcp_server.h>
 
 #include "internal_logger.h"
-#include "lmrtsp/irtsp_server_callback.h"
+#include "lmrtsp/irtsp_server_listener.h"
 #include "lmrtsp/rtsp_server_session.h"
 #include "rtsp_response.h"
 #include "rtsp_server_listener.h"
@@ -173,20 +173,20 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspServerSession> session, const
             transport = it->second;
         }
         LMRTSP_LOGD("invoke OnStreamRequested");
-        NotifyCallback(
-            [&](IRtspServerCallback *callback) { callback->OnSetupReceived(client_ip, transport, request.uri_); });
+        NotifyListener(
+            [&](IRtspServerListener *listener) { listener->OnSetupReceived(client_ip, transport, request.uri_); });
     } else if (method == "PLAY") {
         std::string range = "";
         auto it = request.general_header_.find("Range");
         if (it != request.general_header_.end()) {
             range = it->second;
         }
-        NotifyCallback(
-            [&](IRtspServerCallback *callback) { callback->OnPlayReceived(client_ip, request.uri_, range); });
+        NotifyListener(
+            [&](IRtspServerListener *listener) { listener->OnPlayReceived(client_ip, request.uri_, range); });
     } else if (method == "PAUSE") {
-        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnPauseReceived(client_ip, request.uri_); });
+        NotifyListener([&](IRtspServerListener *listener) { listener->OnPauseReceived(client_ip, request.uri_); });
     } else if (method == "TEARDOWN") {
-        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnTeardownReceived(client_ip, request.uri_); });
+        NotifyListener([&](IRtspServerListener *listener) { listener->OnTeardownReceived(client_ip, request.uri_); });
     }
 
     // Send response
@@ -218,7 +218,7 @@ void RtspServer::HandleStatelessRequest(std::shared_ptr<lmnet::Session> lmnetSes
             client_ip = lmnetSession->host;
         }
         LMRTSP_LOGD("invoke OnStreamRequested");
-        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnStreamRequested(request.uri_, client_ip); });
+        NotifyListener([&](IRtspServerListener *listener) { listener->OnStreamRequested(request.uri_, client_ip); });
 
         // Generate SDP for the requested stream
         std::string sdp = GenerateSDP(request.uri_, GetServerIP(), GetServerPort());
@@ -297,7 +297,7 @@ void RtspServer::RemoveSession(const std::string &sessionId)
 
     // Notify callback about session destruction (outside lock to avoid deadlock)
     if (session) {
-        NotifyCallback([&](IRtspServerCallback *callback) { callback->OnSessionDestroyed(sessionId); });
+        NotifyListener([&](IRtspServerListener *listener) { listener->OnSessionDestroyed(sessionId); });
     }
 }
 
@@ -317,18 +317,18 @@ std::unordered_map<std::string, std::shared_ptr<RtspServerSession>> RtspServer::
     return sessions_;
 }
 
-// Callback interface implementation
-void RtspServer::SetCallback(std::shared_ptr<IRtspServerCallback> callback)
+// Listener interface implementation
+void RtspServer::SetListener(std::shared_ptr<IRtspServerListener> listener)
 {
-    std::lock_guard<std::mutex> lock(callbackMutex_);
-    callback_ = callback;
-    LMRTSP_LOGD("RTSP server callback set");
+    std::lock_guard<std::mutex> lock(listenerMutex_);
+    listener_ = listener;
+    LMRTSP_LOGD("RTSP server listener set");
 }
 
-std::shared_ptr<IRtspServerCallback> RtspServer::GetCallback() const
+std::shared_ptr<IRtspServerListener> RtspServer::GetListener() const
 {
-    std::lock_guard<std::mutex> lock(callbackMutex_);
-    return callback_;
+    std::lock_guard<std::mutex> lock(listenerMutex_);
+    return listener_;
 }
 
 // Media stream management implementation
@@ -448,11 +448,11 @@ std::string RtspServer::GetClientIP(std::shared_ptr<RtspServerSession> session) 
     return "";
 }
 
-void RtspServer::NotifyCallback(std::function<void(IRtspServerCallback *)> func)
+void RtspServer::NotifyListener(std::function<void(IRtspServerListener *)> func)
 {
-    std::lock_guard<std::mutex> lock(callbackMutex_);
-    if (callback_) {
-        func(callback_.get());
+    std::lock_guard<std::mutex> lock(listenerMutex_);
+    if (listener_) {
+        func(listener_.get());
     }
 }
 

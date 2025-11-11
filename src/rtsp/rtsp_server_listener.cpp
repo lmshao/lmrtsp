@@ -67,7 +67,7 @@ void RtspServerListener::OnError(std::shared_ptr<lmnet::Session> session, const 
     // Notify callback
     auto server = rtspServer_.lock();
     if (server) {
-        server->NotifyCallback([&](IRtspServerCallback *callback) { callback->OnError(session->host, -1, errorInfo); });
+        server->NotifyListener([&](IRtspServerListener *listener) { listener->OnError(session->host, -1, errorInfo); });
     }
 }
 
@@ -81,7 +81,7 @@ void RtspServerListener::OnClose(std::shared_ptr<lmnet::Session> session)
     // Notify callback about client disconnection
     auto server = rtspServer_.lock();
     if (server) {
-        server->NotifyCallback([&](IRtspServerCallback *callback) { callback->OnClientDisconnected(session->host); });
+        server->NotifyListener([&](IRtspServerListener *listener) { listener->OnClientDisconnected(session->host); });
 
         // Traverse all sessions to find RTSP sessions using this lmnet session
         // Note: We need to traverse all sessions and check if lmnet sessions match
@@ -111,8 +111,8 @@ void RtspServerListener::OnAccept(std::shared_ptr<lmnet::Session> session)
     // Notify callback about client connection
     auto server = rtspServer_.lock();
     if (server) {
-        server->NotifyCallback([&](IRtspServerCallback *callback) {
-            callback->OnClientConnected(session->host, ""); // User-Agent will be obtained from RTSP request
+        server->NotifyListener([&](IRtspServerListener *listener) {
+            listener->OnClientConnected(session->host, ""); // User-Agent will be obtained from RTSP request
         });
     }
 

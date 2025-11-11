@@ -46,7 +46,8 @@ public:
         if (auto client = client_.lock()) {
             LMRTSP_LOGI("RTSP client disconnected from server");
             client->connected_.store(false);
-            client->NotifyCallback([client](IRtspClientCallback *cb) { cb->OnDisconnected(client->baseUrl_); });
+            client->NotifyListener(
+                [client](IRtspClientListener *listener) { listener->OnDisconnected(client->baseUrl_); });
         }
     }
 
@@ -68,7 +69,7 @@ RtspClient::RtspClient()
     // tcpListener_ will be created in Connect() method when we know the server IP and port
 }
 
-RtspClient::RtspClient(std::shared_ptr<IRtspClientCallback> callback) : callback_(callback)
+RtspClient::RtspClient(std::shared_ptr<IRtspClientListener> listener) : listener_(listener)
 {
     // tcpListener_ will be created in Connect() method when we know the server IP and port
 }
@@ -337,16 +338,16 @@ std::shared_ptr<RtspClientSession> RtspClient::GetSession(const std::string &ses
     return (it != sessions_.end()) ? it->second : nullptr;
 }
 
-void RtspClient::SetCallback(std::shared_ptr<IRtspClientCallback> callback)
+void RtspClient::SetListener(std::shared_ptr<IRtspClientListener> listener)
 {
-    std::lock_guard<std::mutex> lock(callbackMutex_);
-    callback_ = callback;
+    std::lock_guard<std::mutex> lock(listenerMutex_);
+    listener_ = listener;
 }
 
-std::shared_ptr<IRtspClientCallback> RtspClient::GetCallback() const
+std::shared_ptr<IRtspClientListener> RtspClient::GetListener() const
 {
-    std::lock_guard<std::mutex> lock(callbackMutex_);
-    return callback_;
+    std::lock_guard<std::mutex> lock(listenerMutex_);
+    return listener_;
 }
 
 void RtspClient::SetUserAgent(const std::string &user_agent)
@@ -483,16 +484,16 @@ void RtspClient::ParseUrl(const std::string &url, std::string &host, uint16_t &p
 
 void RtspClient::NotifyError(int error_code, const std::string &error_message)
 {
-    NotifyCallback([this, error_code, error_message](IRtspClientCallback *cb) {
-        cb->OnError(baseUrl_, error_code, error_message);
+    NotifyListener([this, error_code, error_message](IRtspClientListener *listener) {
+        listener->OnError(baseUrl_, error_code, error_message);
     });
 }
 
-void RtspClient::NotifyCallback(std::function<void(IRtspClientCallback *)> func)
+void RtspClient::NotifyListener(std::function<void(IRtspClientListener *)> func)
 {
-    std::lock_guard<std::mutex> lock(callbackMutex_);
-    if (callback_) {
-        func(callback_.get());
+    std::lock_guard<std::mutex> lock(listenerMutex_);
+    if (listener_) {
+        func(listener_.get());
     }
 }
 

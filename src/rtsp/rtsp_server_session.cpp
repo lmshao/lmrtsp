@@ -313,8 +313,8 @@ bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &ran
     // Notify callback for multi-track (outside lock to avoid deadlock)
     if (is_multi_track) {
         if (auto server = rtspServer_.lock()) {
-            if (auto callback = server->GetCallback()) {
-                callback->OnSessionStartPlay(shared_from_this());
+            if (auto listener = server->GetListener()) {
+                listener->OnSessionStartPlay(shared_from_this());
             }
         }
         return true;
@@ -338,10 +338,10 @@ bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &ran
 
     LMRTSP_LOGD("Media playback started for session: %s", sessionId_.c_str());
 
-    // Notify callback that session started playing
+    // Notify listener that session started playing
     if (auto server = rtspServer_.lock()) {
-        if (auto callback = server->GetCallback()) {
-            callback->OnSessionStartPlay(shared_from_this());
+        if (auto listener = server->GetListener()) {
+            listener->OnSessionStartPlay(shared_from_this());
         }
     }
 
@@ -377,8 +377,8 @@ bool RtspServerSession::PauseMedia(const std::string &uri)
 
     // Notify callback that session stopped playing
     if (auto server = rtspServer_.lock()) {
-        if (auto callback = server->GetCallback()) {
-            callback->OnSessionStopPlay(sessionId_);
+        if (auto listener = server->GetListener()) {
+            listener->OnSessionStopPlay(sessionId_);
         }
     }
 
@@ -407,8 +407,8 @@ bool RtspServerSession::TeardownMedia(const std::string &uri)
 
     // Notify callback that session stopped playing
     if (auto server = rtspServer_.lock()) {
-        if (auto callback = server->GetCallback()) {
-            callback->OnSessionStopPlay(sessionId_);
+        if (auto listener = server->GetListener()) {
+            listener->OnSessionStopPlay(sessionId_);
         }
     }
 
