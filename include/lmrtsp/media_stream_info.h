@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "lmrtsp/media_types.h"
+
 namespace lmshao::lmrtsp {
 
 /**
@@ -62,11 +64,11 @@ struct MediaStreamInfo {
 
     std::string GenerateSDPMediaLine() const
     {
-        if (media_type == "video") {
+        if (media_type == MediaKind::VIDEO) {
             return "m=video 0 RTP/AVP " + std::to_string(payload_type);
         }
 
-        if (media_type == "audio") {
+        if (media_type == MediaKind::AUDIO) {
             return "m=audio 0 RTP/AVP " + std::to_string(payload_type);
         }
         return "";

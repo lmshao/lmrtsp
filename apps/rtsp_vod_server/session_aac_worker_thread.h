@@ -14,8 +14,8 @@
 #include <atomic>
 #include <memory>
 #include <string>
-#include <thread>
 
+#include "base_session_worker_thread.h"
 #include "session_aac_reader.h"
 
 /**
@@ -24,7 +24,7 @@
  * Reads AAC frames from file and sends them via RTP at correct timing.
  * Uses frame duration (1024 samples per frame) for timing control.
  */
-class SessionAacWorkerThread {
+class SessionAacWorkerThread : public BaseSessionWorkerThread {
 public:
     /**
      * @brief Constructor
@@ -38,39 +38,20 @@ public:
     ~SessionAacWorkerThread();
 
     /**
-     * @brief Start the worker thread
-     * @return true if started successfully
+     * @brief Reset playback to beginning
      */
-    bool Start();
+    void Reset() override;
 
-    /**
-     * @brief Stop the worker thread
-     */
-    void Stop();
-
-    /**
-     * @brief Check if worker is running
-     */
-    bool IsRunning() const { return running_; }
+protected:
+    bool InitializeReader() override;
+    bool SendNextData() override;
+    std::chrono::microseconds GetDataInterval() const override;
+    void ResetReader() override;
+    void CleanupReader() override;
+    void ReleaseFile() override;
 
 private:
-    /**
-     * @brief Worker thread function
-     */
-    void WorkerThreadFunc();
-
-    /**
-     * @brief Get frame interval based on sample rate
-     * Each AAC frame = 1024 samples, so interval = 1024 / sample_rate seconds
-     */
-    std::chrono::microseconds GetFrameInterval() const;
-
-    std::shared_ptr<lmshao::lmrtsp::RtspServerSession> session_;
-    std::string file_path_;
     uint32_t sample_rate_;
-
-    std::atomic<bool> running_{false};
-    std::unique_ptr<std::thread> worker_thread_;
     std::unique_ptr<SessionAacReader> reader_;
 };
 

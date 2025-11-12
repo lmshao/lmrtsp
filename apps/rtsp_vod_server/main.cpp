@@ -13,6 +13,7 @@
 #include <lmnet/network_utils.h>
 #include <lmrtsp/lmrtsp_logger.h>
 #include <lmrtsp/media_stream_info.h>
+#include <lmrtsp/media_types.h>
 #include <lmrtsp/rtsp_server.h>
 #include <lmrtsp/rtsp_server_session.h>
 #include <signal.h>
@@ -30,6 +31,8 @@
 #include "aac_file_reader.h"
 #include "file_manager.h"
 #include "session_aac_worker_thread.h"
+#include "session_h264_reader.h"
+#include "session_h264_worker_thread.h"
 #include "session_h265_reader.h"
 #include "session_h265_worker_thread.h"
 #include "session_manager.h"
@@ -59,21 +62,7 @@ std::string g_media_directory;
 std::map<std::string, MediaFile> g_media_files;
 std::mutex g_media_mutex;
 
-// TS worker threads (separate from H264 workers managed by SessionManager)
-std::map<std::string, std::shared_ptr<SessionTSWorkerThread>> g_ts_workers;
-std::mutex g_ts_workers_mutex;
-
-// AAC worker threads
-std::map<std::string, std::shared_ptr<SessionAacWorkerThread>> g_aac_workers;
-std::mutex g_aac_workers_mutex;
-
-// H265 worker threads
-std::map<std::string, std::shared_ptr<SessionH265WorkerThread>> g_h265_workers;
-std::mutex g_h265_workers_mutex;
-
-// MKV worker threads
-std::map<std::string, std::shared_ptr<SessionMkvWorkerThread>> g_mkv_workers;
-std::mutex g_mkv_workers_mutex;
+// All worker threads are now managed by SessionManager
 
 // Session event listener for managing worker threads
 class SessionEventListener : public lmshao::lmrtsp::IRtspServerListener {
@@ -86,50 +75,17 @@ public:
     void OnSessionDestroyed(const std::string &session_id) override
     {
         std::cout << "Session destroyed: " << session_id << std::endl;
-        // Stop the H264 worker thread for this session
+        // Stop all worker threads for this session (managed by SessionManager)
         SessionManager::GetInstance().StopSession(session_id);
 
-        // Stop the TS worker thread if exists
-        {
-            std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
-            auto ts_it = g_ts_workers.find(session_id);
-            if (ts_it != g_ts_workers.end()) {
-                ts_it->second->Stop();
-                g_ts_workers.erase(ts_it);
-                std::cout << "Stopped TS worker for session: " << session_id << std::endl;
-            }
-        }
-
-        // Stop the AAC worker thread if exists
-        {
-            std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
-            auto aac_it = g_aac_workers.find(session_id);
-            if (aac_it != g_aac_workers.end()) {
-                aac_it->second->Stop();
-                g_aac_workers.erase(aac_it);
-                std::cout << "Stopped AAC worker for session: " << session_id << std::endl;
-            }
-        }
-
-        // Stop the H265 worker thread if exists
-        {
-            std::lock_guard<std::mutex> h265_lock(g_h265_workers_mutex);
-            auto h265_it = g_h265_workers.find(session_id);
-            if (h265_it != g_h265_workers.end()) {
-                h265_it->second->Stop();
-                g_h265_workers.erase(h265_it);
-                std::cout << "Stopped H265 worker for session: " << session_id << std::endl;
-            }
-        }
-
-        // Stop the MKV worker thread if exists
-        {
-            std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
-            auto mkv_it = g_mkv_workers.find(session_id);
-            if (mkv_it != g_mkv_workers.end()) {
-                mkv_it->second->Stop();
-                g_mkv_workers.erase(mkv_it);
-                std::cout << "Stopped MKV worker for session: " << session_id << std::endl;
+        // For multi-track sessions, also stop track-specific workers
+        // Worker keys are in format: session_id + "_track" + track_index
+        // We need to check and stop all track workers
+        auto &manager = SessionManager::GetInstance();
+        auto session_ids = manager.GetActiveSessionIds();
+        for (const auto &id : session_ids) {
+            if (id.find(session_id + "_track") == 0) {
+                manager.StopSession(id);
             }
         }
     }
@@ -198,15 +154,15 @@ public:
                 const MediaFile &media = it->second;
 
                 // Start worker for this track
-                if (media.codec == "MKV") {
+                if (media.codec == Codec::MKV) {
                     uint32_t frame_rate;
 
                     // Calculate correct frame rate based on media type
-                    if (track.stream_info->media_type == "video") {
+                    if (track.stream_info->media_type == MediaKind::VIDEO) {
                         // Video: use configured frame rate
                         frame_rate = track.stream_info->frame_rate > 0 ? track.stream_info->frame_rate : 25;
                         std::cout << "  DEBUG: Video track, frame_rate=" << frame_rate << std::endl;
-                    } else if (track.stream_info->media_type == "audio") {
+                    } else if (track.stream_info->media_type == MediaKind::AUDIO) {
                         // Audio: calculate frame rate from sample rate
                         // AAC frame size is typically 1024 samples
                         // Frame rate = sample_rate / samples_per_frame
@@ -228,11 +184,10 @@ public:
                     // Create unique worker key for multi-track: session_id + track index
                     std::string worker_key = session_id + "_track" + std::to_string(track.track_index);
 
-                    auto mkv_worker = std::make_shared<SessionMkvWorkerThread>(
-                        session, media.file_path, media.track_number, track.track_index, frame_rate);
-                    if (mkv_worker->Start()) {
-                        std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
-                        g_mkv_workers[worker_key] = mkv_worker;
+                    // Use SessionManager to start MKV worker with custom session ID for multi-track
+                    if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::MKV, frame_rate,
+                                                                   2000000, media.track_number, track.track_index,
+                                                                   worker_key)) {
                         std::cout << "  Started MKV worker for track " << track.track_index << " (file track "
                                   << media.track_number << ", " << track.stream_info->codec << ", rate=" << frame_rate
                                   << ")" << std::endl;
@@ -268,58 +223,49 @@ public:
         const MediaFile &media = it->second;
 
         // Handle different codecs
-        if (media.codec == "H264") {
+        if (media.codec == Codec::H264) {
             uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
 
             // Start H264 worker thread for this session
             if (!SessionManager::GetInstance().StartSession(session, media.file_path, frame_rate)) {
                 std::cout << "Failed to start H264 worker thread for session: " << session_id << std::endl;
             }
-        } else if (media.codec == "MP2T") {
+        } else if (media.codec == Codec::MP2T) {
             // Start TS worker thread for this session
             uint32_t bitrate = 2000000; // 2 Mbps default, could be read from stream_info if available
+            uint32_t frame_rate = 0;    // Not used for TS
 
-            auto ts_worker = std::make_shared<SessionTSWorkerThread>(session, media.file_path, bitrate);
-            if (ts_worker->Start()) {
-                std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
-                g_ts_workers[session_id] = ts_worker;
+            if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::MP2T, frame_rate,
+                                                           bitrate)) {
                 std::cout << "Started TS worker thread for session: " << session_id << std::endl;
             } else {
                 std::cout << "Failed to start TS worker thread for session: " << session_id << std::endl;
             }
-        } else if (media.codec == "AAC") {
+        } else if (media.codec == Codec::AAC) {
             // Start AAC worker thread for this session
             uint32_t sample_rate = stream_info->sample_rate > 0 ? stream_info->sample_rate : 48000;
 
-            auto aac_worker = std::make_shared<SessionAacWorkerThread>(session, media.file_path, sample_rate);
-            if (aac_worker->Start()) {
-                std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
-                g_aac_workers[session_id] = aac_worker;
+            if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::AAC, sample_rate)) {
                 std::cout << "Started AAC worker thread for session: " << session_id << std::endl;
             } else {
                 std::cout << "Failed to start AAC worker thread for session: " << session_id << std::endl;
             }
-        } else if (media.codec == "H265") {
+        } else if (media.codec == Codec::H265) {
             // Start H265 worker thread for this session
             uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
 
-            auto h265_worker = std::make_shared<SessionH265WorkerThread>(session, media.file_path, frame_rate);
-            if (h265_worker->Start()) {
-                std::lock_guard<std::mutex> h265_lock(g_h265_workers_mutex);
-                g_h265_workers[session_id] = h265_worker;
+            if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::H265, frame_rate)) {
                 std::cout << "Started H265 worker thread for session: " << session_id << std::endl;
             } else {
                 std::cout << "Failed to start H265 worker thread for session: " << session_id << std::endl;
             }
-        } else if (media.codec == "MKV") {
-            // Start MKV worker thread for this session
+        } else if (media.codec == Codec::MKV) {
+            // Start MKV worker thread for this session (single track)
             uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
 
-            auto mkv_worker =
-                std::make_shared<SessionMkvWorkerThread>(session, media.file_path, media.track_number, frame_rate);
-            if (mkv_worker->Start()) {
-                std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
-                g_mkv_workers[session_id] = mkv_worker;
+            // For single-track MKV, use track_number as rtsp_track_index (0)
+            if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::MKV, frame_rate, 2000000,
+                                                           media.track_number, 0)) {
                 std::cout << "Started MKV worker thread for session: " << session_id << " (track " << media.track_number
                           << ")" << std::endl;
             } else {
@@ -333,28 +279,15 @@ public:
     void OnSessionStopPlay(const std::string &session_id) override
     {
         std::cout << "Session stop play: " << session_id << std::endl;
-        // Stop the H264 worker thread for this session
+        // Stop all worker threads for this session (managed by SessionManager)
         SessionManager::GetInstance().StopSession(session_id);
 
-        // Stop the TS worker thread if exists
-        {
-            std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
-            auto ts_it = g_ts_workers.find(session_id);
-            if (ts_it != g_ts_workers.end()) {
-                ts_it->second->Stop();
-                g_ts_workers.erase(ts_it);
-                std::cout << "Stopped TS worker for session: " << session_id << std::endl;
-            }
-        }
-
-        // Stop the AAC worker thread if exists
-        {
-            std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
-            auto aac_it = g_aac_workers.find(session_id);
-            if (aac_it != g_aac_workers.end()) {
-                aac_it->second->Stop();
-                g_aac_workers.erase(aac_it);
-                std::cout << "Stopped AAC worker for session: " << session_id << std::endl;
+        // For multi-track sessions, also stop track-specific workers
+        auto &manager = SessionManager::GetInstance();
+        auto session_ids = manager.GetActiveSessionIds();
+        for (const auto &id : session_ids) {
+            if (id.find(session_id + "_track") == 0) {
+                manager.StopSession(id);
             }
         }
     }
@@ -458,15 +391,15 @@ std::string GetCodecFromExtension(const std::string &filename)
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
     if (ext == ".h264" || ext == ".264") {
-        return "H264";
+        return Codec::H264;
     } else if (ext == ".h265" || ext == ".265" || ext == ".hevc") {
-        return "H265";
+        return Codec::H265;
     } else if (ext == ".aac") {
-        return "AAC";
+        return Codec::AAC;
     } else if (ext == ".ts" || ext == ".m2ts") {
-        return "MP2T";
+        return Codec::MP2T;
     } else if (ext == ".mkv" || ext == ".webm") {
-        return "MKV";
+        return Codec::MKV;
     }
 
     return "";
@@ -509,7 +442,7 @@ bool ScanMediaDirectory(const std::string &directory)
             media.codec = codec;
 
             // For H.264 files, load parameters using MappedFile
-            if (codec == "H264") {
+            if (codec == Codec::H264) {
                 // Use FileManager to get shared MappedFile
                 auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
                 if (!mapped_file) {
@@ -523,9 +456,9 @@ bool ScanMediaDirectory(const std::string &directory)
                 // Create and register media stream
                 auto streamInfo = std::make_shared<MediaStreamInfo>();
                 streamInfo->stream_path = streamPath;
-                streamInfo->media_type = "video";
-                streamInfo->codec = "H264";
-                streamInfo->payload_type = 96;
+                streamInfo->media_type = MediaKind::VIDEO;
+                streamInfo->codec = Codec::H264;
+                streamInfo->payload_type = static_cast<uint8_t>(MediaType::H264);
                 streamInfo->clock_rate = 90000;
 
                 // Set default resolution (will be updated from SPS if available)
@@ -557,7 +490,7 @@ bool ScanMediaDirectory(const std::string &directory)
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
             // Support for TS files
-            else if (codec == "MP2T") {
+            else if (codec == Codec::MP2T) {
                 // Use FileManager to get shared MappedFile
                 auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
                 if (!mapped_file) {
@@ -571,9 +504,9 @@ bool ScanMediaDirectory(const std::string &directory)
                 // Create and register media stream
                 auto streamInfo = std::make_shared<MediaStreamInfo>();
                 streamInfo->stream_path = streamPath;
-                streamInfo->media_type = "video"; // TS can contain both audio and video
-                streamInfo->codec = "MP2T";
-                streamInfo->payload_type = 33; // Static payload type for MP2T
+                streamInfo->media_type = MediaKind::VIDEO; // TS can contain both audio and video
+                streamInfo->codec = Codec::MP2T;
+                streamInfo->payload_type = static_cast<uint8_t>(MediaType::MP2T);
                 streamInfo->clock_rate = 90000;
 
                 // TS doesn't have separate SPS/PPS
@@ -603,7 +536,7 @@ bool ScanMediaDirectory(const std::string &directory)
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
             // Support for AAC files
-            else if (codec == "AAC") {
+            else if (codec == Codec::AAC) {
                 // Use FileManager to get shared MappedFile
                 auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
                 if (!mapped_file) {
@@ -622,9 +555,9 @@ bool ScanMediaDirectory(const std::string &directory)
                 // Create and register media stream
                 auto streamInfo = std::make_shared<MediaStreamInfo>();
                 streamInfo->stream_path = streamPath;
-                streamInfo->media_type = "audio";
-                streamInfo->codec = "AAC";
-                streamInfo->payload_type = 97; // Dynamic payload type for AAC
+                streamInfo->media_type = MediaKind::AUDIO;
+                streamInfo->codec = Codec::AAC;
+                streamInfo->payload_type = static_cast<uint8_t>(MediaType::AAC);
                 streamInfo->sample_rate = temp_reader.GetSampleRate();
                 streamInfo->channels = temp_reader.GetChannels();
                 streamInfo->clock_rate = temp_reader.GetSampleRate();
@@ -653,7 +586,7 @@ bool ScanMediaDirectory(const std::string &directory)
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
             // Support for H265 files
-            else if (codec == "H265") {
+            else if (codec == Codec::H265) {
                 auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
                 if (!mapped_file) {
                     std::cerr << "Warning: Failed to map H.265 file: " << filepath << std::endl;
@@ -664,9 +597,9 @@ bool ScanMediaDirectory(const std::string &directory)
 
                 auto streamInfo = std::make_shared<MediaStreamInfo>();
                 streamInfo->stream_path = streamPath;
-                streamInfo->media_type = "video";
-                streamInfo->codec = "H265";
-                streamInfo->payload_type = 98;
+                streamInfo->media_type = MediaKind::VIDEO;
+                streamInfo->codec = Codec::H265;
+                streamInfo->payload_type = static_cast<uint8_t>(MediaType::H265);
                 streamInfo->clock_rate = 90000;
 
                 streamInfo->width = 1920;
@@ -696,7 +629,7 @@ bool ScanMediaDirectory(const std::string &directory)
                 FileManager::GetInstance().ReleaseMappedFile(filepath);
             }
             // Support for MKV files
-            else if (codec == "MKV") {
+            else if (codec == Codec::MKV) {
                 auto mapped_file = FileManager::GetInstance().GetMappedFile(filepath);
                 if (!mapped_file) {
                     std::cerr << "Warning: Failed to map MKV file: " << filepath << std::endl;
@@ -709,9 +642,18 @@ bool ScanMediaDirectory(const std::string &directory)
                 struct ScanListener : public lmshao::lmmkv::IMkvDemuxListener {
                     lmshao::lmmkv::MkvInfo info;
                     std::vector<lmshao::lmmkv::MkvTrackInfo> tracks;
+                    std::mutex mutex; // Protect tracks vector (defensive programming)
 
-                    void OnInfo(const lmshao::lmmkv::MkvInfo &i) override { info = i; }
-                    void OnTrack(const lmshao::lmmkv::MkvTrackInfo &t) override { tracks.push_back(t); }
+                    void OnInfo(const lmshao::lmmkv::MkvInfo &i) override
+                    {
+                        std::lock_guard<std::mutex> lock(mutex);
+                        info = i;
+                    }
+                    void OnTrack(const lmshao::lmmkv::MkvTrackInfo &t) override
+                    {
+                        std::lock_guard<std::mutex> lock(mutex);
+                        tracks.push_back(t);
+                    }
                     void OnFrame(const lmshao::lmmkv::MkvFrame &) override {}
                     void OnEndOfStream() override {}
                     void OnError(int, const std::string &) override {}
@@ -726,11 +668,18 @@ bool ScanMediaDirectory(const std::string &directory)
                     continue;
                 }
 
-                // Quick scan - only parse headers
                 const uint8_t *data = mapped_file->Data();
                 size_t scan_size = std::min(mapped_file->Size(), size_t(1024 * 1024)); // Scan first 1MB
                 scanner.Consume(data, scan_size);
                 scanner.Stop();
+
+                std::lock_guard<std::mutex> lock(scan_listener->mutex);
+                if (scan_listener->tracks.empty()) {
+                    std::cerr << "Warning: No tracks found in MKV file (may need larger scan size or file is invalid): "
+                              << filepath << std::endl;
+                    FileManager::GetInstance().ReleaseMappedFile(filepath);
+                    continue;
+                }
 
                 // Find first video track for main stream registration
                 uint64_t default_video_track = 0;
@@ -747,13 +696,13 @@ bool ScanMediaDirectory(const std::string &directory)
                     MediaType media_type;
 
                     if (track.codec_id.find("V_MPEG4/ISO/AVC") == 0) {
-                        track_codec = "H264";
+                        track_codec = Codec::H264;
                         media_type = MediaType::H264;
                     } else if (track.codec_id.find("V_MPEGH/ISO/HEVC") == 0) {
-                        track_codec = "H265";
+                        track_codec = Codec::H265;
                         media_type = MediaType::H265;
                     } else if (track.codec_id.find("A_AAC") == 0) {
-                        track_codec = "AAC";
+                        track_codec = Codec::AAC;
                         media_type = MediaType::AAC;
                     } else {
                         // Skip unsupported codecs
@@ -770,7 +719,7 @@ bool ScanMediaDirectory(const std::string &directory)
                     media.filename = filename;
                     media.stream_path = track_stream_path;
                     media.file_path = filepath;
-                    media.codec = "MKV"; // Mark as MKV container
+                    media.codec = Codec::MKV; // Mark as MKV container
                     media.track_number = track.track_number;
 
                     // Create and register media stream
@@ -779,10 +728,11 @@ bool ScanMediaDirectory(const std::string &directory)
                     streamInfo->codec = track_codec;
                     streamInfo->clock_rate = 90000;
 
-                    if (track_codec == "H264" || track_codec == "H265") {
+                    if (track_codec == Codec::H264 || track_codec == Codec::H265) {
                         // Video track
-                        streamInfo->media_type = "video";
-                        streamInfo->payload_type = (track_codec == "H264") ? 96 : 98;
+                        streamInfo->media_type = MediaKind::VIDEO;
+                        streamInfo->payload_type = (track_codec == Codec::H264) ? static_cast<uint8_t>(MediaType::H264)
+                                                                                : static_cast<uint8_t>(MediaType::H265);
                         streamInfo->width = track.width > 0 ? track.width : 1920;
                         streamInfo->height = track.height > 0 ? track.height : 1080;
 
@@ -794,7 +744,7 @@ bool ScanMediaDirectory(const std::string &directory)
                         if (temp_reader.Initialize()) {
                             streamInfo->frame_rate = temp_reader.GetFrameRate();
 
-                            if (track_codec == "H264") {
+                            if (track_codec == Codec::H264) {
                                 streamInfo->sps = temp_reader.GetSPS();
                                 streamInfo->pps = temp_reader.GetPPS();
                             } else {
@@ -803,10 +753,10 @@ bool ScanMediaDirectory(const std::string &directory)
                                 streamInfo->pps = temp_reader.GetPPS();
                             }
                         }
-                    } else if (track_codec == "AAC") {
+                    } else if (track_codec == Codec::AAC) {
                         // Audio track
-                        streamInfo->media_type = "audio";
-                        streamInfo->payload_type = 97;
+                        streamInfo->media_type = MediaKind::AUDIO;
+                        streamInfo->payload_type = static_cast<uint8_t>(MediaType::AAC);
                         streamInfo->sample_rate = track.sample_rate > 0 ? track.sample_rate : 48000;
                         streamInfo->channels = track.channels > 0 ? track.channels : 2;
                         streamInfo->clock_rate = streamInfo->sample_rate;
@@ -822,7 +772,7 @@ bool ScanMediaDirectory(const std::string &directory)
                     std::cout << "      Stream:     rtsp://localhost:8554" << track_stream_path << std::endl;
                     std::cout << "      Codec:      " << track_codec << " (from MKV)" << std::endl;
 
-                    if (streamInfo->media_type == "video") {
+                    if (streamInfo->media_type == MediaKind::VIDEO) {
                         std::cout << "      Resolution: " << streamInfo->width << "x" << streamInfo->height
                                   << std::endl;
                         std::cout << "      Frame rate: " << streamInfo->frame_rate << " fps" << std::endl;
@@ -847,8 +797,8 @@ bool ScanMediaDirectory(const std::string &directory)
                     auto main_stream_info = std::make_shared<MediaStreamInfo>();
                     main_stream_info->stream_path = main_stream_path;
                     // Use first track's type as main type (usually video)
-                    main_stream_info->media_type = "multi";
-                    main_stream_info->codec = "MKV";
+                    main_stream_info->media_type = MediaKind::MULTI;
+                    main_stream_info->codec = Codec::MKV;
 
                     // Collect all registered tracks as sub-tracks
                     for (const auto &track : scan_listener->tracks) {
@@ -867,7 +817,7 @@ bool ScanMediaDirectory(const std::string &directory)
                             main_media.filename = filename;
                             main_media.stream_path = main_stream_path;
                             main_media.file_path = filepath;
-                            main_media.codec = "MKV";
+                            main_media.codec = Codec::MKV;
                             main_media.track_number = default_video_track;
 
                             std::lock_guard<std::mutex> lock(g_media_mutex);
@@ -895,7 +845,7 @@ bool ScanMediaDirectory(const std::string &directory)
             // So we don't need to add anything else to g_media_files here
 
             // For non-MKV files, register the media info
-            if (codec != "MKV") {
+            if (codec != Codec::MKV) {
                 std::lock_guard<std::mutex> lock(g_media_mutex);
                 g_media_files[streamPath] = media;
             }
@@ -1080,48 +1030,8 @@ int main(int argc, char *argv[])
     // Cleanup
     std::cout << "\nShutting down..." << std::endl;
 
-    // Stop all session worker threads (H264)
+    // Stop all session worker threads (all types managed by SessionManager)
     SessionManager::GetInstance().StopAllSessions();
-
-    // Stop all TS worker threads
-    {
-        std::lock_guard<std::mutex> ts_lock(g_ts_workers_mutex);
-        for (auto &pair : g_ts_workers) {
-            std::cout << "Stopping TS worker: " << pair.first << std::endl;
-            pair.second->Stop();
-        }
-        g_ts_workers.clear();
-    }
-
-    // Stop all AAC worker threads
-    {
-        std::lock_guard<std::mutex> aac_lock(g_aac_workers_mutex);
-        for (auto &pair : g_aac_workers) {
-            std::cout << "Stopping AAC worker: " << pair.first << std::endl;
-            pair.second->Stop();
-        }
-        g_aac_workers.clear();
-    }
-
-    // Stop all H265 worker threads
-    {
-        std::lock_guard<std::mutex> h265_lock(g_h265_workers_mutex);
-        for (auto &pair : g_h265_workers) {
-            std::cout << "Stopping H265 worker: " << pair.first << std::endl;
-            pair.second->Stop();
-        }
-        g_h265_workers.clear();
-    }
-
-    // Stop all MKV worker threads
-    {
-        std::lock_guard<std::mutex> mkv_lock(g_mkv_workers_mutex);
-        for (auto &pair : g_mkv_workers) {
-            std::cout << "Stopping MKV worker: " << pair.first << std::endl;
-            pair.second->Stop();
-        }
-        g_mkv_workers.clear();
-    }
 
     // Clear file cache
     FileManager::GetInstance().ClearCache();
