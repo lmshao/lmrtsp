@@ -116,7 +116,7 @@ bool UdpRtpTransportAdapter::Setup(const TransportConfig &config)
 
     if (success) {
         active_ = true;
-        LMRTSP_LOGI("UDP RTP transport adapter setup successfully (RTCP {})", IsRtcpEnabled() ? "enabled" : "disabled");
+        LMRTSP_LOGI("UDP RTP transport adapter setup successfully (RTCP %s)", IsRtcpEnabled() ? "enabled" : "disabled");
     } else {
         LMRTSP_LOGE("Failed to setup UDP RTP transport adapter");
         Close();
@@ -272,7 +272,7 @@ bool UdpRtpTransportAdapter::InitializeUdpServers()
         if (rtcp_enabled) {
             serverRtcpPort_ = allocated_port + 1;
         }
-        LMRTSP_LOGI("Allocated server ports: RTP={}, RTCP={}", serverRtpPort_, rtcp_enabled ? serverRtcpPort_ : 0);
+        LMRTSP_LOGI("Allocated server ports: RTP=%u, RTCP=%u", serverRtpPort_, rtcp_enabled ? serverRtcpPort_ : 0);
     }
 
     // Create RTP server (always required)
@@ -344,7 +344,7 @@ bool UdpRtpTransportAdapter::InitializeUdpClients()
             if (rtcp_enabled) {
                 serverRtcpPort_ = allocated_port + 1;
             }
-            LMRTSP_LOGI("Allocated local ports for SOURCE mode: RTP={}, RTCP={}", serverRtpPort_,
+            LMRTSP_LOGI("Allocated local ports for SOURCE mode: RTP=%u, RTCP=%u", serverRtpPort_,
                         rtcp_enabled ? serverRtcpPort_ : 0);
         }
         rtp_local_port = serverRtpPort_;

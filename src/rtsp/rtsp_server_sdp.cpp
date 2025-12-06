@@ -9,6 +9,7 @@
 #include "internal_logger.h"
 #include "lmcore/base64.h"
 #include "lmcore/hex.h"
+#include "lmrtsp/media_types.h"
 #include "lmrtsp/rtsp_server.h"
 
 using namespace lmshao::lmcore;
@@ -20,7 +21,7 @@ static std::string GenerateTrackSDP(const std::shared_ptr<MediaStreamInfo> &trac
 {
     std::string sdp;
 
-    if (track_info->media_type == "video") {
+    if (track_info->media_type == MediaKind::VIDEO) {
         // Use UDP mode (RTP/AVP), not TCP
         sdp += "m=video 0 RTP/AVP " + std::to_string(track_info->payload_type) + "\r\n";
         sdp += "a=rtpmap:" + std::to_string(track_info->payload_type) + " " + track_info->codec + "/" +
@@ -62,7 +63,7 @@ static std::string GenerateTrackSDP(const std::shared_ptr<MediaStreamInfo> &trac
         // Media-level control attribute - use relative path
         sdp += "a=control:track" + std::to_string(track_index) + "\r\n";
 
-    } else if (track_info->media_type == "audio") {
+    } else if (track_info->media_type == MediaKind::AUDIO) {
         sdp += "m=audio 0 RTP/AVP " + std::to_string(track_info->payload_type) + "\r\n";
 
         // Use RFC 3640 compliant codec name for AAC

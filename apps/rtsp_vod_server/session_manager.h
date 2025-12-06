@@ -9,6 +9,7 @@
 #ifndef LMSHAO_RTSP_SESSION_MANAGER_H
 #define LMSHAO_RTSP_SESSION_MANAGER_H
 
+#include <lmrtsp/media_types.h>
 #include <lmrtsp/rtsp_server_session.h>
 
 #include <memory>
@@ -16,14 +17,14 @@
 #include <string>
 #include <unordered_map>
 
-#include "session_worker_thread.h"
+#include "isession_worker.h"
 
 using namespace lmshao::lmrtsp;
 
 /**
  * @brief Manager for RTSP session worker threads
  *
- * This class manages the lifecycle of SessionWorkerThread instances:
+ * This class manages the lifecycle of all session worker thread instances:
  * - Creates worker threads when sessions start playing
  * - Tracks active sessions and their worker threads
  * - Cleans up finished or disconnected sessions
@@ -43,7 +44,7 @@ public:
     ~SessionManager();
 
     /**
-     * @brief Start a worker thread for a session
+     * @brief Start a worker thread for a session (H264)
      * @param session RTSP session
      * @param file_path Path to the media file
      * @param frame_rate Target frame rate
@@ -51,6 +52,22 @@ public:
      */
     bool StartSession(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
                       uint32_t frame_rate = 25);
+
+    /**
+     * @brief Start a worker thread for a session with codec type
+     * @param session RTSP session
+     * @param file_path Path to the media file
+     * @param codec Codec type (Codec::H264, Codec::H265, Codec::MP2T, Codec::AAC, Codec::MKV)
+     * @param frame_rate Target frame rate (for video) or sample rate (for audio)
+     * @param bitrate Target bitrate for MP2T (bps)
+     * @param track_number Track number for MKV (0 for single track)
+     * @param rtsp_track_index RTSP track index for MKV multi-track (0, 1, 2...)
+     * @param custom_session_id Optional custom session ID (for multi-track sessions)
+     * @return true if started successfully, false otherwise
+     */
+    bool StartSession(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
+                      const std::string &codec, uint32_t frame_rate = 25, uint32_t bitrate = 2000000,
+                      uint64_t track_number = 0, int rtsp_track_index = -1, const std::string &custom_session_id = "");
 
     /**
      * @brief Stop a session worker thread
@@ -67,11 +84,11 @@ public:
     bool IsSessionActive(const std::string &session_id) const;
 
     /**
-     * @brief Get session worker thread
+     * @brief Get session worker interface
      * @param session_id Session ID
-     * @return Shared pointer to SessionWorkerThread, nullptr if not found
+     * @return Shared pointer to ISessionWorker, nullptr if not found
      */
-    std::shared_ptr<SessionWorkerThread> GetSessionWorker(const std::string &session_id) const;
+    std::shared_ptr<ISessionWorker> GetWorker(const std::string &session_id) const;
 
     /**
      * @brief Get number of active sessions
@@ -141,7 +158,8 @@ private:
 
 private:
     mutable std::mutex sessions_mutex_;
-    std::unordered_map<std::string, std::shared_ptr<SessionWorkerThread>> active_sessions_;
+    // Unified storage for all worker types
+    std::unordered_map<std::string, std::shared_ptr<ISessionWorker>> active_sessions_;
 
     // Statistics
     std::atomic<size_t> total_sessions_created_{0};

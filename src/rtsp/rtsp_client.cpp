@@ -214,11 +214,11 @@ bool RtspClient::Setup(const std::string &url, const std::string &transport)
         request.general_header_["Transport"] = transport;
 
         std::string request_str = request.ToString();
-        LMRTSP_LOGD("Sending SETUP request:\n{}", request_str);
+        LMRTSP_LOGD("Sending SETUP request:\n%s", request_str.c_str());
 
         return SendRequest(request);
     } catch (const std::exception &e) {
-        LMRTSP_LOGE("Exception in SETUP: {}", e.what());
+        LMRTSP_LOGE("Exception in SETUP: %s", e.what());
         return false;
     }
 }
@@ -240,11 +240,11 @@ bool RtspClient::Play(const std::string &url)
         request.general_header_["User-Agent"] = userAgent_;
 
         std::string request_str = request.ToString();
-        LMRTSP_LOGD("Sending PLAY request:\n{}", request_str);
+        LMRTSP_LOGD("Sending PLAY request:\n%s", request_str.c_str());
 
         return SendRequest(request);
     } catch (const std::exception &e) {
-        LMRTSP_LOGE("Exception in PLAY: {}", e.what());
+        LMRTSP_LOGE("Exception in PLAY: %s", e.what());
         return false;
     }
 }
@@ -266,7 +266,7 @@ bool RtspClient::Pause(const std::string &url)
         request.general_header_["User-Agent"] = userAgent_;
 
         std::string request_str = request.ToString();
-        LMRTSP_LOGD("Sending PAUSE request:\n{}", request_str);
+        LMRTSP_LOGD("Sending PAUSE request:\n%s", request_str.c_str());
 
         return SendRequest(request);
     } catch (const std::exception &e) {
@@ -292,11 +292,11 @@ bool RtspClient::Teardown(const std::string &url)
         request.general_header_["User-Agent"] = userAgent_;
 
         std::string request_str = request.ToString();
-        LMRTSP_LOGD("Sending TEARDOWN request:\n{}", request_str);
+        LMRTSP_LOGD("Sending TEARDOWN request:\n%s", request_str.c_str());
 
         return SendRequest(request);
     } catch (const std::exception &e) {
-        LMRTSP_LOGE("Exception in TEARDOWN: {}", e.what());
+        LMRTSP_LOGE("Exception in TEARDOWN: %s", e.what());
         return false;
     }
 }
@@ -308,14 +308,14 @@ std::shared_ptr<RtspClientSession> RtspClient::CreateSession(const std::string &
         if (session->Initialize()) {
             std::lock_guard<std::mutex> lock(sessionsMutex_);
             sessions_[session->GetSessionId()] = session;
-            LMRTSP_LOGI("Created session: {} for URL: {}", session->GetSessionId(), url);
+            LMRTSP_LOGI("Created session: %s for URL: %s", session->GetSessionId().c_str(), url.c_str());
             return session;
         } else {
-            LMRTSP_LOGE("Failed to initialize session for URL: {}", url);
+            LMRTSP_LOGE("Failed to initialize session for URL: %s", url.c_str());
             return nullptr;
         }
     } catch (const std::exception &e) {
-        LMRTSP_LOGE("Exception creating session: {}", e.what());
+        LMRTSP_LOGE("Exception creating session: %s", e.what());
         return nullptr;
     }
 }
@@ -327,7 +327,7 @@ void RtspClient::RemoveSession(const std::string &session_id)
     if (it != sessions_.end()) {
         it->second->Cleanup();
         sessions_.erase(it);
-        LMRTSP_LOGI("Removed session: {}", session_id);
+        LMRTSP_LOGI("Removed session: %s", session_id.c_str());
     }
 }
 
@@ -412,7 +412,7 @@ bool RtspClient::SendRequest(const RtspRequest &request)
 
         return true;
     } catch (const std::exception &e) {
-        LMRTSP_LOGE("Exception sending request: {}", e.what());
+        LMRTSP_LOGE("Exception sending request: %s", e.what());
         return false;
     }
 }

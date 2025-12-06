@@ -49,8 +49,9 @@ set(VOD_SOURCES
     session_ts_reader.cpp
     file_manager.cpp
     session_manager.cpp
+    base_session_worker_thread.cpp
     session_aac_worker_thread.cpp
-    session_worker_thread.cpp
+    session_h264_worker_thread.cpp
     session_h265_worker_thread.cpp
     session_ts_worker_thread.cpp
 )

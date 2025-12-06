@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_RTSP_SESSION_WORKER_THREAD_H
-#define LMSHAO_RTSP_SESSION_WORKER_THREAD_H
+#ifndef LMSHAO_RTSP_SESSION_H264_WORKER_THREAD_H
+#define LMSHAO_RTSP_SESSION_H264_WORKER_THREAD_H
 
 #include <lmcore/data_buffer.h>
 #include <lmrtsp/media_types.h>
@@ -17,8 +17,8 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <thread>
 
+#include "base_session_worker_thread.h"
 #include "file_manager.h"
 #include "session_h264_reader.h"
 
@@ -26,15 +26,15 @@ using namespace lmshao::lmrtsp;
 using namespace lmshao::lmcore;
 
 /**
- * @brief Worker thread for handling individual RTSP client session
+ * @brief Worker thread for handling H.264 RTSP client session
  *
- * Each SessionWorkerThread manages one client session independently:
+ * Each SessionH264WorkerThread manages one client session independently:
  * - Uses shared MappedFile through FileManager for efficient memory usage
  * - Maintains independent playback progress with SessionH264Reader
  * - Runs in its own thread for concurrent client support
  * - Handles frame timing and streaming control
  */
-class SessionWorkerThread {
+class SessionH264WorkerThread : public BaseSessionWorkerThread {
 public:
     /**
      * @brief Constructor
@@ -42,36 +42,13 @@ public:
      * @param file_path Path to the H.264 file
      * @param frame_rate Target frame rate for streaming (fps)
      */
-    SessionWorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
-                        uint32_t frame_rate = 25);
+    SessionH264WorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
+                            uint32_t frame_rate = 25);
 
     /**
      * @brief Destructor - ensures proper cleanup
      */
-    ~SessionWorkerThread();
-
-    /**
-     * @brief Start the worker thread
-     * @return true if started successfully, false otherwise
-     */
-    bool Start();
-
-    /**
-     * @brief Stop the worker thread
-     */
-    void Stop();
-
-    /**
-     * @brief Check if the worker thread is running
-     * @return true if running, false otherwise
-     */
-    bool IsRunning() const;
-
-    /**
-     * @brief Get session ID for identification
-     * @return Session ID string
-     */
-    std::string GetSessionId() const;
+    ~SessionH264WorkerThread();
 
     /**
      * @brief Get current playback information
@@ -96,7 +73,7 @@ public:
     /**
      * @brief Reset playback to beginning
      */
-    void Reset();
+    void Reset() override;
 
     /**
      * @brief Set frame rate for streaming
@@ -110,55 +87,53 @@ public:
      */
     uint32_t GetFrameRate() const;
 
-private:
+protected:
     /**
-     * @brief Main worker thread function
+     * @brief Initialize the reader (called by Start())
+     * @return true if successful, false otherwise
      */
-    void WorkerThreadFunc();
+    bool InitializeReader() override;
 
     /**
      * @brief Send next frame to client
      * @return true if frame sent successfully, false if EOF or error
      */
-    bool SendNextFrame();
+    bool SendNextData() override;
 
     /**
      * @brief Calculate frame interval based on frame rate
-     * @return Frame interval in milliseconds
+     * @return Frame interval in microseconds
      */
-    std::chrono::milliseconds GetFrameInterval() const;
+    std::chrono::microseconds GetDataInterval() const override;
 
     /**
-     * @brief Check if session is still valid and playing
-     * @return true if session is active and playing, false otherwise
+     * @brief Reset the reader to beginning
      */
-    bool IsSessionActive() const;
+    void ResetReader() override;
+
+    /**
+     * @brief Cleanup reader resources (called by Stop())
+     */
+    void CleanupReader() override;
+
+    /**
+     * @brief Release file resources (called by Stop())
+     */
+    void ReleaseFile() override;
 
 private:
-    // Session management
-    std::shared_ptr<RtspServerSession> session_;
-    std::string session_id_;
-    std::string file_path_;
+    /**
+     * @brief Send next frame to client (internal implementation)
+     * @return true if frame sent successfully, false if EOF or error
+     */
+    bool SendNextFrame();
 
     // H.264 reader for independent playback
     std::unique_ptr<SessionH264Reader> h264_reader_;
 
-    // Thread management
-    std::unique_ptr<std::thread> worker_thread_;
-    std::atomic<bool> running_;
-    std::atomic<bool> should_stop_;
-
     // Streaming parameters
     std::atomic<uint32_t> frame_rate_;
     std::atomic<uint64_t> frame_counter_;
-
-    // Timing control
-    std::chrono::steady_clock::time_point start_time_;
-    std::chrono::steady_clock::time_point last_frame_time_;
-
-    // Statistics
-    std::atomic<size_t> frames_sent_;
-    std::atomic<size_t> bytes_sent_;
 };
 
-#endif // LMSHAO_RTSP_SESSION_WORKER_THREAD_H
+#endif // LMSHAO_RTSP_SESSION_H264_WORKER_THREAD_H
