@@ -21,7 +21,7 @@
 SessionMkvWorkerThread::SessionMkvWorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
                                                uint64_t track_number, int rtsp_track_index, uint32_t frame_rate)
     : BaseSessionWorkerThread(session, file_path), track_number_(track_number), rtsp_track_index_(rtsp_track_index),
-      frame_rate_(frame_rate), frame_counter_(0)
+      frame_rate_(frame_rate), frame_counter_(0), rtp_timestamp_increment_(3600)
 {
     if (!session_) {
         std::cout << "Invalid RtspServerSession provided to SessionMkvWorkerThread" << std::endl;
@@ -53,6 +53,36 @@ bool SessionMkvWorkerThread::InitializeReader()
         FileManager::GetInstance().ReleaseMappedFile(file_path_);
         return false;
     }
+
+    // Try to get actual frame rate from MKV file
+    uint32_t actual_frame_rate = mkv_reader_->GetFrameRate();
+    if (actual_frame_rate > 0 && actual_frame_rate < 1000) {
+        // Valid video frame rate (not audio scaled value)
+        frame_rate_.store(actual_frame_rate);
+        std::cout << "Using actual MKV frame rate: " << actual_frame_rate << " fps" << std::endl;
+    } else {
+        // For audio or if frame rate unavailable, use configured value
+        std::cout << "Using configured frame rate: " << frame_rate_.load() << std::endl;
+    }
+
+    // Calculate RTP timestamp increment based on actual frame rate
+    // RTP clock is 90kHz, so increment = 90000 / fps
+    uint32_t fps = frame_rate_.load();
+    if (fps == 0) {
+        fps = 25; // Default fallback
+    }
+
+    if (fps > 1000) {
+        // Audio: fps is scaled by 1000, actual fps = fps / 1000
+        // For audio, RTP clock is typically 48kHz, but we use 90kHz for consistency
+        // Increment = 90000 / (fps / 1000) = 90000 * 1000 / fps
+        rtp_timestamp_increment_ = (90000 * 1000) / fps;
+    } else {
+        // Video: normal fps
+        rtp_timestamp_increment_ = 90000 / fps;
+    }
+
+    std::cout << "RTP timestamp increment: " << rtp_timestamp_increment_ << " (90kHz clock)" << std::endl;
 
     frame_counter_.store(0);
     return true;
@@ -137,7 +167,8 @@ bool SessionMkvWorkerThread::SendNextFrame()
     // Create MediaFrame for RTSP session
     lmshao::lmrtsp::MediaFrame rtsp_frame;
     rtsp_frame.data = data_buffer;
-    rtsp_frame.timestamp = static_cast<uint32_t>(frame_counter_.load() * 3600); // 90kHz clock
+    // Use calculated RTP timestamp increment based on actual frame rate
+    rtsp_frame.timestamp = static_cast<uint32_t>(frame_counter_.load() * rtp_timestamp_increment_);
     rtsp_frame.media_type = GetMediaType();
 
     // Send frame to session (multi-track version)

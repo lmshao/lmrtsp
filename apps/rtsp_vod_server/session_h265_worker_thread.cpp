@@ -20,7 +20,8 @@
 
 SessionH265WorkerThread::SessionH265WorkerThread(std::shared_ptr<RtspServerSession> session,
                                                  const std::string &file_path, uint32_t frame_rate)
-    : BaseSessionWorkerThread(session, file_path), frame_rate_(frame_rate), frame_counter_(0)
+    : BaseSessionWorkerThread(session, file_path), frame_rate_(frame_rate), frame_counter_(0),
+      rtp_timestamp_increment_(3600)
 {
     if (!session_) {
         std::cout << "Invalid RtspServerSession provided to SessionH265WorkerThread" << std::endl;
@@ -46,6 +47,17 @@ bool SessionH265WorkerThread::InitializeReader()
 
     h265_reader_ = std::make_unique<SessionH265Reader>(mapped_file);
     frame_counter_.store(0);
+
+    // Calculate RTP timestamp increment based on frame rate
+    // RTP clock is 90kHz, so increment = 90000 / fps
+    uint32_t fps = frame_rate_.load();
+    if (fps == 0) {
+        fps = 25; // Default fallback
+    }
+    rtp_timestamp_increment_ = 90000 / fps;
+
+    std::cout << "RTP timestamp increment: " << rtp_timestamp_increment_ << " (90kHz clock, fps=" << fps << ")"
+              << std::endl;
 
     return true;
 }
@@ -154,7 +166,10 @@ bool SessionH265WorkerThread::SendNextFrame()
 
     lmshao::lmrtsp::MediaFrame rtsp_frame;
     rtsp_frame.data = data_buffer;
-    rtsp_frame.timestamp = static_cast<uint32_t>(frame.timestamp);
+    // Calculate RTP timestamp using frame counter and increment
+    // RTP timestamp must be in 90kHz clock units for proper playback synchronization
+    // Using frame_counter ensures continuous, monotonic timestamps that VLC requires
+    rtsp_frame.timestamp = static_cast<uint32_t>(frame_counter_.load() * rtp_timestamp_increment_);
     rtsp_frame.media_type = MediaType::H265;
     rtsp_frame.video_param.is_key_frame = frame.is_keyframe;
 
@@ -166,7 +181,7 @@ bool SessionH265WorkerThread::SendNextFrame()
         frame_counter_++;
 
         std::cout << "Session " << session_id_ << " sent frame " << data_sent_.load()
-                  << ", size: " << rtsp_frame.data->Size() << " bytes, timestamp: " << rtsp_frame.timestamp
+                  << ", size: " << rtsp_frame.data->Size() << " bytes, RTP timestamp: " << rtsp_frame.timestamp
                   << ", keyframe: " << rtsp_frame.video_param.is_key_frame << std::endl;
     } else {
         std::cout << "Session " << session_id_ << " failed to send frame" << std::endl;

@@ -54,6 +54,10 @@ private:
     std::unique_ptr<SessionH265Reader> h265_reader_;
     std::atomic<uint32_t> frame_rate_;
     std::atomic<uint64_t> frame_counter_;
+
+    // RTP timestamp increment per frame (90kHz clock)
+    // Calculated as: 90000 / fps
+    uint32_t rtp_timestamp_increment_;
 };
 
 #endif // LMSHAO_RTSP_SESSION_H265_WORKER_THREAD_H

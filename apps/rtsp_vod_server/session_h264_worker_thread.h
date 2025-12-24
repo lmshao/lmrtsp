@@ -41,9 +41,13 @@ public:
      * @param session RTSP session to handle
      * @param file_path Path to the H.264 file
      * @param frame_rate Target frame rate for streaming (fps)
+     * @param track_index RTSP track index for multi-track sessions (-1 for single-track)
+     *                    NOTE: After SDP fix, single-track streams should use -1.
+     *                    This parameter is kept for defensive programming to handle
+     *                    edge cases where clients might still send "/track0" in SETUP.
      */
     SessionH264WorkerThread(std::shared_ptr<RtspServerSession> session, const std::string &file_path,
-                            uint32_t frame_rate = 25);
+                            uint32_t frame_rate = 25, int track_index = -1);
 
     /**
      * @brief Destructor - ensures proper cleanup
@@ -134,6 +138,13 @@ private:
     // Streaming parameters
     std::atomic<uint32_t> frame_rate_;
     std::atomic<uint64_t> frame_counter_;
+
+    // RTP timestamp increment per frame (90kHz clock)
+    // Calculated as: 90000 / fps
+    uint32_t rtp_timestamp_increment_;
+
+    // Track index for multi-track sessions (-1 for single-track)
+    int track_index_;
 };
 
 #endif // LMSHAO_RTSP_SESSION_H264_WORKER_THREAD_H

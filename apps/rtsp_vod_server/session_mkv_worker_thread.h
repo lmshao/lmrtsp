@@ -82,6 +82,7 @@ private:
     std::unique_ptr<SessionMkvReader> mkv_reader_;
     std::atomic<uint32_t> frame_rate_; // frames per second (video) or samples per second (audio)
     std::atomic<uint64_t> frame_counter_;
+    uint32_t rtp_timestamp_increment_; // RTP timestamp increment per frame (90kHz clock)
 };
 
 #endif // LMSHAO_RTSP_SESSION_MKV_WORKER_THREAD_H

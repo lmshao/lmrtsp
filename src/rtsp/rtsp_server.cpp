@@ -137,6 +137,12 @@ void RtspServer::HandleRequest(std::shared_ptr<RtspServerSession> session, const
             }
         }
 
+        // Remove trailing slash if present (e.g., /path/file.h264/ -> /path/file.h264)
+        // This handles cases where clients append a trailing slash to the URI
+        if (!stream_path.empty() && stream_path.back() == '/') {
+            stream_path.pop_back();
+        }
+
         // Get media stream info
         auto stream_info = GetMediaStream(stream_path);
         if (stream_info) {

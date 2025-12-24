@@ -19,8 +19,11 @@
 
 SessionAacWorkerThread::SessionAacWorkerThread(std::shared_ptr<lmshao::lmrtsp::RtspServerSession> session,
                                                const std::string &file_path, uint32_t sample_rate)
-    : BaseSessionWorkerThread(session, file_path), sample_rate_(sample_rate)
+    : BaseSessionWorkerThread(session, file_path), sample_rate_(sample_rate), rtp_timestamp_increment_(1920),
+      frame_counter_(0)
 {
+    // Default increment for 48kHz: (90000 * 1024) / 48000 = 1920
+    // Will be recalculated in InitializeReader() based on actual sample rate
 }
 
 SessionAacWorkerThread::~SessionAacWorkerThread() {}
@@ -46,10 +49,24 @@ bool SessionAacWorkerThread::InitializeReader()
         sample_rate_ = reader_->GetSampleRate();
     }
 
+    // Calculate RTP timestamp increment based on sample rate
+    // AAC-LC: 1024 samples per frame
+    // RTP clock is 90kHz, so increment = (90000 * samples_per_frame) / sample_rate
+    constexpr uint32_t SAMPLES_PER_FRAME = 1024; // AAC-LC standard
+    if (sample_rate_ > 0) {
+        rtp_timestamp_increment_ = (90000 * SAMPLES_PER_FRAME) / sample_rate_;
+    } else {
+        rtp_timestamp_increment_ = 1920; // Default for 48kHz
+    }
+
+    frame_counter_.store(0);
+
     std::cout << "AAC worker thread starting for file: " << file_path_ << std::endl;
     std::cout << "  Sample rate: " << sample_rate_ << " Hz" << std::endl;
     std::cout << "  Channels: " << (int)reader_->GetChannels() << std::endl;
     std::cout << "  Bitrate: " << (reader_->GetBitrate() / 1000.0) << " kbps" << std::endl;
+    std::cout << "  RTP timestamp increment: " << rtp_timestamp_increment_ << " (90kHz clock, " << SAMPLES_PER_FRAME
+              << " samples/frame)" << std::endl;
 
     return true;
 }
@@ -92,7 +109,10 @@ bool SessionAacWorkerThread::SendNextData()
     // Create MediaFrame
     lmshao::lmrtsp::MediaFrame frame;
     frame.media_type = lmshao::lmrtsp::MediaType::AAC;
-    frame.timestamp = static_cast<uint32_t>(data_sent_.load() * 1024); // Increment by samples per frame
+    // Calculate RTP timestamp using frame counter and increment
+    // RTP timestamp must be in 90kHz clock units for proper playback synchronization
+    // Using frame_counter ensures continuous, monotonic timestamps that VLC requires
+    frame.timestamp = static_cast<uint32_t>(frame_counter_.load() * rtp_timestamp_increment_);
     frame.audio_param.sample_rate = sample_rate_;
     frame.audio_param.channels = reader_->GetChannels();
 
@@ -104,10 +124,13 @@ bool SessionAacWorkerThread::SendNextData()
     bool success = session_->PushFrame(frame);
 
     if (success) {
+        data_sent_++;
         bytes_sent_ += frame.data->Size();
+        frame_counter_++; // Increment after successful send for next frame's RTP timestamp
         // Log every 100 frames
         if (data_sent_.load() % 100 == 0) {
-            std::cout << "AAC frames sent: " << data_sent_.load() << std::endl;
+            std::cout << "AAC frames sent: " << data_sent_.load() << ", RTP timestamp: " << frame.timestamp
+                      << std::endl;
         }
     } else {
         std::cerr << "Failed to push AAC frame, session may be closed" << std::endl;

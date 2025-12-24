@@ -111,96 +111,172 @@ public:
             auto tracks = session->GetTracks();
             std::cout << "Starting " << tracks.size() << " workers for multi-track session" << std::endl;
 
-            for (const auto &track : tracks) {
-                std::cout << "  Track " << track.track_index << ": " << track.uri << std::endl;
+            // Check if all tracks are MKV (only MKV supports true multi-track)
+            // For single-track files (H264, H265, etc.), even if URI contains /track0,
+            // they should be handled as single-track sessions
+            bool all_mkv = true;
+            std::string first_track_path;
 
-                if (!track.stream_info) {
-                    std::cout << "  Warning: No stream info for track " << track.track_index << std::endl;
-                    continue;
-                }
-
-                // Extract path from URI (e.g., rtsp://host/path -> /path)
-                std::string track_path = track.uri;
-                size_t path_start = track_path.find("://");
-                if (path_start != std::string::npos) {
-                    path_start = track_path.find('/', path_start + 3);
-                    if (path_start != std::string::npos) {
-                        track_path = track_path.substr(path_start);
-                    }
-                }
-
-                // Map track0 -> track1, track1 -> track2 (RTSP vs MKV track numbering)
-                // In RTSP SDP, tracks are numbered from 0
-                // But in g_media_files, they use MKV internal track numbers (usually starting from 1)
-                size_t track_pos = track_path.rfind("/track");
-                if (track_pos != std::string::npos) {
-                    std::string base_path = track_path.substr(0, track_pos);
-                    int rtsp_track_idx = track.track_index;
-
-                    // Find the MKV track number from stream_info
-                    std::string mkv_track_path = track.stream_info->stream_path;
-                    std::cout << "  MKV stream path: " << mkv_track_path << std::endl;
-                    track_path = mkv_track_path;
-                }
-
-                // Find the media file for this track
+            {
                 std::lock_guard<std::mutex> lock(g_media_mutex);
-                auto it = g_media_files.find(track_path);
-                if (it == g_media_files.end()) {
-                    std::cout << "  Warning: Media file not found for track path: " << track_path << std::endl;
-                    continue;
-                }
+                for (const auto &track : tracks) {
+                    if (!track.stream_info) {
+                        continue;
+                    }
 
-                const MediaFile &media = it->second;
-
-                // Start worker for this track
-                if (media.codec == Codec::MKV) {
-                    uint32_t frame_rate;
-
-                    // Calculate correct frame rate based on media type
-                    if (track.stream_info->media_type == MediaKind::VIDEO) {
-                        // Video: use configured frame rate
-                        frame_rate = track.stream_info->frame_rate > 0 ? track.stream_info->frame_rate : 25;
-                        std::cout << "  DEBUG: Video track, frame_rate=" << frame_rate << std::endl;
-                    } else if (track.stream_info->media_type == MediaKind::AUDIO) {
-                        // Audio: calculate frame rate from sample rate
-                        // AAC frame size is typically 1024 samples
-                        // Frame rate = sample_rate / samples_per_frame
-                        uint32_t sample_rate = track.stream_info->sample_rate;
-                        uint32_t samples_per_frame = 1024; // AAC-LC standard
-                        if (sample_rate > 0) {
-                            frame_rate = (sample_rate * 1000) / samples_per_frame; // *1000 for better precision
-                        } else {
-                            frame_rate = 46875; // Default: 48000Hz / 1024 * 1000 = 46.875 fps * 1000
+                    // Extract path from URI
+                    std::string track_path = track.uri;
+                    size_t path_start = track_path.find("://");
+                    if (path_start != std::string::npos) {
+                        path_start = track_path.find('/', path_start + 3);
+                        if (path_start != std::string::npos) {
+                            track_path = track_path.substr(path_start);
                         }
-                        std::cout << "  DEBUG: Audio track, sample_rate=" << sample_rate
-                                  << ", frame_rate=" << frame_rate << std::endl;
-                    } else {
-                        frame_rate = 25; // Fallback
-                        std::cout << "  DEBUG: Unknown media_type='" << track.stream_info->media_type
-                                  << "', frame_rate=" << frame_rate << std::endl;
                     }
 
-                    // Create unique worker key for multi-track: session_id + track index
-                    std::string worker_key = session_id + "_track" + std::to_string(track.track_index);
-
-                    // Use SessionManager to start MKV worker with custom session ID for multi-track
-                    if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::MKV, frame_rate,
-                                                                   2000000, media.track_number, track.track_index,
-                                                                   worker_key)) {
-                        std::cout << "  Started MKV worker for track " << track.track_index << " (file track "
-                                  << media.track_number << ", " << track.stream_info->codec << ", rate=" << frame_rate
-                                  << ")" << std::endl;
-                    } else {
-                        std::cout << "  Failed to start MKV worker for track " << track.track_index << std::endl;
+                    // Remove /trackX suffix to get base path
+                    size_t track_pos = track_path.rfind("/track");
+                    if (track_pos != std::string::npos) {
+                        track_path = track_path.substr(0, track_pos);
                     }
-                } else {
-                    std::cout << "  Unsupported codec for multi-track: " << media.codec << std::endl;
+
+                    // Find media file
+                    auto it = g_media_files.find(track_path);
+                    if (it == g_media_files.end()) {
+                        // Try using stream_path directly
+                        std::string stream_path = track.stream_info->stream_path;
+                        it = g_media_files.find(stream_path);
+                    }
+
+                    if (it != g_media_files.end()) {
+                        const MediaFile &media = it->second;
+                        if (media.codec != Codec::MKV) {
+                            all_mkv = false;
+                            if (first_track_path.empty()) {
+                                // Use stream_path for single-track files
+                                first_track_path = track.stream_info->stream_path;
+                            }
+                            break;
+                        }
+                    }
                 }
             }
 
-            std::cout << "Multi-track workers started for session: " << session_id << std::endl;
-            return;
+            // If not all tracks are MKV, fall back to single-track processing
+            // Single-track files (H264, H265, etc.) should ignore track number
+            // NOTE: This is defensive programming. After SDP fix, single-track streams
+            // should not have media-level "a=control:track0", so clients won't send
+            // "/track0" in SETUP. This code handles edge cases where clients might
+            // still send "/track0" (e.g., old clients, incorrect implementations).
+            if (!all_mkv) {
+                debug << "Non-MKV multi-track detected, falling back to single-track processing" << std::endl;
+                std::cout << "Non-MKV codec detected in multi-track session, treating as single-track" << std::endl;
+
+                // Get the first track index for PushFrame (should be 0 for single-track files)
+                // This is only needed if client incorrectly sent "/track0" in SETUP
+                int track_index = -1;
+                if (!tracks.empty() && tracks[0].stream_info) {
+                    track_index = tracks[0].track_index;
+                    std::cout << "Using track index " << track_index << " for single-track worker (defensive fallback)"
+                              << std::endl;
+                }
+
+                // Fall through to single-track processing below
+                // Reset is_multi flag to enter single-track branch
+                is_multi = false;
+            } else {
+                // True multi-track MKV session - process all tracks
+                for (const auto &track : tracks) {
+                    std::cout << "  Track " << track.track_index << ": " << track.uri << std::endl;
+
+                    if (!track.stream_info) {
+                        std::cout << "  Warning: No stream info for track " << track.track_index << std::endl;
+                        continue;
+                    }
+
+                    // Extract path from URI (e.g., rtsp://host/path -> /path)
+                    std::string track_path = track.uri;
+                    size_t path_start = track_path.find("://");
+                    if (path_start != std::string::npos) {
+                        path_start = track_path.find('/', path_start + 3);
+                        if (path_start != std::string::npos) {
+                            track_path = track_path.substr(path_start);
+                        }
+                    }
+
+                    // Map track0 -> track1, track1 -> track2 (RTSP vs MKV track numbering)
+                    // In RTSP SDP, tracks are numbered from 0
+                    // But in g_media_files, they use MKV internal track numbers (usually starting from 1)
+                    size_t track_pos = track_path.rfind("/track");
+                    if (track_pos != std::string::npos) {
+                        std::string base_path = track_path.substr(0, track_pos);
+                        int rtsp_track_idx = track.track_index;
+
+                        // Find the MKV track number from stream_info
+                        std::string mkv_track_path = track.stream_info->stream_path;
+                        std::cout << "  MKV stream path: " << mkv_track_path << std::endl;
+                        track_path = mkv_track_path;
+                    }
+
+                    // Find the media file for this track
+                    std::lock_guard<std::mutex> lock(g_media_mutex);
+                    auto it = g_media_files.find(track_path);
+                    if (it == g_media_files.end()) {
+                        std::cout << "  Warning: Media file not found for track path: " << track_path << std::endl;
+                        continue;
+                    }
+
+                    const MediaFile &media = it->second;
+
+                    // Start worker for this track (only MKV at this point)
+                    if (media.codec == Codec::MKV) {
+                        uint32_t frame_rate;
+
+                        // Calculate correct frame rate based on media type
+                        if (track.stream_info->media_type == MediaKind::VIDEO) {
+                            // Video: use configured frame rate
+                            frame_rate = track.stream_info->frame_rate > 0 ? track.stream_info->frame_rate : 25;
+                            std::cout << "  DEBUG: Video track, frame_rate=" << frame_rate << std::endl;
+                        } else if (track.stream_info->media_type == MediaKind::AUDIO) {
+                            // Audio: calculate frame rate from sample rate
+                            // AAC frame size is typically 1024 samples
+                            // Frame rate = sample_rate / samples_per_frame
+                            uint32_t sample_rate = track.stream_info->sample_rate;
+                            uint32_t samples_per_frame = 1024; // AAC-LC standard
+                            if (sample_rate > 0) {
+                                frame_rate = (sample_rate * 1000) / samples_per_frame; // *1000 for better precision
+                            } else {
+                                frame_rate = 46875; // Default: 48000Hz / 1024 * 1000 = 46.875 fps * 1000
+                            }
+                            std::cout << "  DEBUG: Audio track, sample_rate=" << sample_rate
+                                      << ", frame_rate=" << frame_rate << std::endl;
+                        } else {
+                            frame_rate = 25; // Fallback
+                            std::cout << "  DEBUG: Unknown media_type='" << track.stream_info->media_type
+                                      << "', frame_rate=" << frame_rate << std::endl;
+                        }
+
+                        // Create unique worker key for multi-track: session_id + track index
+                        std::string worker_key = session_id + "_track" + std::to_string(track.track_index);
+
+                        // Use SessionManager to start MKV worker with custom session ID for multi-track
+                        if (SessionManager::GetInstance().StartSession(session, media.file_path, Codec::MKV, frame_rate,
+                                                                       2000000, media.track_number, track.track_index,
+                                                                       worker_key)) {
+                            std::cout << "  Started MKV worker for track " << track.track_index << " (file track "
+                                      << media.track_number << ", " << track.stream_info->codec
+                                      << ", rate=" << frame_rate << ")" << std::endl;
+                        } else {
+                            std::cout << "  Failed to start MKV worker for track " << track.track_index << std::endl;
+                        }
+                    } else {
+                        std::cout << "  Unsupported codec for multi-track: " << media.codec << std::endl;
+                    }
+                }
+
+                std::cout << "Multi-track workers started for session: " << session_id << std::endl;
+                return;
+            }
         }
 
         // Single-track session (legacy mode)
@@ -226,8 +302,26 @@ public:
         if (media.codec == Codec::H264) {
             uint32_t frame_rate = stream_info->frame_rate > 0 ? stream_info->frame_rate : 25;
 
+            // Defensive programming: Check if session is actually multi-track
+            // (This should not happen after SDP fix, but handles edge cases where
+            // clients might still send "/track0" in SETUP even though SDP doesn't
+            // contain "a=control:track0")
+            // If so, get the track_index for PushFrame (multi-track mode requires
+            // PushFrame(frame, track_index) instead of PushFrame(frame))
+            int track_index = -1;
+            if (session->IsMultiTrack()) {
+                auto tracks = session->GetTracks();
+                if (!tracks.empty()) {
+                    track_index = tracks[0].track_index;
+                    std::cout << "Single-track H264 in multi-track session, using track_index: " << track_index
+                              << " (defensive fallback)" << std::endl;
+                }
+            }
+
             // Start H264 worker thread for this session
-            if (!SessionManager::GetInstance().StartSession(session, media.file_path, frame_rate)) {
+            // Pass track_index to StartSession (will be used if >= 0, otherwise -1 for single-track)
+            if (!SessionManager::GetInstance().StartSession(session, media.file_path, Codec::H264, frame_rate, 2000000,
+                                                            0, track_index)) {
                 std::cout << "Failed to start H264 worker thread for session: " << session_id << std::endl;
             }
         } else if (media.codec == Codec::MP2T) {
@@ -862,10 +956,11 @@ bool ScanMediaDirectory(const std::string &directory)
 void PrintUsage(const char *programName)
 {
     std::cout << "\nRTSP VOD Server - Video On Demand Service\n" << std::endl;
-    std::cout << "Usage: " << programName << " [options] <media_directory>\n" << std::endl;
+    std::cout << "Usage: " << programName << " [options] [media_directory]\n" << std::endl;
 
     std::cout << "Parameters:" << std::endl;
     std::cout << "  media_directory  Directory containing media files (.h264, .h265, .aac, .ts, .mkv)" << std::endl;
+    std::cout << "                   (default: current directory)" << std::endl;
     std::cout << "" << std::endl;
 
     std::cout << "Options:" << std::endl;
@@ -875,6 +970,7 @@ void PrintUsage(const char *programName)
     std::cout << "" << std::endl;
 
     std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << "                    # Use current directory" << std::endl;
     std::cout << "  " << programName << " D:\\videos" << std::endl;
     std::cout << "  " << programName << " -ip 127.0.0.1 -port 8554 /home/user/videos" << std::endl;
     std::cout << "" << std::endl;
@@ -901,18 +997,13 @@ int main(int argc, char *argv[])
     std::string ip = "0.0.0.0";
     uint16_t port = 8554;
 
-    // Parse arguments
-    if (argc < 2) {
-        std::cerr << "Error: Missing media directory\n" << std::endl;
-        PrintUsage(argv[0]);
-        return 1;
-    }
-
     // Check for help
-    std::string firstArg = argv[1];
-    if (firstArg == "-h" || firstArg == "--help") {
-        PrintUsage(argv[0]);
-        return 0;
+    if (argc >= 2) {
+        std::string firstArg = argv[1];
+        if (firstArg == "-h" || firstArg == "--help") {
+            PrintUsage(argv[0]);
+            return 0;
+        }
     }
 
     // Parse options
@@ -942,10 +1033,14 @@ int main(int argc, char *argv[])
         argIndex++;
     }
 
+    // If media directory not specified, use current directory
     if (g_media_directory.empty()) {
-        std::cerr << "Error: Media directory not specified\n" << std::endl;
-        PrintUsage(argv[0]);
-        return 1;
+        try {
+            g_media_directory = std::filesystem::current_path().string();
+        } catch (const std::filesystem::filesystem_error &e) {
+            std::cerr << "Error: Failed to get current directory: " << e.what() << std::endl;
+            return 1;
+        }
     }
 
     // Register signal handler

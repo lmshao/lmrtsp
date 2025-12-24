@@ -62,7 +62,9 @@ bool SessionManager::StartSession(std::shared_ptr<RtspServerSession> session, co
 
     // Create appropriate worker based on codec type
     if (codec == Codec::H264) {
-        auto h264_worker = std::make_shared<SessionH264WorkerThread>(session, file_path, frame_rate);
+        // Use rtsp_track_index for H264 if >= 0 (multi-track mode), otherwise -1 (single-track)
+        int track_index = (rtsp_track_index >= 0) ? rtsp_track_index : -1;
+        auto h264_worker = std::make_shared<SessionH264WorkerThread>(session, file_path, frame_rate, track_index);
         if (!h264_worker->Start()) {
             std::cout << "Failed to start H264 worker thread for session: " << session_id << std::endl;
             return false;

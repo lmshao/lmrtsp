@@ -17,6 +17,8 @@ using namespace lmshao::lmcore;
 namespace lmshao::lmrtsp {
 
 // Helper function to generate SDP for a single track
+// @param track_info Track information
+// @param track_index Track index (0, 1, 2...) for multi-track, -1 for single-track
 static std::string GenerateTrackSDP(const std::shared_ptr<MediaStreamInfo> &track_info, int track_index)
 {
     std::string sdp;
@@ -60,8 +62,13 @@ static std::string GenerateTrackSDP(const std::shared_ptr<MediaStreamInfo> &trac
             sdp += "a=framerate:" + std::to_string(track_info->frame_rate) + "\r\n";
         }
 
-        // Media-level control attribute - use relative path
-        sdp += "a=control:track" + std::to_string(track_index) + "\r\n";
+        // Media-level control attribute
+        // For single-track streams (track_index < 0), omit media-level control
+        // Client will use session-level "a=control:*"
+        // For multi-track streams, use "a=control:track{index}"
+        if (track_index >= 0) {
+            sdp += "a=control:track" + std::to_string(track_index) + "\r\n";
+        }
 
     } else if (track_info->media_type == MediaKind::AUDIO) {
         sdp += "m=audio 0 RTP/AVP " + std::to_string(track_info->payload_type) + "\r\n";
@@ -124,8 +131,13 @@ static std::string GenerateTrackSDP(const std::shared_ptr<MediaStreamInfo> &trac
                 std::string(config_hex) + "\r\n";
         }
 
-        // Media-level control attribute - use relative path
-        sdp += "a=control:track" + std::to_string(track_index) + "\r\n";
+        // Media-level control attribute
+        // For single-track streams (track_index < 0), omit media-level control
+        // Client will use session-level "a=control:*"
+        // For multi-track streams, use "a=control:track{index}"
+        if (track_index >= 0) {
+            sdp += "a=control:track" + std::to_string(track_index) + "\r\n";
+        }
     }
 
     return sdp;
@@ -176,8 +188,9 @@ std::string RtspServer::GenerateSDP(const std::string &stream_path, const std::s
         }
     } else {
         // Single track stream (legacy behavior)
+        // Use track_index = -1 to indicate single-track (no media-level control)
         LMRTSP_LOGD("Generating single-track SDP");
-        sdp += GenerateTrackSDP(stream_info, 0);
+        sdp += GenerateTrackSDP(stream_info, -1);
     }
 
     return sdp;

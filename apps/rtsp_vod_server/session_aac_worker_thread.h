@@ -53,6 +53,14 @@ protected:
 private:
     uint32_t sample_rate_;
     std::unique_ptr<SessionAacReader> reader_;
+
+    // RTP timestamp increment per frame (90kHz clock)
+    // For AAC-LC: samples_per_frame = 1024
+    // Calculated as: (90000 * samples_per_frame) / sample_rate
+    uint32_t rtp_timestamp_increment_;
+
+    // Frame counter for RTP timestamp calculation
+    std::atomic<uint64_t> frame_counter_;
 };
 
 #endif // SESSION_AAC_WORKER_THREAD_H
