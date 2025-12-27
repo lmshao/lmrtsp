@@ -6,8 +6,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef LMSHAO_LMRTSP_RTSP_CLIENT_STATE_H
-#define LMSHAO_LMRTSP_RTSP_CLIENT_STATE_H
+#ifndef LMSHAO_LMRTSP_RTSP_CLIENT_SESSION_STATE_H
+#define LMSHAO_LMRTSP_RTSP_CLIENT_SESSION_STATE_H
 
 #include <lmcore/singleton.h>
 
@@ -26,13 +26,10 @@ enum class ClientStateAction {
     SUCCESS   // Handshake completed successfully
 };
 
-// Forward declaration
-class RtspClient;
-
 // Client session state machine base class - State pattern
-class RtspClientStateMachine {
+class RtspClientSessionState {
 public:
-    virtual ~RtspClientStateMachine() = default;
+    virtual ~RtspClientSessionState() = default;
 
     // RTSP response handling - returns action to take next
     virtual ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
@@ -53,9 +50,9 @@ public:
 };
 
 // Initial state - waiting for OPTIONS or DESCRIBE
-class ClientInitState : public RtspClientStateMachine, public lmcore::ManagedSingleton<ClientInitState> {
+class ClientInitialState : public RtspClientSessionState, public lmcore::Singleton<ClientInitialState> {
 public:
-    friend class lmcore::ManagedSingleton<ClientInitState>;
+    friend class lmcore::Singleton<ClientInitialState>;
 
     ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
                                         const RtspResponse &response) override;
@@ -70,16 +67,16 @@ public:
     ClientStateAction OnTeardownResponse(RtspClientSession *session, RtspClient *client,
                                          const RtspResponse &response) override;
 
-    std::string GetName() const override { return "Init"; }
+    std::string GetName() const override { return "Initial"; }
 
 protected:
-    ClientInitState() = default;
+    ClientInitialState() = default;
 };
 
 // Options sent state - waiting for OPTIONS response, then send DESCRIBE
-class ClientOptionsSentState : public RtspClientStateMachine, public lmcore::ManagedSingleton<ClientOptionsSentState> {
+class ClientOptionsSentState : public RtspClientSessionState, public lmcore::Singleton<ClientOptionsSentState> {
 public:
-    friend class lmcore::ManagedSingleton<ClientOptionsSentState>;
+    friend class lmcore::Singleton<ClientOptionsSentState>;
 
     ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
                                         const RtspResponse &response) override;
@@ -101,10 +98,9 @@ protected:
 };
 
 // Describe sent state - waiting for DESCRIBE response, then send SETUP
-class ClientDescribeSentState : public RtspClientStateMachine,
-                                public lmcore::ManagedSingleton<ClientDescribeSentState> {
+class ClientDescribeSentState : public RtspClientSessionState, public lmcore::Singleton<ClientDescribeSentState> {
 public:
-    friend class lmcore::ManagedSingleton<ClientDescribeSentState>;
+    friend class lmcore::Singleton<ClientDescribeSentState>;
 
     ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
                                         const RtspResponse &response) override;
@@ -126,9 +122,9 @@ protected:
 };
 
 // Setup sent state - waiting for SETUP response, then send PLAY
-class ClientSetupSentState : public RtspClientStateMachine, public lmcore::ManagedSingleton<ClientSetupSentState> {
+class ClientSetupSentState : public RtspClientSessionState, public lmcore::Singleton<ClientSetupSentState> {
 public:
-    friend class lmcore::ManagedSingleton<ClientSetupSentState>;
+    friend class lmcore::Singleton<ClientSetupSentState>;
 
     ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
                                         const RtspResponse &response) override;
@@ -150,9 +146,9 @@ protected:
 };
 
 // Play sent state - waiting for PLAY response
-class ClientPlaySentState : public RtspClientStateMachine, public lmcore::ManagedSingleton<ClientPlaySentState> {
+class ClientPlaySentState : public RtspClientSessionState, public lmcore::Singleton<ClientPlaySentState> {
 public:
-    friend class lmcore::ManagedSingleton<ClientPlaySentState>;
+    friend class lmcore::Singleton<ClientPlaySentState>;
 
     ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
                                         const RtspResponse &response) override;
@@ -174,9 +170,9 @@ protected:
 };
 
 // Playing state - media is playing
-class ClientPlayingState : public RtspClientStateMachine, public lmcore::ManagedSingleton<ClientPlayingState> {
+class ClientPlayingState : public RtspClientSessionState, public lmcore::Singleton<ClientPlayingState> {
 public:
-    friend class lmcore::ManagedSingleton<ClientPlayingState>;
+    friend class lmcore::Singleton<ClientPlayingState>;
 
     ClientStateAction OnOptionsResponse(RtspClientSession *session, RtspClient *client,
                                         const RtspResponse &response) override;
@@ -199,4 +195,4 @@ protected:
 
 } // namespace lmshao::lmrtsp
 
-#endif // LMSHAO_LMRTSP_RTSP_CLIENT_STATE_H
+#endif // LMSHAO_LMRTSP_RTSP_CLIENT_SESSION_STATE_H

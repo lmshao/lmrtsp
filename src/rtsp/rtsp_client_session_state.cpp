@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "rtsp_client_state.h"
+#include "rtsp_client_session_state.h"
 
 #include "internal_logger.h"
 #include "lmrtsp/rtsp_client.h"
@@ -15,13 +15,13 @@
 
 namespace lmshao::lmrtsp {
 
-// ClientInitState implementation
-ClientStateAction ClientInitState::OnOptionsResponse(RtspClientSession *session, RtspClient *client,
-                                                     const RtspResponse &response)
+// ClientInitialState implementation
+ClientStateAction ClientInitialState::OnOptionsResponse(RtspClientSession *session, RtspClient *client,
+                                                        const RtspResponse &response)
 {
-    LMRTSP_LOGD("ClientInitState: Received OPTIONS response");
+    LMRTSP_LOGD("ClientInitialState: Received OPTIONS response");
     // Transition to OptionsSent state
-    session->ChangeState(ClientOptionsSentState::GetInstance());
+    session->ChangeState(&ClientOptionsSentState::GetInstance());
 
     if (response.status_ == StatusCode::OK) {
         // OPTIONS succeeded, send DESCRIBE next
@@ -33,7 +33,7 @@ ClientStateAction ClientInitState::OnOptionsResponse(RtspClientSession *session,
             LMRTSP_LOGD("client->SendDescribeRequest() returned: %s", describe_result ? "true" : "false");
             if (describe_result) {
                 // Transition to DescribeSent state after sending DESCRIBE
-                session->ChangeState(ClientDescribeSentState::GetInstance());
+                session->ChangeState(&ClientDescribeSentState::GetInstance());
                 return ClientStateAction::CONTINUE;
             }
         } else {
@@ -47,45 +47,45 @@ ClientStateAction ClientInitState::OnOptionsResponse(RtspClientSession *session,
         std::string url = session->GetUrl();
         if (client->SendDescribeRequest(url)) {
             // Transition to DescribeSent state after sending DESCRIBE
-            session->ChangeState(ClientDescribeSentState::GetInstance());
+            session->ChangeState(&ClientDescribeSentState::GetInstance());
             return ClientStateAction::CONTINUE;
         }
     }
     return ClientStateAction::FAIL;
 }
 
-ClientStateAction ClientInitState::OnDescribeResponse(RtspClientSession *session, RtspClient *client,
+ClientStateAction ClientInitialState::OnDescribeResponse(RtspClientSession *session, RtspClient *client,
+                                                         const RtspResponse &response)
+{
+    LMRTSP_LOGD("ClientInitialState: Received DESCRIBE response (unexpected in Initial state)");
+    return ClientStateAction::FAIL;
+}
+
+ClientStateAction ClientInitialState::OnSetupResponse(RtspClientSession *session, RtspClient *client,
                                                       const RtspResponse &response)
 {
-    LMRTSP_LOGD("ClientInitState: Received DESCRIBE response (unexpected in Init state)");
+    LMRTSP_LOGD("ClientInitialState: Received SETUP response (unexpected in Initial state)");
     return ClientStateAction::FAIL;
 }
 
-ClientStateAction ClientInitState::OnSetupResponse(RtspClientSession *session, RtspClient *client,
-                                                   const RtspResponse &response)
+ClientStateAction ClientInitialState::OnPlayResponse(RtspClientSession *session, RtspClient *client,
+                                                     const RtspResponse &response)
 {
-    LMRTSP_LOGD("ClientInitState: Received SETUP response (unexpected in Init state)");
+    LMRTSP_LOGD("ClientInitialState: Received PLAY response (unexpected in Initial state)");
     return ClientStateAction::FAIL;
 }
 
-ClientStateAction ClientInitState::OnPlayResponse(RtspClientSession *session, RtspClient *client,
-                                                  const RtspResponse &response)
-{
-    LMRTSP_LOGD("ClientInitState: Received PLAY response (unexpected in Init state)");
-    return ClientStateAction::FAIL;
-}
-
-ClientStateAction ClientInitState::OnPauseResponse(RtspClientSession *session, RtspClient *client,
-                                                   const RtspResponse &response)
-{
-    LMRTSP_LOGD("ClientInitState: Received PAUSE response (unexpected in Init state)");
-    return ClientStateAction::FAIL;
-}
-
-ClientStateAction ClientInitState::OnTeardownResponse(RtspClientSession *session, RtspClient *client,
+ClientStateAction ClientInitialState::OnPauseResponse(RtspClientSession *session, RtspClient *client,
                                                       const RtspResponse &response)
 {
-    LMRTSP_LOGD("ClientInitState: Received TEARDOWN response");
+    LMRTSP_LOGD("ClientInitialState: Received PAUSE response (unexpected in Initial state)");
+    return ClientStateAction::FAIL;
+}
+
+ClientStateAction ClientInitialState::OnTeardownResponse(RtspClientSession *session, RtspClient *client,
+                                                         const RtspResponse &response)
+{
+    LMRTSP_LOGD("ClientInitialState: Received TEARDOWN response");
     return ClientStateAction::SUCCESS;
 }
 
@@ -101,7 +101,7 @@ ClientStateAction ClientOptionsSentState::OnOptionsResponse(RtspClientSession *s
             std::string url = session->GetUrl();
             if (client->SendDescribeRequest(url)) {
                 // Transition to DescribeSent state after sending DESCRIBE
-                session->ChangeState(ClientDescribeSentState::GetInstance());
+                session->ChangeState(&ClientDescribeSentState::GetInstance());
                 return ClientStateAction::CONTINUE;
             }
         }
@@ -112,7 +112,7 @@ ClientStateAction ClientOptionsSentState::OnOptionsResponse(RtspClientSession *s
         std::string url = session->GetUrl();
         if (client->SendDescribeRequest(url)) {
             // Transition to DescribeSent state after sending DESCRIBE
-            session->ChangeState(ClientDescribeSentState::GetInstance());
+            session->ChangeState(&ClientDescribeSentState::GetInstance());
             return ClientStateAction::CONTINUE;
         }
     }
@@ -200,7 +200,7 @@ ClientStateAction ClientDescribeSentState::OnDescribeResponse(RtspClientSession 
 
             if (client->SendSetupRequest(setup_url, transport)) {
                 // Transition to SetupSent state after sending SETUP
-                session->ChangeState(ClientSetupSentState::GetInstance());
+                session->ChangeState(&ClientSetupSentState::GetInstance());
                 return ClientStateAction::CONTINUE;
             }
         }
@@ -268,7 +268,7 @@ ClientStateAction ClientSetupSentState::OnSetupResponse(RtspClientSession *sessi
 
             std::string session_id = session->GetSessionId();
             if (client->SendPlayRequest(url, session_id)) {
-                session->ChangeState(ClientPlaySentState::GetInstance());
+                session->ChangeState(&ClientPlaySentState::GetInstance());
                 return ClientStateAction::CONTINUE;
             }
         }
@@ -326,8 +326,8 @@ ClientStateAction ClientPlaySentState::OnPlayResponse(RtspClientSession *session
     LMRTSP_LOGD("ClientPlaySentState: Received PLAY response");
     if (response.status_ == StatusCode::OK) {
         // PLAY succeeded, transition to Playing state
-        session->ChangeState(ClientPlayingState::GetInstance());
-        session->SetState(RtspClientSessionState::PLAYING);
+        session->ChangeState(&ClientPlayingState::GetInstance());
+        session->SetState(ClientSessionStateEnum::PLAYING);
         // Handshake completed
         return ClientStateAction::SUCCESS;
     }

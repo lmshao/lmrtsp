@@ -19,7 +19,7 @@
 #include "internal_logger.h"
 #include "lmrtsp/media_stream_info.h"
 #include "lmrtsp/rtsp_client.h"
-#include "rtsp_client_state.h"
+#include "rtsp_client_session_state.h"
 
 namespace lmshao::lmrtsp {
 
@@ -38,7 +38,7 @@ RtspClientSession::RtspClientSession(const std::string &url, std::weak_ptr<RtspC
     AllocateClientPorts();
 
     // Initialize state machine to Init state
-    currentState_ = ClientInitState::GetInstance();
+    currentState_ = &ClientInitialState::GetInstance();
 }
 
 RtspClientSession::~RtspClientSession()
@@ -76,7 +76,7 @@ void RtspClientSession::Cleanup()
         LMRTSP_LOGI("Cleaning up RTSP client session: %s", sessionId_.c_str());
 
         StopRtpSession();
-        SetState(RtspClientSessionState::TEARDOWN);
+        SetState(ClientSessionStateEnum::TEARDOWN);
     } catch (const std::exception &e) {
         LMRTSP_LOGE("Exception during cleanup: %s", e.what());
     }
@@ -94,7 +94,7 @@ bool RtspClientSession::HandleDescribeResponse(const std::string &sdp)
             return false;
         }
 
-        SetState(RtspClientSessionState::READY);
+        SetState(ClientSessionStateEnum::READY);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -155,7 +155,7 @@ bool RtspClientSession::HandleSetupResponse(const std::string &session_id, const
             return false;
         }
 
-        SetState(RtspClientSessionState::READY);
+        SetState(ClientSessionStateEnum::READY);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -182,7 +182,7 @@ bool RtspClientSession::HandlePlayResponse(const std::string &rtp_info)
             return false;
         }
 
-        SetState(RtspClientSessionState::PLAYING);
+        SetState(ClientSessionStateEnum::PLAYING);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -206,7 +206,7 @@ bool RtspClientSession::HandlePauseResponse()
         LMRTSP_LOGD("Handling PAUSE response for session: %s", sessionId_.c_str());
 
         StopRtpSession();
-        SetState(RtspClientSessionState::PAUSED);
+        SetState(ClientSessionStateEnum::PAUSED);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -230,7 +230,7 @@ bool RtspClientSession::HandleTeardownResponse()
         LMRTSP_LOGD("Handling TEARDOWN response for session: %s", sessionId_.c_str());
 
         StopRtpSession();
-        SetState(RtspClientSessionState::TEARDOWN);
+        SetState(ClientSessionStateEnum::TEARDOWN);
 
         // Notify callback
         if (auto client = client_.lock()) {
@@ -248,10 +248,10 @@ bool RtspClientSession::HandleTeardownResponse()
     }
 }
 
-void RtspClientSession::SetState(RtspClientSessionState new_state)
+void RtspClientSession::SetState(ClientSessionStateEnum new_state)
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
-    RtspClientSessionState old_state = state_.load();
+    ClientSessionStateEnum old_state = state_.load();
     state_.store(new_state);
 
     LMRTSP_LOGD("Session %s state changed: %s -> %s", sessionId_.c_str(), GetStateString(old_state).c_str(),
@@ -266,7 +266,7 @@ void RtspClientSession::SetState(RtspClientSessionState new_state)
     }
 }
 
-RtspClientSessionState RtspClientSession::GetState() const
+ClientSessionStateEnum RtspClientSession::GetState() const
 {
     return state_.load();
 }
@@ -276,18 +276,18 @@ std::string RtspClientSession::GetStateString() const
     return GetStateString(state_.load());
 }
 
-std::string RtspClientSession::GetStateString(RtspClientSessionState state)
+std::string RtspClientSession::GetStateString(ClientSessionStateEnum state)
 {
     switch (state) {
-        case RtspClientSessionState::INIT:
+        case ClientSessionStateEnum::INIT:
             return "INIT";
-        case RtspClientSessionState::READY:
+        case ClientSessionStateEnum::READY:
             return "READY";
-        case RtspClientSessionState::PLAYING:
+        case ClientSessionStateEnum::PLAYING:
             return "PLAYING";
-        case RtspClientSessionState::PAUSED:
+        case ClientSessionStateEnum::PAUSED:
             return "PAUSED";
-        case RtspClientSessionState::TEARDOWN:
+        case ClientSessionStateEnum::TEARDOWN:
             return "TEARDOWN";
         default:
             return "UNKNOWN";
@@ -627,7 +627,7 @@ std::string RtspClientSession::GenerateTransportHeader()
     return transport.str();
 }
 
-void RtspClientSession::ChangeState(std::shared_ptr<RtspClientStateMachine> new_state)
+void RtspClientSession::ChangeState(RtspClientSessionState *new_state)
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     if (currentState_) {
@@ -637,7 +637,7 @@ void RtspClientSession::ChangeState(std::shared_ptr<RtspClientStateMachine> new_
     currentState_ = new_state;
 }
 
-std::shared_ptr<RtspClientStateMachine> RtspClientSession::GetCurrentState() const
+RtspClientSessionState *RtspClientSession::GetCurrentState() const
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     return currentState_;

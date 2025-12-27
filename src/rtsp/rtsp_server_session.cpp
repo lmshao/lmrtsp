@@ -17,7 +17,7 @@
 #include "lmrtsp/rtsp_media_stream_manager.h"
 #include "lmrtsp/rtsp_server.h"
 #include "rtsp_response.h"
-#include "rtsp_session_state.h"
+#include "rtsp_server_session_state.h"
 
 namespace lmshao::lmrtsp {
 
@@ -33,7 +33,7 @@ RtspServerSession::RtspServerSession(std::shared_ptr<lmnet::Session> lmnetSessio
     lastActiveTime_ = lmcore::TimeUtils::GetCurrentTimeMs();
 
     // Initialize state machine to Initial state
-    currentState_ = InitialState::GetInstance();
+    currentState_ = &ServerInitialState::GetInstance();
 
     LMRTSP_LOGD("RtspServerSession created with ID: %s", sessionId_.c_str());
 }
@@ -49,7 +49,7 @@ RtspServerSession::RtspServerSession(std::shared_ptr<lmnet::Session> lmnetSessio
     lastActiveTime_ = lmcore::TimeUtils::GetCurrentTimeMs();
 
     // Initialize state machine to Initial state
-    currentState_ = InitialState::GetInstance();
+    currentState_ = &ServerInitialState::GetInstance();
 
     LMRTSP_LOGD("RtspServerSession created with ID: %s and server reference", sessionId_.c_str());
 }
@@ -70,36 +70,36 @@ RtspResponse RtspServerSession::ProcessRequest(const RtspRequest &request)
     // Use state machine to process request
     if (!currentState_) {
         // Fallback: initialize to Initial state if not set
-        currentState_ = InitialState::GetInstance();
+        currentState_ = &ServerInitialState::GetInstance();
     }
 
     const std::string &method = request.method_;
 
     // Delegate to state machine based on method
     if (method == "OPTIONS") {
-        return currentState_->OnOptions(this, request);
+        return currentState_->OnOptionsRequest(this, request);
     } else if (method == "DESCRIBE") {
-        return currentState_->OnDescribe(this, request);
+        return currentState_->OnDescribeRequest(this, request);
     } else if (method == "ANNOUNCE") {
-        return currentState_->OnAnnounce(this, request);
+        return currentState_->OnAnnounceRequest(this, request);
     } else if (method == "RECORD") {
-        return currentState_->OnRecord(this, request);
+        return currentState_->OnRecordRequest(this, request);
     } else if (method == "SETUP") {
-        return currentState_->OnSetup(this, request);
+        return currentState_->OnSetupRequest(this, request);
     } else if (method == "PLAY") {
-        return currentState_->OnPlay(this, request);
+        return currentState_->OnPlayRequest(this, request);
     } else if (method == "PAUSE") {
-        return currentState_->OnPause(this, request);
+        return currentState_->OnPauseRequest(this, request);
     } else if (method == "TEARDOWN") {
-        return currentState_->OnTeardown(this, request);
+        return currentState_->OnTeardownRequest(this, request);
     } else if (method == "GET_PARAMETER") {
-        return currentState_->OnGetParameter(this, request);
+        return currentState_->OnGetParameterRequest(this, request);
     } else if (method == "SET_PARAMETER") {
-        return currentState_->OnSetParameter(this, request);
+        return currentState_->OnSetParameterRequest(this, request);
     } else {
         // Unknown method
         int cseq = 0;
-        auto cseq_it = request.general_header_.find("CSeq");
+        auto cseq_it = request.general_header_.find(CSEQ);
         if (cseq_it != request.general_header_.end()) {
             cseq = std::stoi(cseq_it->second);
         }
@@ -107,12 +107,12 @@ RtspResponse RtspServerSession::ProcessRequest(const RtspRequest &request)
     }
 }
 
-void RtspServerSession::ChangeState(std::shared_ptr<RtspServerSessionState> newState)
+void RtspServerSession::ChangeState(RtspServerSessionState *newState)
 {
     currentState_ = newState;
 }
 
-std::shared_ptr<RtspServerSessionState> RtspServerSession::GetCurrentState() const
+RtspServerSessionState *RtspServerSession::GetCurrentState() const
 {
     return currentState_;
 }
@@ -266,8 +266,8 @@ bool RtspServerSession::SetupMedia(const std::string &uri, const std::string &tr
         LMRTSP_LOGD("Single-track setup completed, Transport: %s", transportInfo_.c_str());
     }
 
-    // Set setup flag
-    isSetup_ = true;
+    // Set state to READY
+    SetState(ServerSessionStateEnum::READY);
 
     LMRTSP_LOGD("Media setup completed for session: %s", sessionId_.c_str());
     return true;
@@ -277,7 +277,7 @@ bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &ran
 {
     LMRTSP_LOGD("Playing media for URI: %s, Range: %s", uri.c_str(), range.c_str());
 
-    if (!isSetup_) {
+    if (!IsSetup()) {
         LMRTSP_LOGE("Cannot play media: session not setup");
         return false;
     }
@@ -303,8 +303,7 @@ bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &ran
             }
 
             // Set playing state
-            isPlaying_ = true;
-            isPaused_ = false;
+            SetState(ServerSessionStateEnum::PLAYING);
 
             LMRTSP_LOGD("All tracks started for multi-track session: %s", sessionId_.c_str());
         }
@@ -333,8 +332,7 @@ bool RtspServerSession::PlayMedia(const std::string &uri, const std::string &ran
     }
 
     // Set playing state
-    isPlaying_ = true;
-    isPaused_ = false;
+    SetState(ServerSessionStateEnum::PLAYING);
 
     LMRTSP_LOGD("Media playback started for session: %s", sessionId_.c_str());
 
@@ -352,7 +350,7 @@ bool RtspServerSession::PauseMedia(const std::string &uri)
 {
     LMRTSP_LOGD("Pausing media for URI: %s", uri.c_str());
 
-    if (!isPlaying_) {
+    if (!IsPlaying()) {
         LMRTSP_LOGE("Cannot pause media: not currently playing");
         return false;
     }
@@ -370,8 +368,7 @@ bool RtspServerSession::PauseMedia(const std::string &uri)
     }
 
     // Set paused state
-    isPaused_ = true;
-    isPlaying_ = false;
+    SetState(ServerSessionStateEnum::PAUSED);
 
     LMRTSP_LOGD("Media playback paused for session: %s", sessionId_.c_str());
 
@@ -398,10 +395,8 @@ bool RtspServerSession::TeardownMedia(const std::string &uri)
         }
     }
 
-    // Reset all states
-    isPlaying_ = false;
-    isPaused_ = false;
-    isSetup_ = false;
+    // Reset state to INIT
+    SetState(ServerSessionStateEnum::INIT);
 
     LMRTSP_LOGD("Media teardown completed for session: %s", sessionId_.c_str());
 
@@ -450,17 +445,54 @@ const std::vector<std::shared_ptr<MediaStream>> &RtspServerSession::GetMediaStre
 
 bool RtspServerSession::IsPlaying() const
 {
-    return isPlaying_;
+    return state_ == ServerSessionStateEnum::PLAYING;
 }
 
 bool RtspServerSession::IsPaused() const
 {
-    return isPaused_;
+    return state_ == ServerSessionStateEnum::PAUSED;
 }
 
 bool RtspServerSession::IsSetup() const
 {
-    return isSetup_;
+    return state_ == ServerSessionStateEnum::READY || state_ == ServerSessionStateEnum::PLAYING ||
+           state_ == ServerSessionStateEnum::PAUSED || state_ == ServerSessionStateEnum::RECORDING;
+}
+
+void RtspServerSession::SetState(ServerSessionStateEnum new_state)
+{
+    auto old_state = state_.load();
+    state_ = new_state;
+    LMRTSP_LOGD("Session %s state changed: %s -> %s", sessionId_.c_str(), GetStateString(old_state).c_str(),
+                GetStateString(new_state).c_str());
+}
+
+ServerSessionStateEnum RtspServerSession::GetState() const
+{
+    return state_;
+}
+
+std::string RtspServerSession::GetStateString() const
+{
+    return GetStateString(state_);
+}
+
+std::string RtspServerSession::GetStateString(ServerSessionStateEnum state)
+{
+    switch (state) {
+        case ServerSessionStateEnum::INIT:
+            return "INIT";
+        case ServerSessionStateEnum::READY:
+            return "READY";
+        case ServerSessionStateEnum::PLAYING:
+            return "PLAYING";
+        case ServerSessionStateEnum::PAUSED:
+            return "PAUSED";
+        case ServerSessionStateEnum::RECORDING:
+            return "RECORDING";
+        default:
+            return "UNKNOWN";
+    }
 }
 
 void RtspServerSession::UpdateLastActiveTime()
@@ -561,7 +593,7 @@ bool RtspServerSession::PushFrame(const lmrtsp::MediaFrame &frame)
         return false;
     }
 
-    if (!isPlaying_) {
+    if (!IsPlaying()) {
         LMRTSP_LOGW("Cannot push frame: session not in playing state");
         return false;
     }
@@ -584,7 +616,7 @@ bool RtspServerSession::PushFrame(const lmrtsp::MediaFrame &frame, int track_ind
         return false;
     }
 
-    if (!isPlaying_) {
+    if (!IsPlaying()) {
         LMRTSP_LOGW("Cannot push frame: session not in playing state");
         return false;
     }

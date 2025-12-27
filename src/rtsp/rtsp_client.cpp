@@ -20,7 +20,7 @@
 #include "lmrtsp/rtsp_headers.h"
 #include "lmrtsp/rtsp_request.h"
 #include "lmrtsp/rtsp_response.h"
-#include "rtsp_client_state.h"
+#include "rtsp_client_session_state.h"
 
 namespace lmshao::lmrtsp {
 
@@ -663,7 +663,7 @@ void RtspClient::HandleResponse(const RtspResponse &response)
         } else {
             auto rtp_info_it = response.general_header_.find(RTP_INFO);
             std::string rtp_info = (rtp_info_it != response.general_header_.end()) ? rtp_info_it->second : "";
-            if (!rtp_info.empty() || session->GetState() == RtspClientSessionState::READY) {
+            if (!rtp_info.empty() || session->GetState() == ClientSessionStateEnum::READY) {
                 // PLAY response
                 LMRTSP_LOGI("Identified as PLAY response, RTP-Info: %s", rtp_info.c_str());
                 session->HandlePlayResponse(rtp_info);
@@ -740,7 +740,7 @@ bool RtspClient::PerformRTSPHandshake()
     handshake_failed_.store(false);
 
     // Initialize state machine to Init state
-    currentSession_->ChangeState(ClientInitState::GetInstance());
+    currentSession_->ChangeState(&ClientInitialState::GetInstance());
 
     // Step 0: Send OPTIONS request (state machine will handle the rest)
     LMRTSP_LOGD("Sending OPTIONS request to start handshake");

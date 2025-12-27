@@ -23,12 +23,12 @@ namespace lmshao::lmrtsp {
 
 class RtspClient;
 class RtpSinkSession;
-class RtspClientStateMachine;
+class RtspClientSessionState;
 
 /**
- * @brief RTSP Client Session state
+ * @brief RTSP Client Session state enum
  */
-enum class RtspClientSessionState {
+enum class ClientSessionStateEnum {
     INIT,    // Initial state
     READY,   // SETUP completed, ready to play
     PLAYING, // Playing media
@@ -59,14 +59,14 @@ public:
     bool HandleTeardownResponse();
 
     // State management
-    void SetState(RtspClientSessionState new_state);
-    RtspClientSessionState GetState() const;
+    void SetState(ClientSessionStateEnum new_state);
+    ClientSessionStateEnum GetState() const;
     std::string GetStateString() const;
-    static std::string GetStateString(RtspClientSessionState state);
+    static std::string GetStateString(ClientSessionStateEnum state);
 
     // State machine management
-    void ChangeState(std::shared_ptr<RtspClientStateMachine> new_state);
-    std::shared_ptr<RtspClientStateMachine> GetCurrentState() const;
+    void ChangeState(RtspClientSessionState *new_state);
+    RtspClientSessionState *GetCurrentState() const;
 
     // Session information
     std::string GetSessionId() const { return sessionId_; }
@@ -107,10 +107,10 @@ private:
     std::string url_;
     std::string sessionId_;
     std::weak_ptr<RtspClient> client_;
-    std::atomic<RtspClientSessionState> state_{RtspClientSessionState::INIT};
+    std::atomic<ClientSessionStateEnum> state_{ClientSessionStateEnum::INIT};
 
     // State machine
-    std::shared_ptr<RtspClientStateMachine> currentState_;
+    RtspClientSessionState *currentState_;
 
     // Media information
     std::string sdpDescription_;

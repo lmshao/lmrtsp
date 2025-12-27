@@ -33,6 +33,17 @@ class RtspServer;
 class RtspMediaStreamManager;
 struct MediaFrame;
 
+/**
+ * @brief RTSP Server Session state enum
+ */
+enum class ServerSessionStateEnum {
+    INIT,     // Initial state
+    READY,    // SETUP completed, ready to play or record
+    PLAYING,  // Playing media
+    PAUSED,   // Media paused
+    RECORDING // Recording media
+};
+
 class RtspServerSession : public std::enable_shared_from_this<RtspServerSession> {
 public:
     explicit RtspServerSession(std::shared_ptr<lmnet::Session> lmnetSession);
@@ -43,8 +54,13 @@ public:
     RtspResponse ProcessRequest(const RtspRequest &request);
 
     // State management
-    void ChangeState(std::shared_ptr<RtspServerSessionState> newState);
-    std::shared_ptr<RtspServerSessionState> GetCurrentState() const;
+    void ChangeState(RtspServerSessionState *newState);
+    RtspServerSessionState *GetCurrentState() const;
+
+    void SetState(ServerSessionStateEnum state);
+    ServerSessionStateEnum GetState() const;
+    std::string GetStateString() const;
+    static std::string GetStateString(ServerSessionStateEnum state);
 
     // Session information
     std::string GetSessionId() const;
@@ -106,7 +122,7 @@ private:
     static std::string GenerateSessionId();
 
     std::string sessionId_;
-    std::shared_ptr<RtspServerSessionState> currentState_;
+    RtspServerSessionState *currentState_;
     std::shared_ptr<lmnet::Session> lmnetSession_;
     std::weak_ptr<RtspServer> rtspServer_;
 
@@ -139,10 +155,8 @@ private:
     // std::shared_ptr<IRTPSender> rtpSender_;
     // RtpTransportParams rtpTransportParams_;
 
-    // State flags
-    std::atomic<bool> isPlaying_{false};
-    std::atomic<bool> isPaused_{false};
-    std::atomic<bool> isSetup_{false};
+    // Session state
+    std::atomic<ServerSessionStateEnum> state_{ServerSessionStateEnum::INIT};
 
     // Session timeout
     uint32_t timeout_;                    // Session timeout (seconds)

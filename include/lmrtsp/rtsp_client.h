@@ -34,7 +34,7 @@ class RtspClientSession;
  * It automatically handles all RTSP protocol details internally.
  */
 // Forward declaration for state machine
-class RtspClientStateMachine;
+class RtspClientSessionState;
 
 class RtspClient : public std::enable_shared_from_this<RtspClient> {
 public:
@@ -126,8 +126,8 @@ private:
     void NotifyListener(std::function<void(IRtspClientListener *)> func);
 
     // Friend classes for state machine to access private methods
-    friend class RtspClientStateMachine;
-    friend class ClientInitState;
+    friend class RtspClientSessionState;
+    friend class ClientInitialState;
     friend class ClientOptionsSentState;
     friend class ClientDescribeSentState;
     friend class ClientSetupSentState;
