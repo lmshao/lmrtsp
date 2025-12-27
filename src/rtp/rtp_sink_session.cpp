@@ -20,6 +20,7 @@
 #include "lmrtsp/rtp_packet.h"
 #include "rtp_depacketizer_h264.h"
 #include "rtp_depacketizer_h265.h"
+#include "rtp_depacketizer_ts.h"
 #include "udp_rtp_transport_adapter.h"
 
 namespace lmshao::lmrtsp {
@@ -136,6 +137,11 @@ bool RtpSinkSession::Initialize(const RtpSinkSessionConfig &config)
         videoDepacketizer_ = std::make_unique<RtpDepacketizerH265>();
         depacketizerListener_ = std::make_shared<DepacketizerListener>(this);
         videoDepacketizer_->SetListener(depacketizerListener_);
+    } else if (config_.video_type == MediaType::MP2T) {
+        videoDepacketizer_ = std::make_unique<RtpDepacketizerTs>();
+        depacketizerListener_ = std::make_shared<DepacketizerListener>(this);
+        videoDepacketizer_->SetListener(depacketizerListener_);
+        LMRTSP_LOGI("Created MPEG-2 TS depacketizer");
     } else {
         LMRTSP_LOGE("Unsupported video type: %d", static_cast<int>(config_.video_type));
         transportAdapter_.reset();
@@ -229,11 +235,17 @@ void RtpSinkSession::HandleRtpData(std::shared_ptr<lmcore::DataBuffer> buffer)
         return;
     }
 
-    // Validate payload type
+    // Log payload type mismatch but continue processing
+    // This allows supporting multiple codecs (H.264, H.265, MPEG-2 TS, AAC, etc.)
     if (rtp_packet->payload_type != config_.video_payload_type) {
-        LMRTSP_LOGW("Received RTP packet with unexpected payload type: %u (expected: %u)", rtp_packet->payload_type,
-                    config_.video_payload_type);
-        return;
+        static bool logged_once = false;
+        if (!logged_once) {
+            LMRTSP_LOGI("Processing RTP packets with payload type: %u (configured: %u)", rtp_packet->payload_type,
+                        config_.video_payload_type);
+            logged_once = true;
+        }
+        // Update expected payload type to actual received type
+        config_.video_payload_type = rtp_packet->payload_type;
     }
 
     // Initialize RTCP context with sender SSRC on first RTP packet

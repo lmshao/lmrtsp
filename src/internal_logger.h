@@ -17,24 +17,18 @@ namespace lmshao::lmrtsp {
 
 /**
  * @brief Get LMRTSP logger with automatic initialization
- *
- * Used internally by LMRTSP modules.
- * Ensures the logger is initialized before first use.
  */
 inline lmcore::Logger &GetLmrtspLoggerWithAutoInit()
 {
     static std::once_flag initFlag;
-    std::call_once(initFlag, []() {
-        lmcore::LoggerRegistry::RegisterModule<LmrtspModuleTag>("LMRTSP");
-        InitLmrtspLogger();
-    });
+    std::call_once(initFlag, []() { lmcore::LoggerRegistry::RegisterModule<LmrtspModuleTag>("LMRTSP"); });
     return lmcore::LoggerRegistry::GetLogger<LmrtspModuleTag>();
 }
 
 // Internal LMRTSP logging macros with auto-initialization and module tagging
 #define LMRTSP_LOGD(fmt, ...)                                                                                          \
     do {                                                                                                               \
-        auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
+        thread_local auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                     \
         if (logger.ShouldLog(lmcore::LogLevel::kDebug)) {                                                              \
             logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmcore::LogLevel::kDebug, __FILE__, __LINE__,     \
                                                                      __FUNCTION__, fmt, ##__VA_ARGS__);                \
@@ -43,7 +37,7 @@ inline lmcore::Logger &GetLmrtspLoggerWithAutoInit()
 
 #define LMRTSP_LOGI(fmt, ...)                                                                                          \
     do {                                                                                                               \
-        auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
+        thread_local auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                     \
         if (logger.ShouldLog(lmcore::LogLevel::kInfo)) {                                                               \
             logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmcore::LogLevel::kInfo, __FILE__, __LINE__,      \
                                                                      __FUNCTION__, fmt, ##__VA_ARGS__);                \
@@ -52,7 +46,7 @@ inline lmcore::Logger &GetLmrtspLoggerWithAutoInit()
 
 #define LMRTSP_LOGW(fmt, ...)                                                                                          \
     do {                                                                                                               \
-        auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
+        thread_local auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                     \
         if (logger.ShouldLog(lmcore::LogLevel::kWarn)) {                                                               \
             logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmcore::LogLevel::kWarn, __FILE__, __LINE__,      \
                                                                      __FUNCTION__, fmt, ##__VA_ARGS__);                \
@@ -61,7 +55,7 @@ inline lmcore::Logger &GetLmrtspLoggerWithAutoInit()
 
 #define LMRTSP_LOGE(fmt, ...)                                                                                          \
     do {                                                                                                               \
-        auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
+        thread_local auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                     \
         if (logger.ShouldLog(lmcore::LogLevel::kError)) {                                                              \
             logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmcore::LogLevel::kError, __FILE__, __LINE__,     \
                                                                      __FUNCTION__, fmt, ##__VA_ARGS__);                \
@@ -70,7 +64,7 @@ inline lmcore::Logger &GetLmrtspLoggerWithAutoInit()
 
 #define LMRTSP_LOGF(fmt, ...)                                                                                          \
     do {                                                                                                               \
-        auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                                  \
+        thread_local auto &logger = lmshao::lmrtsp::GetLmrtspLoggerWithAutoInit();                                     \
         if (logger.ShouldLog(lmcore::LogLevel::kFatal)) {                                                              \
             logger.LogWithModuleTag<lmshao::lmrtsp::LmrtspModuleTag>(lmcore::LogLevel::kFatal, __FILE__, __LINE__,     \
                                                                      __FUNCTION__, fmt, ##__VA_ARGS__);                \

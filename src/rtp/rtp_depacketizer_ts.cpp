@@ -15,16 +15,11 @@ namespace lmshao::lmrtsp {
 void RtpDepacketizerTs::SubmitPacket(const std::shared_ptr<RtpPacket> &packet)
 {
     if (!packet) {
-        LMRTSP_LOGD("SubmitPacket: packet is null");
         return;
     }
 
-    LMRTSP_LOGD("SubmitPacket: timestamp=%u, seq=%u, marker=%d", packet->timestamp, packet->sequence_number,
-                packet->marker);
-
     auto payload = packet->payload;
     if (!payload || payload->Size() == 0) {
-        LMRTSP_LOGD("Empty payload, size: %zu", payload ? payload->Size() : 0);
         return;
     }
 
@@ -38,7 +33,6 @@ void RtpDepacketizerTs::ProcessTsData(const uint8_t *data, size_t size, uint32_t
 {
     auto l = listener_.lock();
     if (!l) {
-        LMRTSP_LOGD("ProcessTsData: no listener");
         return;
     }
 
@@ -49,24 +43,17 @@ void RtpDepacketizerTs::ProcessTsData(const uint8_t *data, size_t size, uint32_t
     }
 
     size_t numTsPackets = size / TS_PACKET_SIZE;
-    LMRTSP_LOGD("Processing %zu TS packets from RTP payload", numTsPackets);
 
     // Validate all TS packets have correct sync byte
-    bool allValid = true;
     for (size_t i = 0; i < numTsPackets; i++) {
         const uint8_t *tsPacket = data + (i * TS_PACKET_SIZE);
         if (!ValidateTsPacket(tsPacket)) {
-            LMRTSP_LOGW("Invalid TS packet at index %zu (sync byte missing)", i);
-            allValid = false;
-            break;
+            LMRTSP_LOGW("Invalid TS packet at index %zu", i);
+            return;
         }
     }
 
-    if (!allValid) {
-        return;
-    }
-
-    // Create MediaFrame with TS data
+    // Pass through all RTP payloads directly
     auto buffer = std::make_shared<lmcore::DataBuffer>(size);
     buffer->Assign(data, size);
 
@@ -75,7 +62,6 @@ void RtpDepacketizerTs::ProcessTsData(const uint8_t *data, size_t size, uint32_t
     frame->media_type = MediaType::MP2T;
     frame->data = buffer;
 
-    LMRTSP_LOGD("Delivering TS frame: size=%zu, ts=%u, packets=%zu", size, timestamp, numTsPackets);
     l->OnFrame(frame);
 }
 
@@ -83,6 +69,12 @@ bool RtpDepacketizerTs::ValidateTsPacket(const uint8_t *packet)
 {
     // Check sync byte (0x47)
     return packet[0] == TS_SYNC_BYTE;
+}
+
+uint16_t RtpDepacketizerTs::ExtractPID(const uint8_t *packet)
+{
+    // PID is in bits 8-20 (bytes 1-2)
+    return ((packet[1] & 0x1F) << 8) | packet[2];
 }
 
 } // namespace lmshao::lmrtsp

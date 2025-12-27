@@ -37,6 +37,7 @@ private:
 
     void ProcessTsData(const uint8_t *data, size_t size, uint32_t timestamp);
     bool ValidateTsPacket(const uint8_t *packet);
+    uint16_t ExtractPID(const uint8_t *packet);
 };
 
 } // namespace lmshao::lmrtsp

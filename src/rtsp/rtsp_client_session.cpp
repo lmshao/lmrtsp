@@ -19,6 +19,7 @@
 #include "internal_logger.h"
 #include "lmrtsp/media_stream_info.h"
 #include "lmrtsp/rtsp_client.h"
+#include "rtsp_client_state.h"
 
 namespace lmshao::lmrtsp {
 
@@ -35,6 +36,9 @@ RtspClientSession::RtspClientSession(const std::string &url, std::weak_ptr<RtspC
 
     // Allocate client ports
     AllocateClientPorts();
+
+    // Initialize state machine to Init state
+    currentState_ = ClientInitState::GetInstance();
 }
 
 RtspClientSession::~RtspClientSession()
@@ -58,7 +62,7 @@ bool RtspClientSession::Initialize()
             mediaPath_ = "/";
         }
 
-        SetState(RtspClientSessionState::INIT);
+        // State is already initialized to INIT in constructor, no need to set again
         return true;
     } catch (const std::exception &e) {
         LMRTSP_LOGE("Exception initializing session: %s", e.what());
@@ -113,7 +117,15 @@ bool RtspClientSession::HandleSetupResponse(const std::string &session_id, const
         LMRTSP_LOGD("Handling SETUP response for session: %s", sessionId_.c_str());
 
         if (!session_id.empty()) {
-            sessionId_ = session_id;
+            // Extract only the session ID part (before semicolon)
+            // Example: "F42364D7;timeout=65" -> "F42364D7"
+            size_t semicolon_pos = session_id.find(';');
+            if (semicolon_pos != std::string::npos) {
+                sessionId_ = session_id.substr(0, semicolon_pos);
+                LMRTSP_LOGD("Parsed Session ID: %s (from: %s)", sessionId_.c_str(), session_id.c_str());
+            } else {
+                sessionId_ = session_id;
+            }
         }
 
         transportInfo_ = transport;
@@ -134,6 +146,12 @@ bool RtspClientSession::HandleSetupResponse(const std::string &session_id, const
         // Setup RTP session
         if (!SetupRtpSession()) {
             LMRTSP_LOGE("Failed to setup RTP session");
+            return false;
+        }
+
+        // Start RTP session immediately to avoid missing initial packets
+        if (!StartRtpSession()) {
+            LMRTSP_LOGE("Failed to start RTP session");
             return false;
         }
 
@@ -393,10 +411,12 @@ bool RtspClientSession::ParseSDP(const std::string &sdp)
         mediaStreamInfo_ = std::make_shared<MediaStreamInfo>();
         mediaStreamInfo_->stream_path = mediaPath_;
 
-        // Parse SDP for H.264 video
+        // Parse SDP for video/audio media
         std::istringstream sdp_stream(sdp);
         std::string line;
-        bool video_found = false;
+        bool media_found = false;
+        std::string current_media_type;
+        uint8_t current_payload_type = 0;
 
         while (std::getline(sdp_stream, line)) {
             // Remove carriage return if present
@@ -406,50 +426,118 @@ bool RtspClientSession::ParseSDP(const std::string &sdp)
                 continue;
 
             if (line[0] == 'v') {
-                // Version line - not stored in MediaStreamInfo
+                // Version line
                 LMRTSP_LOGD("SDP Version: %s", line.substr(2).c_str());
             } else if (line[0] == 's') {
-                // Session name - not stored in MediaStreamInfo
+                // Session name
                 LMRTSP_LOGD("SDP Session: %s", line.substr(2).c_str());
             } else if (line[0] == 'm') {
-                // Media description
-                if (line.find("video") != std::string::npos && line.find("RTP/AVP") != std::string::npos) {
-                    video_found = true;
-                    // Extract payload type
-                    std::istringstream media_line(line);
-                    std::string media_type, transport, temp;
+                // Media description: m=<media> <port> <proto> <fmt>
+                // Example: m=video 0 RTP/AVP 96
+                // Example: m=video 0 RTP/AVP 33  (for MPEG-2 TS)
+                // Example: m=audio 0 RTP/AVP 97
+                if (line.find("RTP/AVP") != std::string::npos) {
+                    // Parse: m=video 0 RTP/AVP 96
+                    std::istringstream media_line(line.substr(2)); // Skip "m="
+                    std::string media_type, transport;
                     uint16_t port;
-                    media_line >> temp >> port >> media_type >> transport;
-                    if (media_line >> temp) {
-                        mediaStreamInfo_->payload_type = static_cast<uint8_t>(std::stoi(temp));
+                    media_line >> media_type >> port >> transport;
+
+                    // Check if it's video or audio
+                    if (media_type == "video" || media_type == "audio") {
+                        current_media_type = media_type;
+
+                        // Extract payload type(s)
+                        std::string pt_str;
+                        if (media_line >> pt_str) {
+                            current_payload_type = static_cast<uint8_t>(std::stoi(pt_str));
+                            mediaStreamInfo_->payload_type = current_payload_type;
+                            media_found = true;
+                            LMRTSP_LOGD("Found media: type=%s, payload_type=%u", current_media_type.c_str(),
+                                        current_payload_type);
+                        }
                     }
                 }
-            } else if (line[0] == 'a' && video_found) {
-                // Attribute lines
-                if (line.find("rtpmap:") != std::string::npos) {
-                    // Parse RTP map
+            } else if (line[0] == 'a') {
+                // Attribute lines (parse regardless of media_found to get control URL)
+                if (line.find("control:") != std::string::npos) {
+                    // Parse control URL
+                    size_t control_pos = line.find("control:");
+                    if (control_pos != std::string::npos) {
+                        controlUrl_ = line.substr(control_pos + 8); // Skip "control:"
+                        // Trim whitespace
+                        controlUrl_.erase(0, controlUrl_.find_first_not_of(" \t\r\n"));
+                        controlUrl_.erase(controlUrl_.find_last_not_of(" \t\r\n") + 1);
+                        LMRTSP_LOGI("Found control URL: %s", controlUrl_.c_str());
+                    }
+                } else if (media_found && line.find("rtpmap:") != std::string::npos) {
+                    // Parse RTP map: a=rtpmap:<payload type> <encoding name>/<clock rate>
+                    // Example: a=rtpmap:96 H264/90000
+                    // Example: a=rtpmap:97 H265/90000
+                    // Example: a=rtpmap:33 MP2T/90000
+                    // Example: a=rtpmap:96 mpeg4-generic/44100/2
                     std::istringstream attr_line(line.substr(2)); // Skip "a="
                     std::string rtpmap_str;
                     attr_line >> rtpmap_str;
-                    if (rtpmap_str.find("96") != std::string::npos) {
-                        std::string codec_info;
-                        attr_line >> codec_info;
-                        if (codec_info.find("H264") != std::string::npos) {
-                            mediaStreamInfo_->codec = "H264";
+
+                    // Extract payload type and encoding
+                    size_t colon_pos = rtpmap_str.find(':');
+                    if (colon_pos != std::string::npos) {
+                        uint8_t pt = static_cast<uint8_t>(std::stoi(rtpmap_str.substr(colon_pos + 1)));
+                        std::string encoding;
+                        attr_line >> encoding;
+
+                        // Extract encoding name (before '/')
+                        size_t slash_pos = encoding.find('/');
+                        if (slash_pos != std::string::npos) {
+                            encoding = encoding.substr(0, slash_pos);
+                        }
+
+                        // Identify codec
+                        if (pt == current_payload_type) {
+                            if (encoding == "H264") {
+                                mediaStreamInfo_->codec = "H264";
+                                LMRTSP_LOGI("Detected H.264 codec (PT=%u)", pt);
+                            } else if (encoding == "H265") {
+                                mediaStreamInfo_->codec = "H265";
+                                LMRTSP_LOGI("Detected H.265 codec (PT=%u)", pt);
+                            } else if (encoding == "MP2T") {
+                                mediaStreamInfo_->codec = "MP2T";
+                                LMRTSP_LOGI("Detected MPEG-2 TS codec (PT=%u)", pt);
+                            } else if (encoding == "mpeg4-generic" || encoding == "MP4A-LATM") {
+                                mediaStreamInfo_->codec = "AAC";
+                                LMRTSP_LOGI("Detected AAC codec (PT=%u)", pt);
+                            } else {
+                                mediaStreamInfo_->codec = encoding;
+                                LMRTSP_LOGI("Detected codec: %s (PT=%u)", encoding.c_str(), pt);
+                            }
                         }
                     }
                 } else if (line.find("fmtp:") != std::string::npos) {
-                    // Parse format parameters
+                    // Parse format parameters (for H.264/H.265 SPS/PPS, AAC config, etc.)
                     mediaStreamInfo_->profile_level = line.substr(line.find("fmtp:") + 5);
+                    LMRTSP_LOGD("Format parameters: %s", mediaStreamInfo_->profile_level.c_str());
                 }
             }
         }
 
-        if (video_found) {
-            LMRTSP_LOGI("Successfully parsed SDP for H.264 video stream");
+        if (media_found) {
+            if (mediaStreamInfo_->codec.empty()) {
+                // Try to infer codec from payload type
+                if (current_payload_type == 33) {
+                    mediaStreamInfo_->codec = "MP2T";
+                    LMRTSP_LOGI("Inferred MPEG-2 TS from payload type 33");
+                } else {
+                    mediaStreamInfo_->codec = "Unknown";
+                    LMRTSP_LOGW("Could not determine codec, using Unknown");
+                }
+            }
+
+            LMRTSP_LOGI("Successfully parsed SDP: codec=%s, payload_type=%u", mediaStreamInfo_->codec.c_str(),
+                        mediaStreamInfo_->payload_type);
             return true;
         } else {
-            LMRTSP_LOGE("No video stream found in SDP");
+            LMRTSP_LOGE("No media stream found in SDP");
             return false;
         }
     } catch (const std::exception &e) {
@@ -470,9 +558,24 @@ bool RtspClientSession::SetupRtpSession()
         RtpSinkSessionConfig config;
         config.session_id = sessionId_;
         config.expected_ssrc = mediaStreamInfo_->ssrc;
-        config.video_type = MediaType::H264;
+
+        // Determine video type from codec
+        if (mediaStreamInfo_->codec == "MP2T") {
+            config.video_type = MediaType::MP2T;
+        } else if (mediaStreamInfo_->codec == "H265" || mediaStreamInfo_->codec == "HEVC") {
+            config.video_type = MediaType::H265;
+        } else if (mediaStreamInfo_->codec == "AAC") {
+            config.video_type = MediaType::AAC;
+        } else {
+            // Default to H264
+            config.video_type = MediaType::H264;
+        }
+
         config.video_payload_type = mediaStreamInfo_->payload_type;
         config.transport = transportConfig_;
+
+        LMRTSP_LOGI("Creating RTP sink session: codec=%s, video_type=%d, payload_type=%u",
+                    mediaStreamInfo_->codec.c_str(), static_cast<int>(config.video_type), config.video_payload_type);
 
         // Create RTP session
         rtpSession_ = std::make_shared<RtpSinkSession>();
@@ -508,7 +611,9 @@ std::string RtspClientSession::AllocateClientPorts()
 
         LMRTSP_LOGI("Allocated client ports: RTP=%u, RTCP=%u", clientRtpPort_, clientRtcpPort_);
 
-        return GenerateTransportHeader();
+        // Generate and save transport info for SETUP request
+        transportInfo_ = GenerateTransportHeader();
+        return transportInfo_;
     } catch (const std::exception &e) {
         LMRTSP_LOGE("Exception allocating client ports: %s", e.what());
         return "";
@@ -520,6 +625,22 @@ std::string RtspClientSession::GenerateTransportHeader()
     std::ostringstream transport;
     transport << "RTP/AVP;unicast;client_port=" << clientRtpPort_ << "-" << clientRtcpPort_;
     return transport.str();
+}
+
+void RtspClientSession::ChangeState(std::shared_ptr<RtspClientStateMachine> new_state)
+{
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    if (currentState_) {
+        LMRTSP_LOGD("Session %s state machine: %s -> %s", sessionId_.c_str(), currentState_->GetName().c_str(),
+                    new_state ? new_state->GetName().c_str() : "null");
+    }
+    currentState_ = new_state;
+}
+
+std::shared_ptr<RtspClientStateMachine> RtspClientSession::GetCurrentState() const
+{
+    std::lock_guard<std::mutex> lock(sessionMutex_);
+    return currentState_;
 }
 
 } // namespace lmshao::lmrtsp

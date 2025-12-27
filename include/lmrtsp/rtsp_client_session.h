@@ -23,6 +23,7 @@ namespace lmshao::lmrtsp {
 
 class RtspClient;
 class RtpSinkSession;
+class RtspClientStateMachine;
 
 /**
  * @brief RTSP Client Session state
@@ -63,11 +64,16 @@ public:
     std::string GetStateString() const;
     static std::string GetStateString(RtspClientSessionState state);
 
+    // State machine management
+    void ChangeState(std::shared_ptr<RtspClientStateMachine> new_state);
+    std::shared_ptr<RtspClientStateMachine> GetCurrentState() const;
+
     // Session information
     std::string GetSessionId() const { return sessionId_; }
     std::string GetUrl() const { return url_; }
     std::string GetTransportInfo() const { return transportInfo_; }
     std::string GetSdpDescription() const { return sdpDescription_; }
+    std::string GetControlUrl() const { return controlUrl_; } // Get control URL from SDP
 
     // Media information
     std::shared_ptr<MediaStreamInfo> GetMediaStreamInfo() const;
@@ -103,10 +109,14 @@ private:
     std::weak_ptr<RtspClient> client_;
     std::atomic<RtspClientSessionState> state_{RtspClientSessionState::INIT};
 
+    // State machine
+    std::shared_ptr<RtspClientStateMachine> currentState_;
+
     // Media information
     std::string sdpDescription_;
     std::shared_ptr<MediaStreamInfo> mediaStreamInfo_;
     std::string mediaPath_;
+    std::string controlUrl_; // Control URL from SDP (e.g., "track1" or "*")
 
     // Transport information
     std::string transportInfo_;

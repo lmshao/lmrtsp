@@ -30,32 +30,23 @@ class RtspClientSession;
 /**
  * @brief RTSP Client class for connecting to RTSP servers
  *
- * This class manages connections to RTSP servers and handles the RTSP protocol.
- * It supports basic RTSP methods: OPTIONS, DESCRIBE, SETUP, PLAY, PAUSE, TEARDOWN.
+ * This class provides a high-level interface for RTSP streaming, similar to RtspServer.
+ * It automatically handles all RTSP protocol details internally.
  */
+// Forward declaration for state machine
+class RtspClientStateMachine;
+
 class RtspClient : public std::enable_shared_from_this<RtspClient> {
 public:
     RtspClient();
     explicit RtspClient(std::shared_ptr<IRtspClientListener> listener);
     ~RtspClient();
 
-    // Connection management
-    bool Connect(const std::string &url, int timeout_ms = 5000);
-    bool Disconnect();
-    bool IsConnected() const;
-
-    // RTSP methods
-    bool Options(const std::string &url);
-    bool Describe(const std::string &url);
-    bool Setup(const std::string &url, const std::string &transport);
-    bool Play(const std::string &url);
-    bool Pause(const std::string &url);
-    bool Teardown(const std::string &url);
-
-    // Session management
-    std::shared_ptr<RtspClientSession> CreateSession(const std::string &url);
-    void RemoveSession(const std::string &session_id);
-    std::shared_ptr<RtspClientSession> GetSession(const std::string &session_id);
+    // High-level interface (symmetric with RtspServer)
+    bool Init(const std::string &url); // Initialize with RTSP URL
+    bool Start();                      // Start streaming (auto-completes RTSP handshake)
+    bool Stop();                       // Stop streaming (auto-completes cleanup)
+    bool IsPlaying() const;            // Check if currently playing
 
     // Listener management
     void SetListener(std::shared_ptr<IRtspClientListener> listener);
@@ -71,19 +62,45 @@ public:
     // Statistics
     std::string GetServerIP() const;
     uint16_t GetServerPort() const;
-    size_t GetSessionCount() const;
+    std::string GetUrl() const; // Get initialized URL
 
 private:
+    // Forward declaration for private nested class
+    class TcpClientListener;
+
+    // RTSP protocol methods (internal use only)
+    bool Connect(const std::string &url, int timeout_ms = 5000);
+    bool Disconnect();
+    bool IsConnected() const;
+    bool SendOptionsRequest(const std::string &url);
+    bool SendDescribeRequest(const std::string &url);
+    bool SendSetupRequest(const std::string &url, const std::string &transport);
+    bool SendPlayRequest(const std::string &url, const std::string &session_id = "");
+    bool SendPauseRequest(const std::string &url, const std::string &session_id = "");
+    bool SendTeardownRequest(const std::string &url, const std::string &session_id = "");
+
+    // Session management (internal use only)
+    std::shared_ptr<RtspClientSession> CreateSession(const std::string &url);
+    void RemoveSession(const std::string &session_id);
+    std::shared_ptr<RtspClientSession> GetSession(const std::string &session_id);
+    size_t GetSessionCount() const;
+
     // Network connection
     std::shared_ptr<lmnet::TcpClient> tcpClient_;
+    std::shared_ptr<TcpClientListener> tcpListener_; // Keep listener alive
     std::string serverIP_;
     uint16_t serverPort_;
     std::string baseUrl_;
+    std::string rtspUrl_; // Initialized URL
     std::atomic<bool> connected_{false};
+    std::atomic<bool> playing_{false};            // Playing state
+    std::atomic<bool> handshake_complete_{false}; // Handshake completion flag
+    std::atomic<bool> handshake_failed_{false};   // Handshake failure flag
 
     // Session management
     mutable std::mutex sessionsMutex_;
     std::unordered_map<std::string, std::shared_ptr<RtspClientSession>> sessions_;
+    std::shared_ptr<RtspClientSession> currentSession_; // Current active session
 
     // Listener interface
     mutable std::mutex listenerMutex_;
@@ -102,14 +119,20 @@ private:
     bool SendRequest(const RtspRequest &request);
     void HandleResponse(const RtspResponse &response);
     void ParseUrl(const std::string &url, std::string &host, uint16_t &port, std::string &path);
+    bool PerformRTSPHandshake(); // Internal RTSP handshake
 
     // Error handling
     void NotifyError(int error_code, const std::string &error_message);
     void NotifyListener(std::function<void(IRtspClientListener *)> func);
 
-    // TCP client listener
-    class TcpClientListener;
-    std::shared_ptr<TcpClientListener> tcpListener_;
+    // Friend classes for state machine to access private methods
+    friend class RtspClientStateMachine;
+    friend class ClientInitState;
+    friend class ClientOptionsSentState;
+    friend class ClientDescribeSentState;
+    friend class ClientSetupSentState;
+    friend class ClientPlaySentState;
+    friend class ClientPlayingState;
 };
 
 } // namespace lmshao::lmrtsp

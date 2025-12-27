@@ -262,37 +262,56 @@ bool UdpRtpTransportAdapter::IsActive() const
 bool UdpRtpTransportAdapter::InitializeUdpServers()
 {
     bool rtcp_enabled = IsRtcpEnabled();
-    if (serverRtpPort_ == 0 || (rtcp_enabled && serverRtcpPort_ == 0)) {
+
+    // In SINK mode, listen on client ports (where we receive data)
+    // In SOURCE mode, listen on server ports (where we send data from)
+    uint16_t listen_rtp_port = (config_.mode == TransportConfig::Mode::SINK) ? clientRtpPort_ : serverRtpPort_;
+    uint16_t listen_rtcp_port = (config_.mode == TransportConfig::Mode::SINK) ? clientRtcpPort_ : serverRtcpPort_;
+
+    if (listen_rtp_port == 0 || (rtcp_enabled && listen_rtcp_port == 0)) {
         uint16_t allocated_port = FindAvailablePortPair();
         if (allocated_port == 0) {
-            LMRTSP_LOGE("Failed to allocate server port pair");
+            LMRTSP_LOGE("Failed to allocate listen port pair");
             return false;
         }
-        serverRtpPort_ = allocated_port;
+        listen_rtp_port = allocated_port;
         if (rtcp_enabled) {
-            serverRtcpPort_ = allocated_port + 1;
+            listen_rtcp_port = allocated_port + 1;
         }
-        LMRTSP_LOGI("Allocated server ports: RTP=%u, RTCP=%u", serverRtpPort_, rtcp_enabled ? serverRtcpPort_ : 0);
+
+        // Update the appropriate port variables based on mode
+        if (config_.mode == TransportConfig::Mode::SINK) {
+            clientRtpPort_ = listen_rtp_port;
+            if (rtcp_enabled) {
+                clientRtcpPort_ = listen_rtcp_port;
+            }
+        } else {
+            serverRtpPort_ = listen_rtp_port;
+            if (rtcp_enabled) {
+                serverRtcpPort_ = listen_rtcp_port;
+            }
+        }
+        LMRTSP_LOGI("Allocated listen ports: RTP=%u, RTCP=%u", listen_rtp_port, rtcp_enabled ? listen_rtcp_port : 0);
     }
 
     // Create RTP server (always required)
-    rtp_server_ = lmnet::UdpServer::Create(serverRtpPort_);
+    rtp_server_ = lmnet::UdpServer::Create(listen_rtp_port);
     if (!rtp_server_) {
-        LMRTSP_LOGE("Failed to create RTP server on port %u", serverRtpPort_);
+        LMRTSP_LOGE("Failed to create RTP server on port %u", listen_rtp_port);
         return false;
     }
     rtp_server_listener_ = std::make_shared<UdpServerReceiveListener>(this, ListenerMode::RTP);
     rtp_server_->SetListener(rtp_server_listener_);
     if (!(rtp_server_->Init() && rtp_server_->Start())) {
-        LMRTSP_LOGE("Failed to start RTP server on port %u", serverRtpPort_);
+        LMRTSP_LOGE("Failed to start RTP server on port %u", listen_rtp_port);
         return false;
     }
 
     // Create RTCP server only if RTCP is enabled
     if (rtcp_enabled) {
-        rtcp_server_ = lmnet::UdpServer::Create(serverRtcpPort_);
+        rtcp_server_ = lmnet::UdpServer::Create(listen_rtcp_port);
         if (!rtcp_server_) {
-            LMRTSP_LOGE("Failed to create RTCP server on port %u", serverRtcpPort_);
+            LMRTSP_LOGE("Failed to create RTCP server on port %u", listen_rtcp_port);
             rtp_server_->Stop();
             rtp_server_.reset();
             return false;
@@ -300,16 +319,18 @@ bool UdpRtpTransportAdapter::InitializeUdpServers()
         rtcp_server_listener_ = std::make_shared<UdpServerReceiveListener>(this, ListenerMode::RTCP);
         rtcp_server_->SetListener(rtcp_server_listener_);
         if (!(rtcp_server_->Init() && rtcp_server_->Start())) {
-            LMRTSP_LOGE("Failed to start RTCP server on port %u", serverRtcpPort_);
+            LMRTSP_LOGE("Failed to start RTCP server on port %u", listen_rtcp_port);
             if (rtp_server_) {
                 rtp_server_->Stop();
                 rtp_server_.reset();
             }
             return false;
         }
-        LMRTSP_LOGI("UDP servers initialized: RTP port %u, RTCP port %u", serverRtpPort_, serverRtcpPort_);
+        LMRTSP_LOGI("UDP servers initialized: RTP port %u, RTCP port %u (mode: %s)", listen_rtp_port, listen_rtcp_port,
+                    config_.mode == TransportConfig::Mode::SINK ? "SINK" : "SOURCE");
     } else {
-        LMRTSP_LOGI("UDP servers initialized: RTP port %u (RTCP disabled)", serverRtpPort_);
+        LMRTSP_LOGI("UDP servers initialized: RTP port %u (RTCP disabled, mode: %s)", listen_rtp_port,
+                    config_.mode == TransportConfig::Mode::SINK ? "SINK" : "SOURCE");
     }
 
     return true;
